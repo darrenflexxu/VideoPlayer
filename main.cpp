@@ -1,6 +1,7 @@
 #include <QtGui>
 #include <QtWidgets>
 #include <QtQml>
+#include <QTranslator>
 
 #include "MainWindow.h"
 #include "WindowFramelessHelper.h"
@@ -8,6 +9,12 @@
 int main(int argc, char *argv[]) {
     QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
     QApplication a(argc, argv);
+
+    QTranslator translator;
+
+    if (translator.load(":/translate/lang_zh.qm")) {
+        a.installTranslator(&translator);
+    }
 #if 0
     qmlRegisterType<WindowFramelessHelper>("QtShark.Window", 1, 0, "FramelessHelper");
     QQmlApplicationEngine engine;

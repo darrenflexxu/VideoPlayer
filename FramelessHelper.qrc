@@ -17,5 +17,6 @@
         <file>res/maximize-button1.png</file>
         <file>res/maximize-button2.png</file>
         <file>res/minimize-button1.png</file>
+		<file>translate/lang_zh.qm</file>
     </qresource>
 </RCC>
