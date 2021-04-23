@@ -1,6 +1,6 @@
-cmake_minimum_required(VERSION 3.8)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.8)
 
-project(VideoProc)
+PROJECT(VideoProc)
 
 SET(CMAKE_PREFIX_PATH C:/Qt/Qt5.10.0/5.10.0/msvc2015_64/lib/cmake)
 
@@ -12,12 +12,30 @@ FIND_PACKAGE(Qt5Widgets REQUIRED)
 FIND_PACKAGE(Qt5Gui REQUIRED)
 FIND_PACKAGE(Qt5Core REQUIRED)
 FIND_PACKAGE(Qt5OpenGL REQUIRED)
+FIND_PACKAGE(Qt5LinguistTools REQUIRED)
+FIND_PACKAGE(Qt5Qml REQUIRED)
+FIND_PACKAGE(Qt5Quick REQUIRED)
+FIND_PACKAGE(Qt5WinExtras REQUIRED)
 
-file(GLOB_RECURSE SRC "*.cpp")
-file(GLOB_RECURSE HEADER "*.h")
-file(GLOB_RECURSE UI "*.ui")
-file(GLOB_RECURSE QRC "*.qrc")
 
-add_executable(${PROJECT_NAME} ${SRC} ${HEADER} ${UI} ${QRC})
+include_directories("${PROJECT_SOURCE_DIR}/FramelessHelper")
 
-TARGET_LINK_LIBRARIES(${PROJECT_NAME} Qt5::Widgets Qt5::Core Qt5::Gui Qt5::OpenGL OpenGL32 Glu32)
+add_subdirectory(FramelessHelper)
+
+FILE(GLOB SRC "${PROJECT_SOURCE_DIR}/*.cpp")
+FILE(GLOB HEADER "${PROJECT_SOURCE_DIR}/*.h")
+FILE(GLOB UI "${PROJECT_SOURCE_DIR}/*.ui")
+FILE(GLOB QRC "${PROJECT_SOURCE_DIR}/*.qrc")
+file(GLOB TS_FILES "${PROJECT_SOURCE_DIR}/*.ts")
+
+QT5_CREATE_TRANSLATION(QM_FILES
+    ${PROJECT_SOURCE_DIR}
+    ${TS_FILES}
+    OPTIONS -source-language zh_CN -noobsolete)
+
+SOURCE_GROUP(UI FILES ${UI})
+SOURCE_GROUP(Resouces FILES ${QRC})
+
+ADD_EXECUTABLE(${PROJECT_NAME} ${SRC} ${HEADER} ${UI} ${QRC})
+
+TARGET_LINK_LIBRARIES(${PROJECT_NAME} Qt5::Widgets Qt5::Core Qt5::Gui Qt5::Qml Qt5::Quick Qt5::OpenGL Qt5::WinExtras OpenGL32 Glu32 FramelessHelper)
