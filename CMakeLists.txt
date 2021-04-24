@@ -2,6 +2,8 @@ CMAKE_MINIMUM_REQUIRED(VERSION 3.8)
 
 PROJECT(VideoProc)
 
+set(ThirdParty "${PROJECT_SOURCE_DIR}/thirdparty")
+
 SET(CMAKE_PREFIX_PATH C:/Qt/Qt5.10.0/5.10.0/msvc2015_64/lib/cmake)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
@@ -18,12 +20,16 @@ FIND_PACKAGE(Qt5Qml REQUIRED)
 FIND_PACKAGE(Qt5Quick REQUIRED)
 FIND_PACKAGE(Qt5WinExtras REQUIRED)
 
-include_directories("${PROJECT_SOURCE_DIR}/FramelessHelper")
-
-set(ThirdParty "${PROJECT_SOURCE_DIR}/thirdparty")
+include_directories("${PROJECT_SOURCE_DIR}/FramelessHelper"
+"${PROJECT_SOURCE_DIR}/VideoPlayer"
+"${PROJECT_SOURCE_DIR}/Form"
+"${ThirdParty}/ffmpeg/include"
+"${ThirdParty}/SDL2/include"
+)
 
 add_subdirectory(FramelessHelper)
 add_subdirectory(VideoPlayer)
+add_subdirectory(Form)
 
 FILE(GLOB SRC "${PROJECT_SOURCE_DIR}/*.cpp")
 FILE(GLOB HEADER "${PROJECT_SOURCE_DIR}/*.h")
@@ -62,4 +68,4 @@ endforeach()
 
 ADD_EXECUTABLE(${PROJECT_NAME} ${SRC} ${HEADER} ${UI} ${QRC} ${QM_FILES}) 
 
-TARGET_LINK_LIBRARIES(${PROJECT_NAME} Qt5::Widgets Qt5::Core Qt5::Gui Qt5::Qml Qt5::Quick Qt5::OpenGL Qt5::WinExtras OpenGL32 Glu32 FramelessHelper VideoPlayer)
+TARGET_LINK_LIBRARIES(${PROJECT_NAME} Qt5::Widgets Qt5::Core Qt5::Gui Qt5::Qml Qt5::Quick Qt5::OpenGL Qt5::WinExtras OpenGL32 Glu32 FramelessHelper VideoPlayer Form)
