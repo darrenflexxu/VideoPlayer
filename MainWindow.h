@@ -7,8 +7,7 @@ namespace Ui {
 class MainWindow;
 }
 
-class MainWindow : public QWidget
-{
+class MainWindow : public QWidget {
     Q_OBJECT
 
 public:
@@ -18,6 +17,7 @@ public:
 protected:
     void updateMaximizeButton(bool maximized);
     void paintEvent(QPaintEvent *event) final;
+
 private:
     Ui::MainWindow *ui;
 

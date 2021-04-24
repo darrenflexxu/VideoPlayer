@@ -1,17 +1,14 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
-
 #include <QTimer>
 #include <QWindow>
 #include <QScreen>
 #include <QPainter>
-
 #include "FramelessHelper.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QWidget(parent, Qt::FramelessWindowHint)
-    , ui(new Ui::MainWindow())
-{
+    , ui(new Ui::MainWindow()) {
     ui->setupUi(this);
 
     setWindowTitle("Qt Widgets Inside");
@@ -40,13 +37,11 @@ MainWindow::MainWindow(QWidget *parent)
     QTimer::singleShot(100, this, &MainWindow::syncPosition);
 }
 
-MainWindow::~MainWindow()
-{
+MainWindow::~MainWindow() {
     delete ui;
 }
 
-void MainWindow::updateMaximizeButton(bool maximized)
-{
+void MainWindow::updateMaximizeButton(bool maximized) {
     if (maximized) {
         ui->maximizeButton->setIcon(QIcon(QStringLiteral(":/res/maximize-button2.png")));
         ui->maximizeButton->setToolTip(tr("Restore"));
@@ -56,26 +51,15 @@ void MainWindow::updateMaximizeButton(bool maximized)
     }
 }
 
-void MainWindow::paintEvent(QPaintEvent *event)
-{
+void MainWindow::paintEvent(QPaintEvent *event) {
     Q_UNUSED(event);
-
     QPainter painter(this);
     QImage backgroundImage(QStringLiteral(":/res/background.png"));
     painter.drawImage(contentsRect(), backgroundImage);
-
-    /*
-    painter.setPen(Qt::red);
-    painter.drawRect(rect().adjusted(0, 0, -1, -1));
-    painter.setPen(Qt::blue);
-    painter.drawRect(rect().adjusted(4, 4, -5, -5));
-    */
 }
 
-void MainWindow::syncPosition()
-{
+void MainWindow::syncPosition() {
     QWindow *window = windowHandle();
     QScreen *screen = window->screen();
-
     window->setX(screen->availableGeometry().width() / 2 + 10);
 }

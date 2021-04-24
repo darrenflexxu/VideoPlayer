@@ -17,6 +17,24 @@
         <file>res/maximize-button1.png</file>
         <file>res/maximize-button2.png</file>
         <file>res/minimize-button1.png</file>
-		<file>translate/lang_zh.qm</file>
+		<file>res/open_focus.png</file>
+        <file>res/open_normal.png</file>
+        <file>res/pause_focus.png</file>
+        <file>res/pause_normal.png</file>
+        <file>res/pause1_normal.png</file>
+        <file>res/start_focus.png</file>
+        <file>res/start_normal.png</file>
+        <file>res/start1_normal.png</file>
+        <file>res/close_normal.png</file>
+        <file>res/showmaxsizebtn.png</file>
+        <file>res/showminisizebtn.png</file>
+        <file>res/shownormalbtn.png</file>
+        <file>res/stop_focus.png</file>
+        <file>res/stop_normal.png</file>
+        <file>res/stop1_normal.png</file>
+        <file>res/volume_mute.png</file>
+        <file>res/volume_normal.png</file>
+        <file>res/audio.png</file>
+		<file>translate/lang_zh.qm</file>	
     </qresource>
 </RCC>
