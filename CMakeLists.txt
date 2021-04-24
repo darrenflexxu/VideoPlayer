@@ -20,7 +20,10 @@ FIND_PACKAGE(Qt5WinExtras REQUIRED)
 
 include_directories("${PROJECT_SOURCE_DIR}/FramelessHelper")
 
+set(ThirdParty "${PROJECT_SOURCE_DIR}/thirdparty")
+
 add_subdirectory(FramelessHelper)
+add_subdirectory(VideoPlayer)
 
 FILE(GLOB SRC "${PROJECT_SOURCE_DIR}/*.cpp")
 FILE(GLOB HEADER "${PROJECT_SOURCE_DIR}/*.h")
@@ -59,4 +62,4 @@ endforeach()
 
 ADD_EXECUTABLE(${PROJECT_NAME} ${SRC} ${HEADER} ${UI} ${QRC} ${QM_FILES}) 
 
-TARGET_LINK_LIBRARIES(${PROJECT_NAME} Qt5::Widgets Qt5::Core Qt5::Gui Qt5::Qml Qt5::Quick Qt5::OpenGL Qt5::WinExtras OpenGL32 Glu32 FramelessHelper)
+TARGET_LINK_LIBRARIES(${PROJECT_NAME} Qt5::Widgets Qt5::Core Qt5::Gui Qt5::Qml Qt5::Quick Qt5::OpenGL Qt5::WinExtras OpenGL32 Glu32 FramelessHelper VideoPlayer)

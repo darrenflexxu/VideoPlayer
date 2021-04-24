@@ -2,7 +2,7 @@
 #define VIDEOPLAYEREVENTHANDLE_H
 
 #include "types.h"
-#include "VideoPlayer/Video/VideoFrame.h"
+#include "Video/VideoFrame.h"
 
 class VideoPlayerCallBack
 {

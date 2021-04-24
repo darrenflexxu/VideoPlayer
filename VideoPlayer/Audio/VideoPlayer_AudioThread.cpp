@@ -4,7 +4,7 @@
  * http://blog.yundiantech.com/
  */
 
-#include "VideoPlayer/VideoPlayer.h"
+#include "VideoPlayer.h"
 
 #include "PcmVolumeControl.h"
 
