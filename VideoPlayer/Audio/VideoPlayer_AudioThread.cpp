@@ -1,9 +1,3 @@
-/**
- * Ò¶º£»Ô
- * QQÈº121376426
- * http://blog.yundiantech.com/
- */
-
 #include "VideoPlayer.h"
 
 #include "PcmVolumeControl.h"

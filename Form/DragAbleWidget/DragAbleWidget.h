@@ -1,9 +1,3 @@
-/**
- * Ò¶º£»Ô
- * QQÈº121376426
- * http://blog.yundiantech.com/
- */
-
 #ifndef DRAGABLEWIDGET_H
 #define DRAGABLEWIDGET_H
 

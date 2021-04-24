@@ -1,10 +1,4 @@
-﻿/**
- * 叶海辉
- * QQ群121376426
- * http://blog.yundiantech.com/
- */
-
-#include "MainWindow.h"
+﻿#include "MainWindow.h"
 #include "ui_MainWindow.h"
 
 #include <QPainter>

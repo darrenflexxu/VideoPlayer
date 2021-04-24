@@ -281,7 +281,7 @@ font-family:&quot;微软雅黑&quot;;</string>
                      </property>
                      <property name="icon">
                       <iconset resource="../resources/resources.qrc">
-                       <normaloff>:/image/showminisizebtn.png</normaloff>:/image/showminisizebtn.png</iconset>
+                       <normaloff>:/res/showminisizebtn.png</normaloff>:/res/showminisizebtn.png</iconset>
                      </property>
                      <property name="iconSize">
                       <size>
@@ -325,7 +325,7 @@ font-family:&quot;微软雅黑&quot;;</string>
                      </property>
                      <property name="icon">
                       <iconset resource="../resources/resources.qrc">
-                       <normaloff>:/image/showmaxsizebtn.png</normaloff>:/image/showmaxsizebtn.png</iconset>
+                       <normaloff>:/res/showmaxsizebtn.png</normaloff>:/res/showmaxsizebtn.png</iconset>
                      </property>
                      <property name="iconSize">
                       <size>
@@ -360,7 +360,7 @@ font-family:&quot;微软雅黑&quot;;</string>
                   </property>
                   <property name="icon">
                    <iconset resource="../resources/resources.qrc">
-                    <normaloff>:/image/close_normal.png</normaloff>:/image/close_normal.png</iconset>
+                    <normaloff>:/res/close_normal.png</normaloff>:/res/close_normal.png</iconset>
                   </property>
                   <property name="iconSize">
                    <size>

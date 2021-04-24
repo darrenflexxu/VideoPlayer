@@ -139,7 +139,7 @@
         <item>
          <widget class="QLabel" name="label">
           <property name="styleSheet">
-           <string notr="true">image: url(:/image/audio.png);</string>
+           <string notr="true">image: url(:/res/audio.png);</string>
           </property>
           <property name="text">
            <string/>
@@ -544,7 +544,7 @@ font-size:16px;
            </property>
            <property name="styleSheet">
             <string notr="true">QPushButton{ 
-image: url(:/image/volume_normal.png);
+image: url(:/res/volume_normal.png);
 border-radius:0px; 
 padding:5px;
 }  
@@ -554,10 +554,10 @@ border-radius:0px;
 padding:3px;
 } 
 QPushButton:!checked{ 
-image: url(:/image/volume_normal.png);
+image: url(:/res/volume_normal.png);
 } 
 QPushButton:checked{ 
-image: url(:/image/volume_mute.png);
+image: url(:/res/volume_mute.png);
 } 
 
 </string>

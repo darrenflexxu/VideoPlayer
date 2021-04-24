@@ -1,9 +1,3 @@
-/**
- * 叶海辉
- * QQ群121376426
- * http://blog.yundiantech.com/
- */
-
 #include "DragAbleWidget.h"
 #include "ui_DragAbleWidget.h"
 
@@ -285,7 +279,7 @@ void DragAbleWidget::doShowFullScreen()
 
     showBorderRadius(false);
 
-    ui->btnMenu_Max->setIcon(QIcon(":/image/shownormalbtn.png"));
+    ui->btnMenu_Max->setIcon(QIcon(":/res/shownormalbtn.png"));
 
     ui->widget_title->hide(); //隐藏标题栏
 //    ui->verticalLayout_titleWidget_Back->removeWidget(ui->widget_title);
@@ -315,7 +309,7 @@ void DragAbleWidget::doShowNormal()
     }
 
 
-    ui->btnMenu_Max->setIcon(QIcon(":/image/showmaxsizebtn.png"));
+    ui->btnMenu_Max->setIcon(QIcon(":/res/showmaxsizebtn.png"));
 
     QTimer::singleShot(20,this,[&]()
     {

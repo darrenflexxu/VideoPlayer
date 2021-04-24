@@ -1,10 +1,4 @@
-﻿/**
- * 叶海辉
- * QQ群121376426
- * http://blog.yundiantech.com/
- */
-
-#include "VideoPlayer.h"
+﻿#include "VideoPlayer.h"
 
 #include "Audio/PcmVolumeControl.h"
 

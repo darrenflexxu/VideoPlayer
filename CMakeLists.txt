@@ -66,6 +66,16 @@ foreach(_ts_file ${TS_FILES})
     )
 endforeach()
 
+link_directories("${ThirdParty}/ffmpeg/lib"
+"${ThirdParty}/SDL2/lib"
+)
+
 ADD_EXECUTABLE(${PROJECT_NAME} ${SRC} ${HEADER} ${UI} ${QRC} ${QM_FILES}) 
 
-TARGET_LINK_LIBRARIES(${PROJECT_NAME} Qt5::Widgets Qt5::Core Qt5::Gui Qt5::Qml Qt5::Quick Qt5::OpenGL Qt5::WinExtras OpenGL32 Glu32 FramelessHelper VideoPlayer Form)
+TARGET_LINK_LIBRARIES(${PROJECT_NAME} Qt5::Widgets Qt5::Core Qt5::Gui Qt5::Qml Qt5::Quick Qt5::OpenGL Qt5::WinExtras OpenGL32 Glu32 FramelessHelper VideoPlayer Form avcodec avdevice avfilter avformat avutil postproc swresample swscale SDL2)
+
+add_custom_command(
+        TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+                ${ThirdParty}/bin/
+                \$\(OutDir\))
