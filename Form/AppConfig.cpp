@@ -43,14 +43,14 @@ void Sleep(long mSeconds)
 
 QString AppConfig::APPID = "{a1db97ad-b8ed-11e9-a297-0235d2b38928}";
 int AppConfig::VERSION = 1;
-QString AppConfig::VERSION_NAME = "2.1.4";
+QString AppConfig::VERSION_NAME = "1.0.0";
 
 MainWindow *AppConfig::gMainWindow = NULL;
 QRect AppConfig::gMainWindowRect;
 
 QRect AppConfig::gScreenRect;
 
-bool AppConfig::gVideoKeepAspectRatio = false; //按比例显示
+bool AppConfig::gVideoKeepAspectRatio = true; //按比例显示
 bool AppConfig::gVideoHardDecoder = false; //硬解解码
 QString AppConfig::gVideoFilePath;
 

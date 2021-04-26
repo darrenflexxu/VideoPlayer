@@ -50,11 +50,11 @@ MainWindow::MainWindow(QWidget *parent) :
     mPlayer->setVideoPlayerCallBack(this);
 
     mTimer = new QTimer; //定时器-获取当前视频时间
-    connect(mTimer, &QTimer::timeout, this, &MainWindow::slotTimerTimeOut);
+    connect(mTimer, SIGNAL(timeout()), this, SLOT(slotTimerTimeOut()));
     mTimer->setInterval(500);
 
     mTimer_CheckControlWidget = new QTimer; //用于控制控制界面的出现和隐藏
-    connect(mTimer_CheckControlWidget, &QTimer::timeout, this, &MainWindow::slotTimerTimeOut);
+    connect(mTimer_CheckControlWidget, SIGNAL(timeout()), this, SLOT(slotTimerTimeOut()));
     mTimer_CheckControlWidget->setInterval(1500);
 
     mAnimation_ControlWidget  = new QPropertyAnimation(ui->widget_controller, "geometry");
@@ -63,7 +63,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->pushButton_pause->hide();
 
     resize(1024,768);
-    setTitle(QStringLiteral("我的播放器-V%1").arg(AppConfig::VERSION_NAME));
+    setTitle(QStringLiteral("VideoProc-V%1").arg(AppConfig::VERSION_NAME));
 
     mVolume = mPlayer->getVolume();
 
@@ -347,14 +347,14 @@ bool MainWindow::eventFilter(QObject *target, QEvent *event)
     }
     else if(target == ui->page_video)
     {
-        if(event->type() == QEvent::MouseMove)
+        if(event->type() == QEvent::MouseButtonPress)
         {
-            if (!mTimer_CheckControlWidget->isActive())
-            {
+            if (!mTimer_CheckControlWidget->isActive()) {
                 showOutControlWidget();
             }
 
             mTimer_CheckControlWidget->stop();
+            
             mTimer_CheckControlWidget->start();
         }
         else if(event->type() == QEvent::Enter)

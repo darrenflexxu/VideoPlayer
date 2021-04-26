@@ -732,12 +732,8 @@ void VideoPlayer::doDisplayVideo(const uint8_t *yuv420Buffer, const int &width, 
     if (mVideoPlayerCallBack != nullptr)
     {
         VideoFramePtr videoFrame = std::make_shared<VideoFrame>();
-
-        VideoFrame * ptr = videoFrame.get();
-
-        ptr->initBuffer(width, height);
-        ptr->setYUVbuf(yuv420Buffer);
-
+        videoFrame->initBuffer(width, height);
+        videoFrame->setYUVbuf(yuv420Buffer);
         mVideoPlayerCallBack->onDisplayVideo(videoFrame);
     }
 }

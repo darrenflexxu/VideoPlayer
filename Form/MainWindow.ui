@@ -239,15 +239,15 @@
            </property>
            <property name="styleSheet">
             <string notr="true">QPushButton{ 
-image: url(:image/open_normal.png);
+image: url(:/res/open_normal.png);
 border-radius:0px; 
 } 
 QPushButton:hover{ 
-image: url(:image/open_focus.png);
+image: url(:/res/open_focus.png);
 border-radius:0px; 
 } 
 QPushButton:pressed{ 
-image: url(:image/open_normal.png);
+image: url(:/res/open_normal.png);
 border-radius:0px; 
 }
 </string>
@@ -286,15 +286,15 @@ border-radius:0px;
            </property>
            <property name="styleSheet">
             <string notr="true">QPushButton{ 
-image: url(:image/start_normal.png);
+image: url(:/res/start_normal.png);
 border-radius:0px; 
 }  
 QPushButton:hover{ 
-image: url(:image/start_focus.png);
+image: url(:/res/start_focus.png);
 border-radius:0px; 
 } 
 QPushButton:pressed{ 
-image: url(:image/start_normal.png);
+image: url(:/res/start_normal.png);
 border-radius:0px; 
 }
 </string>
@@ -317,15 +317,15 @@ border-radius:0px;
            </property>
            <property name="styleSheet">
             <string notr="true">QPushButton{ 
-image: url(:image/pause_normal.png);
+image: url(:/res/pause_normal.png);
 border-radius:0px; 
 } 
 QPushButton:hover{ 
-image: url(:image/pause_focus.png);
+image: url(:/res/pause_focus.png);
 border-radius:0px; 
 } 
 QPushButton:pressed{ 
-image: url(:image/pause_normal.png);
+image: url(:/res/pause_normal.png);
 border-radius:0px; 
 }
 </string>
@@ -364,15 +364,15 @@ border-radius:0px;
            </property>
            <property name="styleSheet">
             <string notr="true">QPushButton{ 
-image: url(:image/stop_normal.png);
+image: url(:/res/stop_normal.png);
 border-radius:0px; 
 }  
 QPushButton:hover{ 
-image: url(:image/stop_focus.png);
+image: url(:/res/stop_focus.png);
 border-radius:0px; 
 } 
 QPushButton:pressed{ 
-image: url(:image/stop_normal.png);
+image: url(:/res/stop_normal.png);
 border-radius:0px; 
 }
 </string>
