@@ -49,7 +49,7 @@ bool FunctionTransfer::isMainThread()
 
 void FunctionTransfer::runInMainThread(std::function<void()> f, bool isBlock)
 {
-//    FunctionTransfer::main_thread_forward->exec(f, isBlock);
+ 
     if(FunctionTransfer::isMainThread())
     {
         f();
@@ -70,19 +70,4 @@ void FunctionTransfer::runInMainThread(std::function<void()> f, bool isBlock)
 void FunctionTransfer::slotExec(std::function<void()> f)
 {
     f();
-//    if(FunctionTransfer::isMainThread())
-//    {
-//        f();
-//    }
-//    else
-//    {
-//        if (isBlock)
-//        {
-//            Q_EMIT this->comming(f);
-//        }
-//        else
-//        {
-//            Q_EMIT this->comming_noBlock(f);
-//        }
-//    }
 }

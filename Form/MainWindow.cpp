@@ -55,7 +55,7 @@ MainWindow::MainWindow(QWidget *parent) :
 
     mTimer_CheckControlWidget = new QTimer; //用于控制控制界面的出现和隐藏
     connect(mTimer_CheckControlWidget, SIGNAL(timeout()), this, SLOT(slotTimerTimeOut()));
-    mTimer_CheckControlWidget->setInterval(1500);
+    mTimer_CheckControlWidget->setInterval(3000);
 
     mAnimation_ControlWidget  = new QPropertyAnimation(ui->widget_controller, "geometry");
 
@@ -347,19 +347,13 @@ bool MainWindow::eventFilter(QObject *target, QEvent *event)
     }
     else if(target == ui->page_video)
     {
-        if(event->type() == QEvent::MouseButtonPress)
+        if(event->type() == QEvent::Enter || event->type() == QEvent::MouseButtonPress)
         {
             if (!mTimer_CheckControlWidget->isActive()) {
                 showOutControlWidget();
             }
-
             mTimer_CheckControlWidget->stop();
-            
             mTimer_CheckControlWidget->start();
-        }
-        else if(event->type() == QEvent::Enter)
-        {
-            ui->widget_controller->show();
         }
         else if(event->type() == QEvent::Leave)
         {
