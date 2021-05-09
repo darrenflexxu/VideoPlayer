@@ -56,7 +56,7 @@ void VideoPlayer::decodeVideoThread() {
         }
 
         if (avcodec_send_packet(codec_ctx_, packet) != 0) {
-            qDebug("input AVPacket to decoder failed!\n");
+            printf("input AVPacket to decoder failed!\n");
             av_packet_unref(packet);
             continue;
         }

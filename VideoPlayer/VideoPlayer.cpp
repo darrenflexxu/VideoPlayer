@@ -76,7 +76,7 @@ bool VideoPlayer::pause() {
     }
     pause_start_time_ = av_gettime();
     player_state_ = VideoPlayer_Pause;
-    emit doPlayerStateChanged(VideoPlayer_Pause, video_stream_ != nullptr, audio_stream_ != nullptr);
+    doPlayerStateChanged(VideoPlayer_Pause, video_stream_ != nullptr, audio_stream_ != nullptr);
     return true;
 }
 

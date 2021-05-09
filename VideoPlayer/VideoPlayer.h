@@ -1,8 +1,7 @@
 ﻿#ifndef VIDEOPLAYER_H
 #define VIDEOPLAYER_H
 
-#include <QObject>
-#include <QImage>
+#include <list>
 #include <thread>
 
 extern "C"

@@ -3,7 +3,7 @@
 Mutex::Mutex()
 {
 #if defined(WIN32)
-    m_mutex = ::CreateMutex(NULL, FALSE, NULL);
+    mutex_ = ::CreateMutex(NULL, FALSE, NULL);
 #else
     pthread_mutex_init(&mutex, NULL);
 #endif
@@ -13,7 +13,7 @@ Mutex::Mutex()
 Mutex::~Mutex()
 {
 #if defined(WIN32)
-    ::CloseHandle(m_mutex);
+    ::CloseHandle(mutex_);
 #else
      pthread_mutex_destroy(&mutex);
 #endif
@@ -23,7 +23,7 @@ Mutex::~Mutex()
 int Mutex::Lock() const
 {
 #if defined(WIN32)
-    DWORD ret = WaitForSingleObject(m_mutex, INFINITE);
+    DWORD ret = WaitForSingleObject(mutex_, INFINITE);
 #else
     int ret = pthread_mutex_lock((pthread_mutex_t*)&mutex);
 #endif
@@ -35,7 +35,7 @@ int Mutex::Lock() const
 int Mutex::Unlock() const
 {
 #if defined(WIN32)
-    bool ret = ::ReleaseMutex(m_mutex);
+    bool ret = ::ReleaseMutex(mutex_);
 #else
     int ret = pthread_mutex_unlock((pthread_mutex_t*)&mutex);
 #endif

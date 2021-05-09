@@ -1,98 +1,83 @@
 #include "Cond.h"
 
-Cond::Cond()
-{
+Cond::Cond() {
 #if defined(WIN32) && !defined(MINGW)
-    InitializeCriticalSection(&m_mutex);
-    InitializeConditionVariable(&m_cond);
+    InitializeCriticalSection(&mutex_);
+    InitializeConditionVariable(&cond_);
 #else
-    pthread_mutex_init(&m_mutex, NULL);
-    pthread_cond_init(&m_cond, NULL);
+    pthread_mutex_init(&mutex_, NULL);
+    pthread_cond_init(&cond_, NULL);
 #endif
-
 }
 
-Cond::~Cond()
-{
+Cond::~Cond() {
 #if defined(WIN32) && !defined(MINGW)
-    DeleteCriticalSection(&m_mutex);
+    DeleteCriticalSection(&mutex_);
 #else
-    pthread_mutex_destroy(&m_mutex);
-    pthread_cond_destroy(&m_cond);
+    pthread_mutex_destroy(&mutex_);
+    pthread_cond_destroy(&cond_);
 #endif
-
 }
 
 //加锁
-int Cond::Lock()
-{
+int Cond::Lock() {
 #if defined(WIN32) && !defined(MINGW)
-    EnterCriticalSection(&m_mutex);
+    EnterCriticalSection(&mutex_);
     return 0;
 #else
-    return pthread_mutex_lock(&m_mutex);
+    return pthread_mutex_lock(&mutex_);
 #endif
-
 }
 
 //解锁
-int Cond::Unlock()
-{
+int Cond::Unlock() {
 #if defined(WIN32) && !defined(MINGW)
-    LeaveCriticalSection(&m_mutex);
+    LeaveCriticalSection(&mutex_);
     return 0;
 #else
-    return pthread_mutex_unlock(&m_mutex);
+    return pthread_mutex_unlock(&mutex_);
 #endif
 }
 
-int Cond::Wait()
-{
+int Cond::Wait() {
 #if defined(WIN32) && !defined(MINGW)
-    DWORD ret = SleepConditionVariableCS((PCONDITION_VARIABLE)&m_cond, &m_mutex, INFINITE);
+    DWORD ret = SleepConditionVariableCS((PCONDITION_VARIABLE)&cond_, &mutex_, INFINITE);
 #else
-    int ret = pthread_cond_wait(&m_cond, &m_mutex);
+    int ret = pthread_cond_wait(&cond_, &mutex_);
 #endif
-
     return ret;
-
 }
 
 //固定时间等待
-int Cond::TimedWait(int second)
-{
+int Cond::TimedWait(int second) {
 #if defined(WIN32) && !defined(MINGW)
-    SleepConditionVariableCS((PCONDITION_VARIABLE)&m_cond, &m_mutex, second*1000);
+    SleepConditionVariableCS((PCONDITION_VARIABLE)&cond_, &mutex_, second * 1000);
     return 0;
 #else
     struct timespec abstime;
     //获取从当前时间，并加上等待时间， 设置进程的超时睡眠时间
     clock_gettime(CLOCK_REALTIME, &abstime);
     abstime.tv_sec += second;
-    return pthread_cond_timedwait(&m_cond, &m_mutex, &abstime);
+    return pthread_cond_timedwait(&cond_, &mutex_, &abstime);
 #endif
-
 }
 
-int Cond::Signal()
-{
+int Cond::Signal() {
 #if defined(WIN32) && !defined(MINGW)
     int ret = 0;
-    WakeConditionVariable((PCONDITION_VARIABLE)&m_cond);
+    WakeConditionVariable((PCONDITION_VARIABLE)&cond_);
 #else
-    int ret = pthread_cond_signal(&m_cond);
+    int ret = pthread_cond_signal(&cond_);
 #endif
     return ret;
 }
 
 //唤醒所有睡眠线程
-int Cond::Broadcast()
-{
+int Cond::Broadcast() {
 #if defined(WIN32) && !defined(MINGW)
-    WakeAllConditionVariable((PCONDITION_VARIABLE)&m_cond);
+    WakeAllConditionVariable((PCONDITION_VARIABLE)&cond_);
     return 0;
 #else
-    return pthread_cond_broadcast(&m_cond);
+    return pthread_cond_broadcast(&cond_);
 #endif
-
 }

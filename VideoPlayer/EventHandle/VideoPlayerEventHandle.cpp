@@ -1,6 +1,4 @@
 #include "VideoPlayerEventHandle.h"
 
-VideoPlayerCallBack::~VideoPlayerCallBack()
-{
-
+VideoPlayerCallBack::~VideoPlayerCallBack() {
 }

@@ -9,47 +9,37 @@
 #endif
 
 #if defined(WIN32) && !defined(MINGW)
-    #include <WinSock2.h>
-    #include <Windows.h>
+#include <WinSock2.h>
+#include <Windows.h>
 #else
-    #include <pthread.h>
-    #include <time.h>
+#include <pthread.h>
+#include <time.h>
 #endif
 
-class Cond
-{
+class Cond {
 public:
     Cond();
     ~Cond();
-
     //上锁
     int Lock();
-
     //解锁
     int Unlock();
-
     //
     int Wait();
-
     //固定时间等待
     int TimedWait(int second);
-
     //
     int Signal();
-
     //唤醒所有睡眠线程
     int Broadcast();
 
 private:
-
 #if defined(WIN32) && !defined(MINGW)
-    CRITICAL_SECTION m_mutex;
-    RTL_CONDITION_VARIABLE m_cond;
+    CRITICAL_SECTION mutex_;
+    RTL_CONDITION_VARIABLE cond_;
 #else
-    pthread_mutex_t m_mutex;
-    pthread_cond_t m_cond;
+    pthread_mutex_t mutex_;
+    pthread_cond_t cond_;
 #endif
-
 };
-
 #endif // MUTEX_H

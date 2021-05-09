@@ -215,7 +215,7 @@ void MainWindow::onPlayerStateChanged(const VideoPlayerState &state, const bool 
 }
 
 ///显示视频数据，此函数不宜做耗时操作，否则会影响播放的流畅性。
-void MainWindow::onDisplayVideo(std::shared_ptr<VideoFrame> videoFrame) {
+void MainWindow::onDisplayVideo(VideoFramePtr videoFrame) {
     ui->widget_videoPlayer->inputOneFrame(videoFrame);
 }
 

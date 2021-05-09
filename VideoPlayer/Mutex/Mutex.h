@@ -25,7 +25,7 @@ public:
 private:
 
 #if defined(WIN32)
-     HANDLE m_mutex;
+     HANDLE mutex_;
 #else
     pthread_mutex_t mutex;
 #endif
