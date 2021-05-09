@@ -15,7 +15,6 @@ typedef FLOAT               *PFLOAT;
 typedef int                 INT;
 typedef unsigned int        UINT;
 typedef unsigned int        *PUINT;
-
 typedef unsigned long ULONG_PTR, *PULONG_PTR;
 typedef ULONG_PTR DWORD_PTR, *PDWORD_PTR;
 
@@ -26,33 +25,23 @@ typedef ULONG_PTR DWORD_PTR, *PDWORD_PTR;
 #define LOBYTE(w)           ((BYTE)(((DWORD_PTR)(w)) & 0xff))
 #define HIBYTE(w)           ((BYTE)((((DWORD_PTR)(w)) >> 8) & 0xff))
 
-
-PcmVolumeControl::PcmVolumeControl()
-{
-
+PcmVolumeControl::PcmVolumeControl() {
 }
 
 ///buf为需要调节音量的音频数据块首地址指针，size为长度，uRepeat为重复次数，通常设为1，vol为增益倍数,可以小于1
-void PcmVolumeControl::RaiseVolume(char* buf, int size, int uRepeat, double vol)
-{
-    if (!size)
-    {
+void PcmVolumeControl::RaiseVolume(char* buf, int size, int uRepeat, double vol) {
+    if (!size) {
         return;
     }
-    for (int i = 0; i < size; i += 2)
-    {
+    for (int i = 0; i < size; i += 2) {
         short wData;
         wData = MAKEWORD(buf[i], buf[i + 1]);
         long dwData = wData;
-        for (int j = 0; j < uRepeat; j++)
-        {
+        for (int j = 0; j < uRepeat; j++) {
             dwData = dwData * vol;
-            if (dwData < -0x8000)
-            {
+            if (dwData < -0x8000) {
                 dwData = -0x8000;
-            }
-            else if (dwData > 0x7FFF)
-            {
+            } else if (dwData > 0x7FFF) {
                 dwData = 0x7FFF;
             }
         }
