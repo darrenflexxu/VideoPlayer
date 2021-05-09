@@ -2,8 +2,7 @@
 #define VIDEOPLAYEREVENTHANDLE_H
 
 #include "types.h"
-
-struct IVideoFrame;
+#include "IVideoFrame.h"
 
 struct DLL_API VideoPlayerCallBack {
     ///打开文件失败
