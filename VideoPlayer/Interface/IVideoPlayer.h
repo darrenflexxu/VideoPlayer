@@ -5,7 +5,7 @@
 struct VideoPlayerCallBack;
 
 struct DLL_API IVideoFrame {
-    virtual uint8_t * buffer() = 0;
+    virtual uint8_t * buffer() = 0; // YUV420
     virtual int width() = 0;
     virtual int height() = 0;
 };
@@ -25,6 +25,9 @@ struct DLL_API IVideoPlayer {
     virtual double getCurrentTime() = 0; //µ•Œª√Î
 };
 
-extern "C" DLL_API IVideoPlayer* CreateVideoPlayer();
-extern "C"  DLL_API void ReleaseVideoPlayer(IVideoPlayer*);
-extern "C"  DLL_API void ReleaseVideoFrame(IVideoFrame*);
+extern "C"
+{
+    DLL_API IVideoPlayer* CreateVideoPlayer();
+    DLL_API void ReleaseVideoPlayer(IVideoPlayer*);
+    DLL_API void ReleaseVideoFrame(IVideoFrame*);
+}
