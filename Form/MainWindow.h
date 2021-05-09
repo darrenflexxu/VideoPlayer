@@ -43,7 +43,7 @@ private slots:
     void slotBtnClick(bool isChecked);
 
 private:
-    Ui::MainWindow *ui;
+    Ui::MainWindow *ui_;
     IVideoPlayer *mPlayer = nullptr; //播放线程
     QTimer *mTimer; //定时器-获取当前视频时间
     float mVolume;

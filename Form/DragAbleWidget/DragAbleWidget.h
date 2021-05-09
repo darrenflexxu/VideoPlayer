@@ -26,7 +26,7 @@ public:
     void setTitle(QString str);
 
 private:
-    Ui::DragAbleWidget *ui;
+    Ui::DragAbleWidget *ui_;
 
     QTimer *mTimer;
 

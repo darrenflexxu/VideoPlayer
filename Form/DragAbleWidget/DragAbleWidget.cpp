@@ -10,9 +10,9 @@
 
 DragAbleWidget::DragAbleWidget(QWidget *parent) :
     QWidget(parent),
-    ui(new Ui::DragAbleWidget)
+    ui_(new Ui::DragAbleWidget)
 {
-    ui->setupUi(this);
+    ui_->setupUi(this);
 
     ///定时器用于定制检测鼠标位置，防止鼠标快速移入窗口，没有检测到，导致鼠标箭头呈现拖拉的形状
     mTimer = new QTimer;
@@ -37,20 +37,20 @@ DragAbleWidget::DragAbleWidget(QWidget *parent) :
     isLeftPressDown = false;
     this->dir = NONE;
     this->setMouseTracking(true);// 追踪鼠标
-    ui->widget_frame->setMouseTracking(true);
-    ui->widget_back->setMouseTracking(true);
-    ui->widget_container->setMouseTracking(true);
-//    ui->widget_center->setMouseTracking(true);
+    ui_->widget_frame->setMouseTracking(true);
+    ui_->widget_back->setMouseTracking(true);
+    ui_->widget_container->setMouseTracking(true);
+//    ui_->widget_center->setMouseTracking(true);
 
     this->setFocusPolicy(Qt::ClickFocus);
 
-    ui->widget_frame->setContentsMargins(MARGINS,MARGINS,MARGINS,MARGINS);
+    ui_->widget_frame->setContentsMargins(MARGINS,MARGINS,MARGINS,MARGINS);
     showBorderRadius(true);
 
-//    ui->widget_frame->setContentsMargins(1, 1, 1, 1);
+//    ui_->widget_frame->setContentsMargins(1, 1, 1, 1);
 
     //安装事件监听器,让标题栏识别鼠标双击
-//    ui->widget_beingClass_back->installEventFilter(this);
+//    ui_->widget_beingClass_back->installEventFilter(this);
 
 }
 
@@ -61,12 +61,12 @@ DragAbleWidget::~DragAbleWidget()
 
 QWidget *DragAbleWidget::getContainWidget()
 {
-    return ui->widget_container;
+    return ui_->widget_container;
 }
 
 void DragAbleWidget::setTitle(QString str)
 {
-    ui->label_titleName->setText(str);
+    ui_->label_titleName->setText(str);
     this->setWindowTitle(str);
 }
 
@@ -275,19 +275,19 @@ void DragAbleWidget::doShowFullScreen()
     this->show();
     this->showFullScreen();
     this->raise();
-    ui->widget_frame->setContentsMargins(0,0,0,0); //隐藏边框
+    ui_->widget_frame->setContentsMargins(0,0,0,0); //隐藏边框
 
     showBorderRadius(false);
 
-    ui->btnMenu_Max->setIcon(QIcon(":/res/shownormalbtn.png"));
+    ui_->btnMenu_Max->setIcon(QIcon(":/res/shownormalbtn.png"));
 
-    ui->widget_title->hide(); //隐藏标题栏
-//    ui->verticalLayout_titleWidget_Back->removeWidget(ui->widget_title);
-//    ui->widget_title->setParent(NULL);
-//    ui->widget_title->setWindowFlags(Qt::FramelessWindowHint|Qt::WindowStaysOnTopHint|Qt::Tool|Qt::X11BypassWindowManagerHint);
-//    ui->widget_title->resize(QApplication::desktop()->screen()->width(), ui->widget_title->height());
-//    ui->widget_title->move(0,0);
-//    ui->widget_title->show();
+    ui_->widget_title->hide(); //隐藏标题栏
+//    ui_->verticalLayout_titleWidget_Back->removeWidget(ui_->widget_title);
+//    ui_->widget_title->setParent(NULL);
+//    ui_->widget_title->setWindowFlags(Qt::FramelessWindowHint|Qt::WindowStaysOnTopHint|Qt::Tool|Qt::X11BypassWindowManagerHint);
+//    ui_->widget_title->resize(QApplication::desktop()->screen()->width(), ui_->widget_title->height());
+//    ui_->widget_title->move(0,0);
+//    ui_->widget_title->show();
 
 }
 
@@ -301,20 +301,20 @@ void DragAbleWidget::doShowNormal()
 
     if (!isMax)
     {
-        ui->widget_frame->setContentsMargins(MARGINS,MARGINS,MARGINS,MARGINS);
+        ui_->widget_frame->setContentsMargins(MARGINS,MARGINS,MARGINS,MARGINS);
         showBorderRadius(true);
     } else {
-        ui->widget_frame->setContentsMargins(0,0,0,0);
+        ui_->widget_frame->setContentsMargins(0,0,0,0);
         showBorderRadius(false);
     }
 
 
-    ui->btnMenu_Max->setIcon(QIcon(":/res/showmaxsizebtn.png"));
+    ui_->btnMenu_Max->setIcon(QIcon(":/res/showmaxsizebtn.png"));
 
     QTimer::singleShot(20,this,[&]()
     {
-        ui->verticalLayout_titleWidget_Back->addWidget(ui->widget_title);
-        ui->widget_title->show();
+        ui_->verticalLayout_titleWidget_Back->addWidget(ui_->widget_title);
+        ui_->widget_title->show();
     });
 
 }
@@ -391,7 +391,7 @@ void DragAbleWidget::showBorderRadius(bool isShow)
                         }");
     }
 
-    ui->widget_frame->setStyleSheet(str);
+    ui_->widget_frame->setStyleSheet(str);
 
 }
 
@@ -420,7 +420,7 @@ void DragAbleWidget::on_btnMenu_Close_clicked()
 //    {
 //        QPoint pt(0, 0);
 //        QMouseEvent evt(QEvent::Leave, pt, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
-//        qApp->sendEvent(ui->btnMenu_Close, &evt);
+//        qApp->sendEvent(ui_->btnMenu_Close, &evt);
 //    });
 
 }
@@ -436,8 +436,8 @@ void DragAbleWidget::on_btnMenu_Min_clicked()
     {
 //        mAnimation->stop();
 //        mTimer_CheckTitle->stop();
-        ui->widget_title->move(ui->widget_title->x(), 0 - ui->widget_title->height());
-        ui->widget_title->hide();
+        ui_->widget_title->move(ui_->widget_title->x(), 0 - ui_->widget_title->height());
+        ui_->widget_title->hide();
     }
     this->showMinimized();
 
@@ -445,7 +445,7 @@ void DragAbleWidget::on_btnMenu_Min_clicked()
     {
         QPoint pt(0, 0);
         QMouseEvent evt(QEvent::Leave, pt, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
-        qApp->sendEvent(ui->btnMenu_Min, &evt);
+        qApp->sendEvent(ui_->btnMenu_Min, &evt);
     });
 }
 

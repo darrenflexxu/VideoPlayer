@@ -1,6 +1,6 @@
 FILE(GLOB_RECURSE FORM_SRC "*.cpp")
 FILE(GLOB_RECURSE FORM_HEADER "*.h")
-FILE(GLOB_RECURSE FORM_UI "*.ui")
+FILE(GLOB_RECURSE FORM_UI "*.ui_")
 
 include_directories(.
 ../VideoPlayer
