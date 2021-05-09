@@ -42,7 +42,7 @@ extern "C"
 class VideoPlayer : public IVideoPlayer {
 public:
     VideoPlayer();
-    ~VideoPlayer();
+    virtual ~VideoPlayer();
 
     ///初始化播放器（必需要调用一次）
     static bool initPlayer();

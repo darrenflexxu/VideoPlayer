@@ -9,7 +9,7 @@
 class VideoFrame : public IVideoFrame {
 public:
     VideoFrame();
-    ~VideoFrame();
+    virtual ~VideoFrame();
     void initBuffer(const int &width, const int &height);
     void setYUVbuf(const uint8_t *buf);
     PixelFormat format() override { return format_; }

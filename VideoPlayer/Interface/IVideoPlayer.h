@@ -5,6 +5,7 @@
 struct VideoPlayerCallBack;
 
 struct DLL_API IVideoPlayer {
+    virtual ~IVideoPlayer() {}
     virtual void setVideoPlayerCallBack(VideoPlayerCallBack *pointer) = 0;
     virtual bool startPlay(const char* filePath) = 0;
     virtual bool replay() = 0;

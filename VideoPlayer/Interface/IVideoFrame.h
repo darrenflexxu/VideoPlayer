@@ -7,6 +7,7 @@ struct DLL_API IVideoFrame {
         kPixelFormatYUV420P = 0,
         kPixelFormatUnknown
     };
+    virtual ~IVideoFrame() {}
     virtual PixelFormat format() = 0;
     virtual uint8_t * buffer() = 0;
     virtual int width() = 0;
