@@ -4,8 +4,6 @@ FILE(GLOB_RECURSE FORM_UI "*.ui")
 
 include_directories(.
 ../VideoPlayer
-"${ThirdParty}/ffmpeg/include"
-"${ThirdParty}/SDL2/include"
 )
 
 add_definitions(-DUNICODE)

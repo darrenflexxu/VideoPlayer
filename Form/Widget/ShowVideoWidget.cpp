@@ -79,8 +79,6 @@ ShowVideoWidget::ShowVideoWidget(QWidget *parent) :
 
     m_vertexVertices = new GLfloat[8];
 
-    mVideoFrame.reset();
-
     m_nVideoH = 0;
     m_nVideoW = 0;
 
@@ -165,7 +163,8 @@ void ShowVideoWidget::clear()
 {
     FunctionTransfer::runInMainThread([=]()
     {
-        mVideoFrame.reset();
+        ReleaseVideoFrame(mVideoFrame);
+        mVideoFrame = nullptr;
 
         mFaceInfoList.clear();
 
@@ -227,12 +226,12 @@ void ShowVideoWidget::mouseMoveEvent(QMouseEvent *event)
     }
 }
 
-void ShowVideoWidget::inputOneFrame(VideoFramePtr videoFrame)
+void ShowVideoWidget::inputOneFrame(IVideoFrame* videoFrame)
 {
     FunctionTransfer::runInMainThread([=]()
     {
-        int width = videoFrame.get()->width();
-        int height = videoFrame.get()->height();
+        int width = videoFrame->width();
+        int height = videoFrame->height();
 
         if (m_nVideoW <= 0 || m_nVideoH <= 0 || m_nVideoW != width || m_nVideoH != height)
         {
@@ -241,7 +240,7 @@ void ShowVideoWidget::inputOneFrame(VideoFramePtr videoFrame)
 
         mLastGetFrameTime = QDateTime::currentMSecsSinceEpoch();
 
-        mVideoFrame.reset();
+        ReleaseVideoFrame(mVideoFrame);
         mVideoFrame = videoFrame;
 
         update(); //调用update将执行 paintEvent函数
@@ -252,7 +251,7 @@ void ShowVideoWidget::inputOneFrame(VideoFramePtr videoFrame)
 
 void ShowVideoWidget::initializeGL()
 {
-    qDebug()<<__FUNCTION__<<mVideoFrame.get();
+    qDebug()<<__FUNCTION__<<mVideoFrame;
 
     mIsOpenGLInited = true;
 
@@ -641,7 +640,7 @@ void ShowVideoWidget::resizeGL(int window_W, int window_H)
         m_program->release();
     }
 
-    VideoFrame * videoFrame = mVideoFrame.get();
+    auto videoFrame = mVideoFrame;
 
     if (videoFrame != nullptr)
     {

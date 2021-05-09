@@ -20,7 +20,6 @@ MainWindow::MainWindow(QWidget *parent):
     ui->setupUi(this->getContainWidget());
     FunctionTransfer::init(QThread::currentThreadId());
     ///初始化播放器
-    VideoPlayer::initPlayer();
     setWindowFlags(Qt::FramelessWindowHint);//|Qt::WindowStaysOnTopHint);  //使窗口的标题栏隐藏
     //因为VideoPlayer::PlayerState是自定义的类型 要跨线程传递需要先注册一下
     qRegisterMetaType<VideoPlayerState>();
@@ -35,7 +34,7 @@ MainWindow::MainWindow(QWidget *parent):
     ui->page_video->setMouseTracking(true);
     ui->page_video->installEventFilter(this);
     ui->widget_container->installEventFilter(this);
-    mPlayer = new VideoPlayer();
+    mPlayer = CreateVideoPlayer();
     mPlayer->setVideoPlayerCallBack(this);
     mTimer = new QTimer; //定时器-获取当前视频时间
     connect(mTimer, SIGNAL(timeout()), this, SLOT(slotTimerTimeOut()));
@@ -52,6 +51,7 @@ MainWindow::MainWindow(QWidget *parent):
 }
 
 MainWindow::~MainWindow() {
+    ReleaseVideoPlayer(mPlayer);
     AppConfig::saveConfigInfoToFile();
     AppConfig::removeDirectory(AppConfig::AppDataPath_Tmp);
     delete ui;
@@ -133,7 +133,7 @@ void MainWindow::slotBtnClick(bool isChecked) {
             + QStringLiteral("所有文件 (*.*)"));
         if (!s.isEmpty()) {
             mPlayer->stop(true); //如果在播放则先停止
-            mPlayer->startPlay(s.toStdString());
+            mPlayer->startPlay(s.toStdString().c_str());
             AppConfig::gVideoFilePath = s;
             AppConfig::saveConfigInfoToFile();
         }
@@ -215,7 +215,7 @@ void MainWindow::onPlayerStateChanged(const VideoPlayerState &state, const bool 
 }
 
 ///显示视频数据，此函数不宜做耗时操作，否则会影响播放的流畅性。
-void MainWindow::onDisplayVideo(VideoFramePtr videoFrame) {
+void MainWindow::onDisplayVideo(IVideoFrame* videoFrame) {
     ui->widget_videoPlayer->inputOneFrame(videoFrame);
 }
 

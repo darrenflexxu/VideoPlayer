@@ -2,6 +2,10 @@ CMAKE_MINIMUM_REQUIRED(VERSION 3.8)
 
 PROJECT(VideoProc)
 
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/Lib)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/Lib)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/Bin)
+
 set(ThirdParty "${PROJECT_SOURCE_DIR}/thirdparty")
 
 SET(CMAKE_PREFIX_PATH C:/Qt/Qt5.10.0/5.10.0/msvc2015_64/lib/cmake)
@@ -21,10 +25,8 @@ FIND_PACKAGE(Qt5Quick REQUIRED)
 FIND_PACKAGE(Qt5WinExtras REQUIRED)
 
 include_directories("${PROJECT_SOURCE_DIR}/FramelessHelper"
-"${PROJECT_SOURCE_DIR}/VideoPlayer"
+"${PROJECT_SOURCE_DIR}/VideoPlayer/Interface"
 "${PROJECT_SOURCE_DIR}/Form"
-"${ThirdParty}/ffmpeg/include"
-"${ThirdParty}/SDL2/include"
 )
 
 add_subdirectory(FramelessHelper)
@@ -72,7 +74,7 @@ link_directories("${ThirdParty}/ffmpeg/lib"
 
 ADD_EXECUTABLE(${PROJECT_NAME} ${SRC} ${HEADER} ${UI} ${QRC} ${QM_FILES}) 
 
-TARGET_LINK_LIBRARIES(${PROJECT_NAME} Qt5::Widgets Qt5::Core Qt5::Gui Qt5::Qml Qt5::Quick Qt5::OpenGL Qt5::WinExtras OpenGL32 Glu32 FramelessHelper VideoPlayer Form avcodec avdevice avfilter avformat avutil postproc swresample swscale SDL2)
+TARGET_LINK_LIBRARIES(${PROJECT_NAME} Qt5::Widgets Qt5::Core Qt5::Gui Qt5::Qml Qt5::Quick Qt5::OpenGL Qt5::WinExtras OpenGL32 Glu32 FramelessHelper VideoPlayer Form)
 
 add_custom_command(
         TARGET ${PROJECT_NAME} POST_BUILD

@@ -7,7 +7,8 @@
 #include <QTimer>
 #include <QPushButton>
 #include <QPropertyAnimation>
-#include "VideoPlayer.h"
+#include "IVideoPlayer.h"
+#include "VideoPlayerEventHandle.h"
 #include "DragAbleWidget/DragAbleWidget.h"
 
 namespace Ui {
@@ -33,7 +34,7 @@ protected:
     ///播放器状态改变的时候回调此函数
     void onPlayerStateChanged(const VideoPlayerState &state, const bool &hasVideo, const bool &hasAudio);
     ///显示视频数据，此函数不宜做耗时操作，否则会影响播放的流畅性。
-    void onDisplayVideo(VideoFramePtr videoFrame);
+    void onDisplayVideo(IVideoFrame* videoFrame);
 
 private slots:
     ///播放器相关的槽函数
@@ -43,7 +44,7 @@ private slots:
 
 private:
     Ui::MainWindow *ui;
-    VideoPlayer *mPlayer; //播放线程
+    IVideoPlayer *mPlayer = nullptr; //播放线程
     QTimer *mTimer; //定时器-获取当前视频时间
     float mVolume;
     QTimer *mTimer_CheckControlWidget; //用于控制控制界面的出现和隐藏
