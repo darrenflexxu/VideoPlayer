@@ -48,8 +48,7 @@ bool FunctionTransfer::isMainThread()
 }
 
 void FunctionTransfer::runInMainThread(std::function<void()> f, bool isBlock)
-{
- 
+{ 
     if(FunctionTransfer::isMainThread())
     {
         f();
