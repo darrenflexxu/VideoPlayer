@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include "Interface/IVideoPlayer.h"
+#include "Interface/IVideoFrame.h"
 
 class VideoFrame : public IVideoFrame {
 public:

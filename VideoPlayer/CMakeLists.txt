@@ -7,7 +7,7 @@ include_directories(.
 )
 
 source_group(Interface FILES "Interface/IVideoPlayer.h" "Interface/VideoPlayerEventHandle.h"
-"Interface/types.h")
+"Interface/types.h" "Interface/IVideoFrame.h")
 
 link_directories("${ThirdParty}/ffmpeg/lib"
 "${ThirdParty}/SDL2/lib"
