@@ -1,6 +1,25 @@
 ﻿#include "VideoPlayer.h"
 #include <stdio.h>
 #include "Audio/PcmVolumeControl.h"
+#include "Video/VideoFrame.h"
+#include "Interface/VideoPlayerEventHandle.h"
+
+struct DllInit {
+    DllInit() {
+        VideoPlayer::initPlayer();
+    }
+};
+
+IVideoPlayer* CreateVideoPlayer() {
+    static DllInit kDllInit;
+    return new VideoPlayer();
+}
+
+void ReleaseVideoPlayer(IVideoPlayer* player) {
+    if (player) {
+        delete player;
+    }
+}
 
 VideoPlayer::VideoPlayer() {
     condition_video_ = new Cond;
@@ -32,13 +51,13 @@ bool VideoPlayer::initPlayer() {
     return true;
 }
 
-bool VideoPlayer::startPlay(const std::string &filePath) {
+bool VideoPlayer::startPlay(const char* filePath) {
     if (player_state_ != VideoPlayer_Stop) {
         return false;
     }
     is_quit_ = false;
     is_pause_ = false;
-    if (!filePath.empty())
+    if (filePath)
         file_path_ = filePath;
     //启动新的线程实现读取视频文件
     std::thread([&] (VideoPlayer *pointer) {
@@ -49,7 +68,7 @@ bool VideoPlayer::startPlay(const std::string &filePath) {
 
 bool VideoPlayer::replay() {
     stop();
-    startPlay(file_path_);
+    startPlay(file_path_.c_str());
     return true;
 }
 
@@ -531,7 +550,7 @@ void VideoPlayer::doPlayerStateChanged(const VideoPlayerState &state, const bool
 void VideoPlayer::doDisplayVideo(const uint8_t *yuv420Buffer, const int &width, const int &height) {
     //    fprintf(stderr, "%s \n", __FUNCTION__);
     if (mVideoPlayerCallBack != nullptr) {
-        VideoFramePtr videoFrame = std::make_shared<VideoFrame>();
+        auto videoFrame = new VideoFrame();
         videoFrame->initBuffer(width, height);
         videoFrame->setYUVbuf(yuv420Buffer);
         mVideoPlayerCallBack->onDisplayVideo(videoFrame);

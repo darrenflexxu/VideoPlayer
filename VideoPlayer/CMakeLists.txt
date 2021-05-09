@@ -6,4 +6,13 @@ include_directories(.
 "${ThirdParty}/SDL2/include"
 )
 
-ADD_LIBRARY(VideoPlayer STATIC ${VIDEO_PLAYER_SRC} ${VIDEO_PLAYER_HEADER})
+source_group(Interface FILES "Interface/IVideoPlayer.h" "Interface/VideoPlayerEventHandle.h"
+"Interface/types.h")
+
+link_directories("${ThirdParty}/ffmpeg/lib"
+"${ThirdParty}/SDL2/lib"
+)
+
+ADD_LIBRARY(VideoPlayer SHARED ${VIDEO_PLAYER_SRC} ${VIDEO_PLAYER_HEADER})
+
+TARGET_LINK_LIBRARIES(VideoPlayer avcodec avdevice avfilter avformat avutil postproc swresample swscale SDL2)

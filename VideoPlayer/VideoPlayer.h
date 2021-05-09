@@ -23,7 +23,7 @@ extern "C"
 
 #include "types.h"
 #include "Mutex/Cond.h"
-#include "EventHandle/VideoPlayerEventHandle.h"
+#include "Interface/IVideoPlayer.h"
 
 #define SDL_AUDIO_BUFFER_SIZE 1024
 #define AVCODEC_MAX_AUDIO_FRAME_SIZE 192000 // 1 second of 48khz 32bit audio
@@ -39,7 +39,7 @@ extern "C"
  * 播放器类，纯c++实现，方便移植，与界面的交互通过回调函数的方式实现
  */
 
-class VideoPlayer {
+class VideoPlayer : public IVideoPlayer {
 public:
     VideoPlayer();
     ~VideoPlayer();
@@ -51,7 +51,7 @@ public:
      * @param pointer
      */
     void setVideoPlayerCallBack(VideoPlayerCallBack *pointer) { mVideoPlayerCallBack = pointer; }
-    bool startPlay(const std::string &filePath);
+    bool startPlay(const char* filePath);
     bool replay(); //重新播放
     bool play(); //播放（用于暂停后，重新开始播放）
     bool pause(); //暂停播放

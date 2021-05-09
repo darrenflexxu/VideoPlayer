@@ -1,5 +1,11 @@
 #include "VideoFrame.h"
 
+void ReleaseVideoFrame(IVideoFrame* frame) {
+    if (frame) {
+        delete frame;
+    }
+}
+
 VideoFrame::VideoFrame() {
     yuv420_buffer_ = nullptr;
 }
