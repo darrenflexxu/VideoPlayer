@@ -15,5 +15,7 @@ struct DLL_API VideoPlayerCallBack {
     virtual void onPlayerStateChanged(const VideoPlayerState &state, const bool &hasVideo, const bool &hasAudio) = 0;
     ///播放视频，此函数不宜做耗时操作，否则会影响播放的流畅性。
     virtual void onDisplayVideo(IVideoFrame* videoFrame) = 0;
+    ///是否开启GPU解码
+    virtual bool OnEnableGPUDecode() = 0;
 };
 #endif // VIDEOPLAERYEVENTHANDLE_H

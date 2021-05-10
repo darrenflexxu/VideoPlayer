@@ -51,7 +51,7 @@ QRect AppConfig::gMainWindowRect;
 QRect AppConfig::gScreenRect;
 
 bool AppConfig::gVideoKeepAspectRatio = true; //按比例显示
-bool AppConfig::gVideoHardDecoder = false; //硬解解码
+bool AppConfig::gVideoHardDecoder = true; //硬解解码
 QString AppConfig::gVideoFilePath;
 
 QString AppConfig::AppDataPath_Main;

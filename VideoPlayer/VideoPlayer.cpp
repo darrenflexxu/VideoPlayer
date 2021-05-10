@@ -222,8 +222,40 @@ void VideoPlayer::readVideoFile() {
     ///打开视频解码器，并启动视频线程
     if (videoStream >= 0) {
         ///查找视频解码器
-        codec_ctx_ = format_ctx_->streams[videoStream]->codec;
-        codec_ = avcodec_find_decoder(codec_ctx_->codec_id);
+        if (video_player_callback_->OnEnableGPUDecode()) {
+            auto ret = av_find_best_stream(format_ctx_, AVMEDIA_TYPE_VIDEO, -1, -1, &codec_, 0);
+
+            if (ret >= 0) {
+                codec_ctx_ = avcodec_alloc_context3(codec_);
+                ret = avcodec_parameters_to_context(codec_ctx_, format_ctx_->streams[videoStream]->codecpar);
+
+                for (int i = AV_HWDEVICE_TYPE_NONE + 1; i < 10; i++) {
+                    ret = av_hwdevice_ctx_create(&hw_device_ctx_, AVHWDeviceType(i), NULL, NULL, 0);
+
+                    if (ret >= 0) {
+                        hw_device_type_ = AVHWDeviceType(i);
+                        codec_ctx_->hw_device_ctx = av_buffer_ref(hw_device_ctx_);
+                        break;
+                    }
+                }               
+
+                for (int i = 0;; i++) {
+                    const AVCodecHWConfig *config = avcodec_get_hw_config(codec_, i);
+
+                    if (config && config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX &&
+                        config->device_type == hw_device_type_) {
+                        hw_pix_fmt_ = config->pix_fmt;
+                        break;
+                    }
+                }
+               
+            }
+        }
+
+        if (codec_ == nullptr || codec_ctx_ == nullptr) {
+            codec_ctx_ = format_ctx_->streams[videoStream]->codec;
+            codec_ = avcodec_find_decoder(codec_ctx_->codec_id);
+        }
 
         if (codec_ == nullptr) {
             fprintf(stderr, "PCodec not found.\n");
@@ -286,13 +318,13 @@ void VideoPlayer::readVideoFile() {
             //输出的声道布局
             audio_tgt_channels_ = 2; ///av_get_channel_layout_nb_channels(out_ch_layout);
             out_ch_layout = av_get_default_channel_layout(audio_tgt_channels_); ///AV_CH_LAYOUT_STEREO
-            out_ch_layout &= ~AV_CH_LAYOUT_STEREO_DOWNMIX;            
+            out_ch_layout &= ~AV_CH_LAYOUT_STEREO_DOWNMIX;
             /// wav/wmv 文件获取到的audio_codec_ctx_->channel_layout为0会导致后面的初始化失败，因此这里需要加个判断。
             if (in_ch_layout <= 0) {
                 in_ch_layout = av_get_default_channel_layout(audio_codec_ctx_->channels);
             }
             swr_ctx_ = swr_alloc_set_opts(nullptr, out_ch_layout, out_sample_fmt_, out_sample_rate_,
-                                        in_ch_layout, in_sample_fmt_, in_sample_rate_, 0, nullptr);
+                                          in_ch_layout, in_sample_fmt_, in_sample_rate_, 0, nullptr);
             /** Open the resampler with the specified parameters. */
             int ret = swr_init(swr_ctx_);
             if (ret < 0) {

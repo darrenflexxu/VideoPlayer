@@ -26,15 +26,17 @@ public:
 protected:
     bool eventFilter(QObject *target, QEvent *event);
     ///打开文件失败
-    void onOpenVideoFileFailed(const int &code);
+    void onOpenVideoFileFailed(const int &code) override;
     ///打开sdl失败的时候回调此函数
-    void onOpenSdlFailed(const int &code);
+    void onOpenSdlFailed(const int &code) override;
     ///获取到视频时长的时候调用此函数
-    void onTotalTimeChanged(const int64_t &uSec);
+    void onTotalTimeChanged(const int64_t &uSec) override;
     ///播放器状态改变的时候回调此函数
-    void onPlayerStateChanged(const VideoPlayerState &state, const bool &hasVideo, const bool &hasAudio);
+    void onPlayerStateChanged(const VideoPlayerState &state, const bool &hasVideo, const bool &hasAudio) override;
     ///显示视频数据，此函数不宜做耗时操作，否则会影响播放的流畅性。
-    void onDisplayVideo(IVideoFrame* videoFrame);
+    void onDisplayVideo(IVideoFrame* videoFrame) override;
+    ///是否开启GPU解码
+    bool OnEnableGPUDecode() override;
 
 private slots:
     ///播放器相关的槽函数

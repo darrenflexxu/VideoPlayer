@@ -219,6 +219,10 @@ void MainWindow::onDisplayVideo(IVideoFrame* videoFrame) {
     ui_->widget_videoPlayer->inputOneFrame(videoFrame);
 }
 
+bool MainWindow::OnEnableGPUDecode() {
+    return AppConfig::gVideoHardDecoder;
+}
+
 //图片显示部件时间过滤器处理
 bool MainWindow::eventFilter(QObject *target, QEvent *event) {
     if (target == ui_->widget_container) {

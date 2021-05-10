@@ -1,4 +1,7 @@
 #include "VideoPlayer.h"
+#include "VideoPlayerEventHandle.h"
+
+extern AVPixelFormat hw_pix_fmt_;
 
 void VideoPlayer::decodeVideoThread() {
     fprintf(stderr, "%s start \n", __FUNCTION__);
@@ -7,16 +10,13 @@ void VideoPlayer::decodeVideoThread() {
     double video_pts = 0; //当前视频的pts
     double audio_pts = 0; //音频pts
     ///解码视频相关
-    AVFrame *pFrame, *pFrameYUV;
+    AVFrame *pFrame, *pFrameYUV, *tmpFrame, *swFrame;
     uint8_t *out_buffer_yuv; //解码后的yuv数据
-    struct SwsContext *img_convert_ctx;  //用于解码后的视频格式转换
-    AVCodecContext *codec_ctx_ = video_stream_->codec; //视频解码器
+    struct SwsContext *img_convert_ctx = nullptr;  //用于解码后的视频格式转换
     pFrame = av_frame_alloc();
+    swFrame = av_frame_alloc();
     pFrameYUV = av_frame_alloc();
-    ///由于解码后的数据不一定都是yuv420p，因此需要将解码后的数据统一转换成YUV420P
-    img_convert_ctx = sws_getContext(codec_ctx_->width, codec_ctx_->height,
-                                     codec_ctx_->pix_fmt, codec_ctx_->width, codec_ctx_->height,
-                                     AV_PIX_FMT_YUV420P, SWS_BICUBIC, NULL, NULL, NULL);
+    ///由于解码后的数据不一定都是yuv420p，因此需要将解码后的数据统一转换成YUV420P    
     numBytes = avpicture_get_size(AV_PIX_FMT_YUV420P, codec_ctx_->width, codec_ctx_->height);
     out_buffer_yuv = (uint8_t *)av_malloc(numBytes * sizeof(uint8_t));
     avpicture_fill((AVPicture *)pFrameYUV, out_buffer_yuv, AV_PIX_FMT_YUV420P,
@@ -50,7 +50,7 @@ void VideoPlayer::decodeVideoThread() {
         AVPacket *packet = &pkt1;
         //收到这个数据 说明刚刚执行过跳转 现在需要把解码器的数据 清除一下
         if (strcmp((char*)packet->data, FLUSH_DATA) == 0) {
-            avcodec_flush_buffers(video_stream_->codec);
+            avcodec_flush_buffers(codec_ctx_);
             av_packet_unref(packet);
             continue;
         }
@@ -114,7 +114,22 @@ void VideoPlayer::decodeVideoThread() {
                     mSleep(delayTime);
                 }
             }
-            sws_scale(img_convert_ctx, (uint8_t const * const *)pFrame->data, pFrame->linesize,
+
+            if (pFrame->format == hw_pix_fmt_) {
+                /* retrieve data from GPU to CPU */
+                if (av_hwframe_transfer_data(swFrame, pFrame, 0) >= 0) {
+                    tmpFrame = swFrame;
+                }
+            } else {
+                tmpFrame = pFrame;
+            }
+
+            if (img_convert_ctx == nullptr) {
+                img_convert_ctx = sws_getContext(codec_ctx_->width, codec_ctx_->height,
+                                                 AVPixelFormat(tmpFrame->format), codec_ctx_->width, codec_ctx_->height,
+                                                 AV_PIX_FMT_YUV420P, SWS_BICUBIC, NULL, NULL, NULL);
+            }
+            sws_scale(img_convert_ctx, (uint8_t const * const *)tmpFrame->data, tmpFrame->linesize,
                       0, codec_ctx_->height, pFrameYUV->data, pFrameYUV->linesize);
             doDisplayVideo(out_buffer_yuv, codec_ctx_->width, codec_ctx_->height);
 
@@ -126,6 +141,7 @@ void VideoPlayer::decodeVideoThread() {
         av_packet_unref(packet);
     }
     av_free(pFrame);
+    av_free(swFrame);
     av_free(pFrameYUV);
     av_free(out_buffer_yuv);
     sws_freeContext(img_convert_ctx);

@@ -89,7 +89,7 @@ private:
     void doPlayerStateChanged(const VideoPlayerState &state, const bool &hasVideo, const bool &hasAudio);
     ///显示视频数据，此函数不宜做耗时操作，否则会影响播放的流畅性。
     void doDisplayVideo(const uint8_t *yuv420Buffer, const int &width, const int &height);
-
+        
     ///SDL播放音频相关
     SDL_AudioDeviceID audio_id_;
     ///回调函数
@@ -121,9 +121,12 @@ private:
     AVStream *video_stream_; //视频流
     AVStream *audio_stream_; //音频流
     ///视频相关
-    AVFormatContext *format_ctx_;
-    AVCodecContext *codec_ctx_;
-    AVCodec *codec_;
+    AVFormatContext *format_ctx_ = nullptr;
+    AVCodecContext *codec_ctx_ = nullptr;
+    AVCodec *codec_ = nullptr;
+    AVHWDeviceType hw_device_type_ = AV_HWDEVICE_TYPE_NONE;
+    AVPixelFormat hw_pix_fmt_ = AV_PIX_FMT_NONE;
+    AVBufferRef* hw_device_ctx_ = nullptr;
     ///音频相关
     AVCodecContext *audio_codec_ctx_;
     AVCodec *audio_codec_;
