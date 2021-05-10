@@ -50,7 +50,7 @@ public:
      * @brief setVideoPlayerCallBack 设置播放器回调函数
      * @param pointer
      */
-    void setVideoPlayerCallBack(VideoPlayerCallBack *pointer) { mVideoPlayerCallBack = pointer; }
+    void setVideoPlayerCallBack(VideoPlayerCallBack *pointer) { video_player_callback_ = pointer; }
     bool startPlay(const char* filePath);
     bool replay(); //重新播放
     bool play(); //播放（用于暂停后，重新开始播放）
@@ -76,13 +76,9 @@ private:
     bool inputAudioQuene(const AVPacket &pkt);
     void clearAudioQuene();
     ///本播放器中SDL仅用于播放音频，不用做别的用途
-    ///SDL播放音频相关
-    SDL_AudioDeviceID mAudioID;
     int openSDL();
     void closeSDL();
     ///回调函数相关，主要用于输出信息给界面
-    ///回调函数
-    VideoPlayerCallBack *mVideoPlayerCallBack;
     ///打开文件失败
     void doOpenVideoFileFailed(const int &code = 0);
     ///打开sdl失败的时候回调此函数
@@ -94,6 +90,10 @@ private:
     ///显示视频数据，此函数不宜做耗时操作，否则会影响播放的流畅性。
     void doDisplayVideo(const uint8_t *yuv420Buffer, const int &width, const int &height);
 
+    ///SDL播放音频相关
+    SDL_AudioDeviceID audio_id_;
+    ///回调函数
+    VideoPlayerCallBack *video_player_callback_;
     std::string file_path_; //视频文件路径
     VideoPlayerState player_state_; //播放状态
     ///音量相关变量

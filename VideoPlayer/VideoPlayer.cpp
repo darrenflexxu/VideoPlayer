@@ -25,8 +25,8 @@ VideoPlayer::VideoPlayer() {
     condition_video_ = new Cond;
     condition_audio_ = new Cond;
     player_state_ = VideoPlayer_Stop;
-    mVideoPlayerCallBack = nullptr;
-    mAudioID = 0;
+    video_player_callback_ = nullptr;
+    audio_id_ = 0;
     is_mute_ = false;
     is_need_pause_ = false;
     volume_ = 1;
@@ -149,27 +149,27 @@ int VideoPlayer::openSDL() {
 
     int num = SDL_GetNumAudioDevices(0);
     for (int i = 0; i < num; i++) {
-        mAudioID = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(i, 0), false, &wanted_spec, &spec, 0);
-        if (mAudioID > 0) {
+        audio_id_ = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(i, 0), false, &wanted_spec, &spec, 0);
+        if (audio_id_ > 0) {
             break;
         }
     }
-    if (mAudioID <= 0) {
+    if (audio_id_ <= 0) {
         is_audio_thread_finished_ = true;
         return -1;
     }
-    fprintf(stderr, "mAudioID=%d\n\n\n\n\n\n", mAudioID);
+    fprintf(stderr, "audio_id_=%d\n\n\n\n\n\n", audio_id_);
     return 0;
 }
 
 void VideoPlayer::closeSDL() {
-    if (mAudioID > 0) {
-        SDL_LockAudioDevice(mAudioID);
-        SDL_PauseAudioDevice(mAudioID, 1);
-        SDL_UnlockAudioDevice(mAudioID);
-        SDL_CloseAudioDevice(mAudioID);
+    if (audio_id_ > 0) {
+        SDL_LockAudioDevice(audio_id_);
+        SDL_PauseAudioDevice(audio_id_, 1);
+        SDL_UnlockAudioDevice(audio_id_);
+        SDL_CloseAudioDevice(audio_id_);
     }
-    mAudioID = 0;
+    audio_id_ = 0;
 }
 
 void VideoPlayer::readVideoFile() {
@@ -312,9 +312,9 @@ void VideoPlayer::readVideoFile() {
             int code = openSDL();
 
             if (code == 0) {
-                SDL_LockAudioDevice(mAudioID);
-                SDL_PauseAudioDevice(mAudioID, 0);
-                SDL_UnlockAudioDevice(mAudioID);
+                SDL_LockAudioDevice(audio_id_);
+                SDL_PauseAudioDevice(audio_id_, 0);
+                SDL_UnlockAudioDevice(audio_id_);
                 is_audio_thread_finished_ = false;
             } else {
                 doOpenSdlFailed(code);
@@ -514,8 +514,8 @@ void VideoPlayer::clearAudioQuene() {
 void VideoPlayer::doOpenVideoFileFailed(const int &code) {
     fprintf(stderr, "%s \n", __FUNCTION__);
 
-    if (mVideoPlayerCallBack != nullptr) {
-        mVideoPlayerCallBack->onOpenVideoFileFailed(code);
+    if (video_player_callback_ != nullptr) {
+        video_player_callback_->onOpenVideoFileFailed(code);
     }
 }
 
@@ -523,8 +523,8 @@ void VideoPlayer::doOpenVideoFileFailed(const int &code) {
 void VideoPlayer::doOpenSdlFailed(const int &code) {
     fprintf(stderr, "%s \n", __FUNCTION__);
 
-    if (mVideoPlayerCallBack != nullptr) {
-        mVideoPlayerCallBack->onOpenSdlFailed(code);
+    if (video_player_callback_ != nullptr) {
+        video_player_callback_->onOpenSdlFailed(code);
     }
 }
 
@@ -532,8 +532,8 @@ void VideoPlayer::doOpenSdlFailed(const int &code) {
 void VideoPlayer::doTotalTimeChanged(const int64_t &uSec) {
     fprintf(stderr, "%s \n", __FUNCTION__);
 
-    if (mVideoPlayerCallBack != nullptr) {
-        mVideoPlayerCallBack->onTotalTimeChanged(uSec);
+    if (video_player_callback_ != nullptr) {
+        video_player_callback_->onTotalTimeChanged(uSec);
     }
 }
 
@@ -541,18 +541,18 @@ void VideoPlayer::doTotalTimeChanged(const int64_t &uSec) {
 void VideoPlayer::doPlayerStateChanged(const VideoPlayerState &state, const bool &hasVideo, const bool &hasAudio) {
     fprintf(stderr, "%s \n", __FUNCTION__);
 
-    if (mVideoPlayerCallBack != nullptr) {
-        mVideoPlayerCallBack->onPlayerStateChanged(state, hasVideo, hasAudio);
+    if (video_player_callback_ != nullptr) {
+        video_player_callback_->onPlayerStateChanged(state, hasVideo, hasAudio);
     }
 }
 
 ///显示视频数据，此函数不宜做耗时操作，否则会影响播放的流畅性。
 void VideoPlayer::doDisplayVideo(const uint8_t *yuv420Buffer, const int &width, const int &height) {
     //    fprintf(stderr, "%s \n", __FUNCTION__);
-    if (mVideoPlayerCallBack != nullptr) {
+    if (video_player_callback_ != nullptr) {
         auto videoFrame = new VideoFrame();
         videoFrame->initBuffer(width, height);
         videoFrame->setYUVbuf(yuv420Buffer);
-        mVideoPlayerCallBack->onDisplayVideo(videoFrame);
+        video_player_callback_->onDisplayVideo(videoFrame);
     }
 }
