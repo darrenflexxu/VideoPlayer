@@ -10,7 +10,7 @@ void VideoPlayer::decodeVideoThread() {
     double video_pts = 0; //当前视频的pts
     double audio_pts = 0; //音频pts
     ///解码视频相关
-    AVFrame *pFrame, *pFrameYUV, *tmpFrame, *swFrame;
+    AVFrame *pFrame, *pFrameYUV, *swFrame;
     uint8_t *out_buffer_yuv; //解码后的yuv数据
     struct SwsContext *img_convert_ctx = nullptr;  //用于解码后的视频格式转换
     pFrame = av_frame_alloc();
@@ -114,14 +114,13 @@ void VideoPlayer::decodeVideoThread() {
                     mSleep(delayTime);
                 }
             }
+            AVFrame * tmpFrame = pFrame;
 
             if (pFrame->format == hw_pix_fmt_) {
                 /* retrieve data from GPU to CPU */
                 if (av_hwframe_transfer_data(swFrame, pFrame, 0) >= 0) {
                     tmpFrame = swFrame;
                 }
-            } else {
-                tmpFrame = pFrame;
             }
 
             if (img_convert_ctx == nullptr) {
