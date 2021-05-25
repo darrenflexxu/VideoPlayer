@@ -45,7 +45,6 @@ int main(int argc, char *argv[])
 
     QTextCodec *codec = QTextCodec::codecForName("GBK");
     QTextCodec::setCodecForLocale(codec);
-
     AppConfig::InitAllDataPath(); //初始化一些变量和路径信息
     AppConfig::loadConfigInfoFromFile();
 
@@ -53,7 +52,6 @@ int main(int argc, char *argv[])
 
     MainWindow w;
     w.show();
-
     return a.exec();
 }
 
