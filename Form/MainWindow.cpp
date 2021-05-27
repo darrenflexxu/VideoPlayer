@@ -33,6 +33,7 @@ struct DXVA2DevicePriv {
 };
 void DrawFrame(AVFrame* frame, AVCodecContext* c) {
     static std::mutex mtx;
+    std::unique_lock<std::mutex> lock(mtx);
     if (!frame->data[3] || !c)return;
     auto surface = (IDirect3DSurface9*)frame->data[3];
     auto ctx = (AVHWDeviceContext*)c->hw_device_ctx->data;
@@ -50,14 +51,38 @@ void DrawFrame(AVFrame* frame, AVCodecContext* c) {
         viewport.top = 0;
         viewport.bottom = frame->height;
     }
-    std::unique_lock<std::mutex> lock(mtx);
+    //device->SetRenderState(D3DRS_LIGHTING, FALSE);
     //设置显示窗口句柄
     device->Present(&viewport, &viewport, hwnd, 0);
     //后台缓冲表面
     static IDirect3DSurface9* back = nullptr;
     if (!back)
         device->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &back);
-    device->StretchRect(surface, 0, back, &viewport, D3DTEXF_LINEAR);
+    device->StretchRect(surface, 0, back, 0, D3DTEXF_LINEAR);
+    av_frame_free(&frame);
+}
+
+void DrawFrameWithHandle(AVFrame* frame, AVCodecContext* c, void* hwnd, int width, int height) {    
+    if (!frame->data[3] || !c || !hwnd)return;
+    static std::mutex mtx;
+    std::unique_lock<std::mutex> lock(mtx);
+    auto surface = (IDirect3DSurface9*)frame->data[3];
+    auto ctx = (AVHWDeviceContext*)c->hw_device_ctx->data;
+    auto priv = (DXVA2DevicePriv*)ctx->user_opaque;
+    auto device = priv->d3d9device;
+    RECT viewport;
+    viewport.left = 0;
+    viewport.right = width;
+    viewport.top = 0;
+    viewport.bottom = height;
+    //device->SetRenderState(D3DRS_LIGHTING, FALSE);
+    //设置显示窗口句柄
+    device->Present(&viewport, &viewport, (HWND)hwnd, 0);
+    //后台缓冲表面
+    static IDirect3DSurface9* back = nullptr;
+    if (!back)
+        device->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &back);
+    device->StretchRect(surface, 0, back, 0, D3DTEXF_LINEAR);
     av_frame_free(&frame);
 }
 #endif
@@ -279,7 +304,11 @@ bool MainWindow::OnRenderGPUNoCopy() {
 
 void MainWindow::onDisplayVideo(AVFrame * frame, AVCodecContext * codec_ctx) {
     auto new_frame = av_frame_clone(frame);
-    FunctionTransfer::runInMainThread(std::bind(DrawFrame, new_frame, codec_ctx));
+    FunctionTransfer::runInMainThread([=] () {
+        ui_->stackedWidget->setCurrentWidget(ui_->page_audio);
+        ui_->label->resize(new_frame->width, new_frame->height);
+        DrawFrameWithHandle(new_frame, codec_ctx, (void*)ui_->label->winId(), ui_->label->width(), ui_->label->height());
+    });
 }
 
 //图片显示部件时间过滤器处理
