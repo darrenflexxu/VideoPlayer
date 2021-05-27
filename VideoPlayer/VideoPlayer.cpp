@@ -17,6 +17,7 @@ IVideoPlayer* CreateVideoPlayer() {
 
 void ReleaseVideoPlayer(IVideoPlayer* player) {
     if (player) {
+        player->stop(true);
         delete player;
     }
 }
