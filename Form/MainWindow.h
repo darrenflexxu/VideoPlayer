@@ -37,6 +37,10 @@ protected:
     void onDisplayVideo(IVideoFrame* videoFrame) override;
     ///是否开启GPU解码
     bool OnEnableGPUDecode() override;
+    ///是否直接在显存中渲染视频
+    bool OnRenderGPUNoCopy() override;
+    /// 播放视频
+    void onDisplayVideo(AVFrame* frame, AVCodecContext* codec_ctx) override;
 
 private slots:
     ///播放器相关的槽函数

@@ -117,20 +117,26 @@ void VideoPlayer::decodeVideoThread() {
             AVFrame * tmpFrame = pFrame;
 
             if (pFrame->format == hw_pix_fmt_) {
-                /* retrieve data from GPU to CPU */
-                if (av_hwframe_transfer_data(swFrame, pFrame, 0) >= 0) {
-                    tmpFrame = swFrame;
+                if (video_player_callback_ && video_player_callback_->OnRenderGPUNoCopy()) {
+                    video_player_callback_->onDisplayVideo(pFrame, codec_ctx_);
+                } else {
+                    /* retrieve data from GPU to CPU */
+                    if (av_hwframe_transfer_data(swFrame, pFrame, 0) >= 0) {
+                        tmpFrame = swFrame;
+                    }
+                }                
+            }
+            if (video_player_callback_ && video_player_callback_->OnRenderGPUNoCopy()) {
+            } else {
+                if (img_convert_ctx == nullptr) {
+                    img_convert_ctx = sws_getContext(codec_ctx_->width, codec_ctx_->height,
+                                                     AVPixelFormat(tmpFrame->format), codec_ctx_->width, codec_ctx_->height,
+                                                     AV_PIX_FMT_YUV420P, SWS_BICUBIC, NULL, NULL, NULL);
                 }
-            }
-
-            if (img_convert_ctx == nullptr) {
-                img_convert_ctx = sws_getContext(codec_ctx_->width, codec_ctx_->height,
-                                                 AVPixelFormat(tmpFrame->format), codec_ctx_->width, codec_ctx_->height,
-                                                 AV_PIX_FMT_YUV420P, SWS_BICUBIC, NULL, NULL, NULL);
-            }
-            sws_scale(img_convert_ctx, (uint8_t const * const *)tmpFrame->data, tmpFrame->linesize,
-                      0, codec_ctx_->height, pFrameYUV->data, pFrameYUV->linesize);
-            doDisplayVideo(out_buffer_yuv, codec_ctx_->width, codec_ctx_->height);
+                sws_scale(img_convert_ctx, (uint8_t const * const *)tmpFrame->data, tmpFrame->linesize,
+                          0, codec_ctx_->height, pFrameYUV->data, pFrameYUV->linesize);
+                doDisplayVideo(out_buffer_yuv, codec_ctx_->width, codec_ctx_->height);
+            }            
 
             if (is_need_pause_) {
                 is_pause_ = true;

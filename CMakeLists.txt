@@ -95,12 +95,14 @@ link_directories("${ThirdParty}/ffmpeg/lib"
 )
 ENDIF()
 
+add_definitions(-DUNICODE)
+
 ADD_EXECUTABLE(${PROJECT_NAME} ${SRC} ${HEADER} ${UI} ${QRC} ${QM_FILES}) 
 
 TARGET_LINK_LIBRARIES(${PROJECT_NAME} Qt5::Widgets Qt5::Core Qt5::Gui Qt5::Qml Qt5::Quick VideoPlayer)
 
 IF(WIN32)
-TARGET_LINK_LIBRARIES(${PROJECT_NAME} Qt5::Widgets Qt5::OpenGL Qt5::WinExtras OpenGL32 Glu32i FramelessHelper Form)
+TARGET_LINK_LIBRARIES(${PROJECT_NAME} Qt5::Widgets Qt5::OpenGL Qt5::WinExtras OpenGL32 FramelessHelper Form)
 
 add_custom_command(
         TARGET ${PROJECT_NAME} POST_BUILD

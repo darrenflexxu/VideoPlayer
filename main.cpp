@@ -6,6 +6,10 @@
 #include "AppConfig.h"
 #include "MainWindow.h"
 
+#ifdef WIN32
+#include <Windows.h>
+#endif
+
 #undef main
 int main(int argc, char *argv[])
 {
@@ -40,7 +44,14 @@ int main(int argc, char *argv[])
 
 //#endif
 //    }
-
+#ifdef WIN32
+    WNDCLASSEX wc;
+    memset(&wc, 0, sizeof(wc));
+    wc.cbSize = sizeof(wc);
+    wc.lpfnWndProc = DefWindowProc; //消息函数
+    wc.lpszClassName = L"DX";
+    RegisterClassEx(&wc);
+#endif
     QApplication a(argc, argv);
 
     QTextCodec *codec = QTextCodec::codecForName("GBK");

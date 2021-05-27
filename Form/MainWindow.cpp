@@ -11,6 +11,56 @@
 #include <QMessageBox>
 #include "AppConfig.h"
 #include "Base/FunctionTransfer.h"
+#include <mutex>
+#ifdef WIN32
+#include <windows.h>
+#include <d3d9.h>
+#endif
+extern "C" { //指定函数是c语言函数，函数名不包含重载标注
+             //引用ffmpeg头文件
+#include <libavcodec/avcodec.h>
+#include <libavutil/opt.h>
+}
+
+#ifdef WIN32
+
+struct DXVA2DevicePriv {
+    HMODULE d3dlib;
+    HMODULE dxva2lib;
+    HANDLE device_handle;
+    IDirect3D9* d3d9;
+    IDirect3DDevice9* d3d9device;
+};
+void DrawFrame(AVFrame* frame, AVCodecContext* c) {
+    static std::mutex mtx;
+    if (!frame->data[3] || !c)return;
+    auto surface = (IDirect3DSurface9*)frame->data[3];
+    auto ctx = (AVHWDeviceContext*)c->hw_device_ctx->data;
+    auto priv = (DXVA2DevicePriv*)ctx->user_opaque;
+    auto device = priv->d3d9device;
+    static HWND hwnd = nullptr;
+    static RECT viewport;
+    if (!hwnd) {
+        hwnd = CreateWindow(L"DX", L"Test DXVA", WS_OVERLAPPEDWINDOW,
+                            200, 200, frame->width, frame->height, 0, 0, 0, 0);
+        ShowWindow(hwnd, 1);
+        UpdateWindow(hwnd);
+        viewport.left = 0;
+        viewport.right = frame->width;
+        viewport.top = 0;
+        viewport.bottom = frame->height;
+    }
+    std::unique_lock<std::mutex> lock(mtx);
+    //设置显示窗口句柄
+    device->Present(&viewport, &viewport, hwnd, 0);
+    //后台缓冲表面
+    static IDirect3DSurface9* back = nullptr;
+    if (!back)
+        device->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &back);
+    device->StretchRect(surface, 0, back, &viewport, D3DTEXF_LINEAR);
+    av_frame_free(&frame);
+}
+#endif
 
 Q_DECLARE_METATYPE(VideoPlayerState)
 
@@ -221,6 +271,15 @@ void MainWindow::onDisplayVideo(IVideoFrame* videoFrame) {
 
 bool MainWindow::OnEnableGPUDecode() {
     return AppConfig::gVideoHardDecoder;
+}
+
+bool MainWindow::OnRenderGPUNoCopy() {
+    return true;
+}
+
+void MainWindow::onDisplayVideo(AVFrame * frame, AVCodecContext * codec_ctx) {
+    auto new_frame = av_frame_clone(frame);
+    FunctionTransfer::runInMainThread(std::bind(DrawFrame, new_frame, codec_ctx));
 }
 
 //图片显示部件时间过滤器处理

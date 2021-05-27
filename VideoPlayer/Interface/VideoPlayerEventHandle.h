@@ -4,6 +4,9 @@
 #include "types.h"
 #include "IVideoFrame.h"
 
+struct AVFrame;
+struct AVCodecContext;
+
 struct DLL_API VideoPlayerCallBack {
     ///打开文件失败
     virtual void onOpenVideoFileFailed(const int &code = 0) = 0;
@@ -17,5 +20,9 @@ struct DLL_API VideoPlayerCallBack {
     virtual void onDisplayVideo(IVideoFrame* videoFrame) = 0;
     ///是否开启GPU解码
     virtual bool OnEnableGPUDecode() = 0;
+    ///是否直接在显存中渲染视频
+    virtual bool OnRenderGPUNoCopy() = 0;
+    /// 播放视频
+    virtual void onDisplayVideo(AVFrame* frame, AVCodecContext* codec_ctx) = 0;
 };
 #endif // VIDEOPLAERYEVENTHANDLE_H
