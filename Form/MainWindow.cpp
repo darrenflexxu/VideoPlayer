@@ -63,7 +63,7 @@ void DrawFrame(AVFrame* frame, AVCodecContext* c) {
 }
 
 void DrawFrameWithHandle(AVFrame* frame, AVCodecContext* c, void* hwnd, int width, int height, IDirect3DSurface9*& back) {    
-    if (!frame->data[3] || !c || !hwnd)return;
+    if (!frame->data[3] || !c || !hwnd || !c->hw_device_ctx)return;
     static std::mutex mtx;
     std::unique_lock<std::mutex> lock(mtx);
     auto surface = (IDirect3DSurface9*)frame->data[3];
