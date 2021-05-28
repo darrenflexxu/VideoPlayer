@@ -62,7 +62,7 @@ void DrawFrame(AVFrame* frame, AVCodecContext* c) {
     av_frame_free(&frame);
 }
 
-void DrawFrameWithHandle(AVFrame* frame, AVCodecContext* c, void* hwnd, int width, int height) {    
+void DrawFrameWithHandle(AVFrame* frame, AVCodecContext* c, void* hwnd, int width, int height, IDirect3DSurface9*& back) {    
     if (!frame->data[3] || !c || !hwnd)return;
     static std::mutex mtx;
     std::unique_lock<std::mutex> lock(mtx);
@@ -77,9 +77,8 @@ void DrawFrameWithHandle(AVFrame* frame, AVCodecContext* c, void* hwnd, int widt
     viewport.bottom = height;
     //device->SetRenderState(D3DRS_LIGHTING, FALSE);
     //设置显示窗口句柄
-    device->Present(&viewport, &viewport, (HWND)hwnd, 0);
+    device->Present(&viewport, 0, (HWND)hwnd, 0);
     //后台缓冲表面
-    static IDirect3DSurface9* back = nullptr;
     if (!back)
         device->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &back);
     device->StretchRect(surface, 0, back, 0, D3DTEXF_LINEAR);
@@ -212,6 +211,7 @@ void MainWindow::slotBtnClick(bool isChecked) {
             AppConfig::gVideoFilePath = s;
             AppConfig::saveConfigInfoToFile();
         }
+        back_ = nullptr;
     } else if (QObject::sender() == ui_->pushButton_volume) {
         qDebug() << isChecked;
         bool isMute = isChecked;
@@ -304,10 +304,16 @@ bool MainWindow::OnRenderGPUNoCopy() {
 
 void MainWindow::onDisplayVideo(AVFrame * frame, AVCodecContext * codec_ctx) {
     auto new_frame = av_frame_clone(frame);
-    FunctionTransfer::runInMainThread([=] () {
+    FunctionTransfer::runInMainThread([this, new_frame, codec_ctx] () {
         ui_->stackedWidget->setCurrentWidget(ui_->page_audio);
-        ui_->label->resize(new_frame->width, new_frame->height);
-        DrawFrameWithHandle(new_frame, codec_ctx, (void*)ui_->label->winId(), ui_->label->width(), ui_->label->height());
+        
+        auto render_on_device = [this, new_frame, codec_ctx](QWidget* widget){
+            if (widget->width() != new_frame->width || widget->height() != new_frame->height) {                
+                widget->resize(new_frame->width, new_frame->height);
+            }
+            DrawFrameWithHandle(new_frame, codec_ctx, (void*)widget->winId(), widget->width(), widget->height(), back_);
+        };
+        render_on_device(ui_->page_audio);
     });
 }
 

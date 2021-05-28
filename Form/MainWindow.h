@@ -15,6 +15,8 @@ namespace Ui {
 class MainWindow;
 }
 
+struct IDirect3DSurface9;
+
 ///这个是播放器的主界面 包括那些按钮和进度条之类的
 class MainWindow : public DragAbleWidget, public VideoPlayerCallBack {
     Q_OBJECT
@@ -57,5 +59,6 @@ private:
     QPropertyAnimation *mAnimation_ControlWidget;   //控制底部控制控件的出现和隐藏
     void showOutControlWidget(); //显示底部控制控件
     void hideControlWidget();    //隐藏底部控制控件
+    IDirect3DSurface9* back_ = nullptr;
 };
 #endif // MAINWINDOW_H
