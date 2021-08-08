@@ -43,6 +43,7 @@ include_directories("${PROJECT_SOURCE_DIR}/FramelessHelper"
 )
 
 add_subdirectory(VideoPlayer)
+add_subdirectory(xcodec)
 
 IF(WIN32)
 add_subdirectory(FramelessHelper)
