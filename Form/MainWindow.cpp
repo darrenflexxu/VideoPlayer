@@ -299,7 +299,7 @@ bool MainWindow::OnEnableGPUDecode() {
 }
 
 bool MainWindow::OnRenderGPUNoCopy() {
-    return true;
+    return false;
 }
 
 void MainWindow::onDisplayVideo(AVFrame * frame, AVCodecContext * codec_ctx) {
