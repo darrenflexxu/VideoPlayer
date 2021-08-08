@@ -90,6 +90,10 @@ std::shared_ptr<XPara> XFormat::CopyAudioPara()
     re.reset(XPara::Create());
     *re->time_base = c_->streams[index]->time_base;
     avcodec_parameters_copy(re->para, c_->streams[index]->codecpar);
+    //×ª»»³ÉºÁÃë
+    re->total_ms = av_rescale_q(c_->streams[index]->duration,
+        c_->streams[index]->time_base, { 1,1000 });
+
     return re;
 }
 
@@ -103,6 +107,11 @@ std::shared_ptr<XPara> XFormat::CopyVideoPara()
     re.reset(XPara::Create());
     *re->time_base = c_->streams[index]->time_base;
     avcodec_parameters_copy(re->para, c_->streams[index]->codecpar);
+
+    //×ª»»³ÉºÁÃë
+    re->total_ms = av_rescale_q(c_->streams[index]->duration,
+        c_->streams[index]->time_base, { 1,1000 });
+
     return re;
 }
 

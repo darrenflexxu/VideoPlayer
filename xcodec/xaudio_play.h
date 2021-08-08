@@ -68,6 +68,9 @@ class XCODEC_API XAudioPlay
 {
 public:
     static XAudioPlay* Instance();
+    
+    //暂停
+    virtual void Pause(bool is_pause) = 0;
 
     virtual void Push(AVFrame* frame);
     virtual bool Open(AVCodecParameters* para);
@@ -76,6 +79,11 @@ public:
     //打开音频 开始播放 调用回调函数
     virtual bool Open(XAudioSpec& spec) = 0;
     virtual void Close() = 0;
+    virtual void Clear()
+    {
+        Close();
+        SetSpeed(speed_);
+    }
 
     //获取当前的播放位置
     virtual long long cur_pts() = 0;
@@ -91,6 +99,7 @@ public:
     //播放速度
     virtual void SetSpeed(float s)
     {
+        speed_ = s;
         auto spec = spec_;
         auto old_freq = spec.freq;
         spec.freq *= s;
@@ -108,6 +117,7 @@ public:
     void set_time_base(double b) { time_base_ = b; }
 protected:
     double time_base_ = 0;
+    float speed_ = 1.;
     XAudioPlay();
     virtual void Callback(unsigned char* stream, int len) = 0;
     static void AudioCallback(void* userdata, unsigned char* stream, int len)

@@ -9,8 +9,24 @@ using namespace std;
 class CXAudioPlay :public XAudioPlay
 {
 public:
-
-
+    
+    //暂停
+    void Pause(bool is_pause)
+    {
+        if (is_pause)
+        {
+            SDL_PauseAudio(1);
+            pause_begin = NowMs();
+        }
+        else
+        {
+            //去掉暂停的事件
+            if(pause_begin>0)
+                last_ms_ += (NowMs() - pause_begin);
+            SDL_PauseAudio(0);
+        }
+            
+    }
     bool Open(XAudioSpec& spec)
     {
         this->spec_ = spec;
@@ -39,6 +55,9 @@ public:
         SDL_QuitSubSystem(SDL_INIT_AUDIO);
         unique_lock<mutex> lock(mux_);
         audio_datas_.clear();
+        cur_pts_ = 0; //当前播放位置
+        last_ms_ = 0;  //上次的时间戳
+        pause_begin = 0;//暂停开始时间戳
     }
     void Callback(unsigned char* stream, int len)
     {
@@ -82,11 +101,12 @@ public:
         //pts 毫秒换算pts的时间基数
         if(time_base_ > 0)
             ms = ms / (double)1000 / (double)time_base_;
-        return cur_pts_ + ms;
+        return cur_pts_ + speed_*ms;
     }
 private:
     long long cur_pts_ = 0; //当前播放位置
     long long last_ms_ = 0;  //上次的时间戳
+    long long pause_begin = 0;//暂停开始时间戳
 };
 
 void XAudioPlay::Push(AVFrame* frame)

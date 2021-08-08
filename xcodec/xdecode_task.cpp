@@ -8,15 +8,43 @@ extern "C"
 
 }
 using namespace std;
+void XDecodeTask::set_time_base(AVRational* time_base)
+{
+    if (!time_base)return;
+    unique_lock<mutex> lock(mux_);
+    if (time_base_)
+        delete time_base_;
+    time_base_ = new AVRational();
+    time_base_->den = time_base->den;
+    time_base_->num = time_base->num;
+}
 
+/// <summary>
+/// 清理缓存
+/// </summary>
+void XDecodeTask::Clear()
+{
+    pkt_list_.Clear();
+    unique_lock<mutex> lock(mux_);
+    while (!frames_.empty())
+    {
+        av_frame_free(&frames_.front());
+        frames_.pop_front();
+    }
+    cur_pts_ = -1;
+    decode_.Clear();
+}
 void XDecodeTask::Stop()
 {
     XThread::Stop();
     pkt_list_.Clear();
-
+   
     unique_lock<mutex> lock(mux_);
     decode_.set_c(nullptr);
     is_open_ = false;
+    if (time_base_)
+        delete time_base_;
+    time_base_ = nullptr;
     while (!frames_.empty())
     {
         av_frame_free(&frames_.front());
@@ -108,13 +136,19 @@ void XDecodeTask::Main()
         frame_ = av_frame_alloc();
     }
 
-    long long cur_pts = -1;//当前解码到的pts（以解码数据为准）
+
     while (!is_exit_)
     {
+        if (is_pause()) //暂停
+        {
+            MSleep(1);
+            continue;
+        }
+        
         //同步
         while (!is_exit_)
         {
-            if (syn_pts_ >= 0 && cur_pts > syn_pts_)
+            if (syn_pts_ >= 0 && cur_pts_ > syn_pts_)
             {
                 MSleep(1);
                 continue;
@@ -143,7 +177,11 @@ void XDecodeTask::Main()
             { 
                 cout << "@" << flush;
                 need_view_ = true;
-                cur_pts = frame_->pts;
+                cur_pts_ = frame_->pts;
+                //转换成毫秒
+                if(time_base_)
+                    cur_ms_ = av_rescale_q(frame_->pts,*time_base_, 
+                    { 1,1000 });;
             }
             if (frame_cache_)
             {

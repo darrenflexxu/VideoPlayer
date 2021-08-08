@@ -28,10 +28,23 @@ public:
     //设置同步时间
     void set_syn_pts(long long p) { syn_pts_ = p; }
     void set_block_size(int s) { block_size_ = s; }
+    /// <summary>
+    /// 清理缓存
+    /// </summary>
+    void Clear();
 
     void Stop();
+
+    //当前播放位置的毫秒
+    long long cur_ms() { return cur_ms_; };
+
+    void set_time_base(AVRational* time_base);
+
 private:
-    int block_size_ = 0;  //阻塞大小
+    long long cur_pts_ = -1;//当前解码到的pts（以解码数据为准）
+    AVRational* time_base_ = nullptr;
+    long long cur_ms_ = 0;  //当前播放位置的毫秒
+    int block_size_ = 0;    //阻塞大小
     long long syn_pts_ = -1;//同步时间 -1不同步
     bool is_open_ = false;
     int stream_index_ = 0;

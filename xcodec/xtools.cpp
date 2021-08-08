@@ -75,6 +75,15 @@ void XThread::Stop() {
     LOGINFO(ss.str());
     is_exit_ = true;
 }
+
+//停止线程（设置退出标志，等待线程退出）
+void XThread::Stop()
+{
+    Exit();
+    Wait();
+}
+
+
 //创建对象
 XPara* XPara::Create() {
     return new XPara();

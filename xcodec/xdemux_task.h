@@ -6,13 +6,22 @@ enum XSYN_TYPE
     XSYN_NONE = 0,  //不做同步
     XSYN_VIDEO = 1, //根据视频同步，不处理音频
 };
+
 class XCODEC_API XDemuxTask :public XThread
 {
 public:
+
+    bool Seek(long long ms);
+
+    ///音频索引
     int audio_index() { return demux_.audio_index(); }
+    
+    ///视频索引
     int video_index() { return demux_.video_index(); }
 
+    ///入口线程函数
     void Main();
+
     /// <summary>
     /// 打开解封装
     /// </summary>
@@ -30,8 +39,10 @@ public:
     {
         return demux_.CopyAudioPara();
     }
+    ///设置同步类型，只支持视频
     void set_syn_type(XSYN_TYPE t) { syn_type_ = t; }
 
+    ///停止线程并清理资源，需要Wait等待线程结束
     void Stop();
 private:
     XDemux demux_;

@@ -23,7 +23,23 @@ public:
 
     //渲染视频 播放音频
     void Update();
+
+    void SetSpeed(float s);
+
+    //总时长 毫秒
+    long long total_ms() { return total_ms_; }
+
+    //当前播放的位置 毫秒
+    long long pos_ms() {return pos_ms_;}
+
+    //设置视频播放位置，毫秒
+    bool Seek(long long ms);
+
+    void Pause(bool is_pause) override;
 protected:
+
+    long long total_ms_ = 0;
+    long long pos_ms_ = 0;
     XDemuxTask demux_;              //解封装
     XDecodeTask audio_decode_;      //音频解码
     XDecodeTask video_decode_;      //视频解码

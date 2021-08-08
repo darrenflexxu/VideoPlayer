@@ -1,11 +1,29 @@
 #include "xplayer.h"
 #include "xaudio_play.h"
+//暂停或者播放
+void XPlayer::Pause(bool is_pause)
+{
+    XThread::Pause(is_pause);
+    demux_.Pause(is_pause);
+    audio_decode_.Pause(is_pause);
+    video_decode_.Pause(is_pause);
+    XAudioPlay::Instance()->Pause(is_pause);
+}
+//设置视频播放位置，毫秒
+bool XPlayer::Seek(long long ms)
+{
+    demux_.Seek(ms);
+    audio_decode_.Clear();
+    video_decode_.Clear();
+    XAudioPlay::Instance()->Clear();
+    return true;
+}
 void XPlayer::Stop()
 {
-    XThread::Stop();
-    demux_.Stop();
-    audio_decode_.Stop();
-    video_decode_.Stop();
+    Exit();
+    demux_.Exit();
+    audio_decode_.Exit();
+    video_decode_.Exit();
     Wait();
     demux_.Wait();
     audio_decode_.Wait();
@@ -27,6 +45,9 @@ bool XPlayer::Open(const char* url, void* winid)
     auto vp = demux_.CopyVideoPara();
     if (vp)
     {
+        //视频总时长
+        this->total_ms_ = vp->total_ms;
+
         if (!video_decode_.Open(vp->para))
         {
             return false;
@@ -114,19 +135,31 @@ void XPlayer::Update()
     au->Push(f);
     XFreeFrame(&f);
 }
-
+void XPlayer::SetSpeed(float s)
+{
+    XAudioPlay::Instance()->SetSpeed(s);
+}
 void XPlayer::Main()
 {
     long long syn = 0;
     auto au = XAudioPlay::Instance();
     auto ap = demux_.CopyAudioPara();
     auto vp = demux_.CopyVideoPara();
-    if (!ap)return;
+    video_decode_.set_time_base(vp->time_base);
     while (!is_exit_)
     {
-        syn = XRescale(au->cur_pts(), ap->time_base, vp->time_base);
-        audio_decode_.set_syn_pts(au->cur_pts() + 10000);
-        video_decode_.set_syn_pts(syn);
+        if (is_pause())
+        {
+            MSleep(1);
+            continue;
+        }
+        this->pos_ms_ = video_decode_.cur_ms();
+        if (ap)
+        {
+            syn = XRescale(au->cur_pts(), ap->time_base, vp->time_base);
+            audio_decode_.set_syn_pts(au->cur_pts() + 10000);
+            video_decode_.set_syn_pts(syn);
+        }
         MSleep(1);
     }
 }

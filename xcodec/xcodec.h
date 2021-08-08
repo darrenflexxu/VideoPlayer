@@ -34,7 +34,7 @@ public:
     //根据AVCodecContext 创建一个AVFrame，需要调用者释放av_frame_free
     AVFrame* CreateFrame();
 
-
+    virtual void Clear();
 protected:
     AVCodecContext* c_ = nullptr;  //编码器上下文
     std::mutex mux_;               //编码器上下文锁

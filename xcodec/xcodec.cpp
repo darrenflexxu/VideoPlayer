@@ -82,6 +82,13 @@ bool XCodec::SetOpt(const char* key, int val)
     }
     return true;
 }
+void XCodec::Clear()
+{
+    unique_lock<mutex>lock(mux_);
+    if (!c_)return ;
+    avcodec_flush_buffers(c_);
+}
+
 
 //////////////////////////////////////////////////////////////
 /// 打开编码器 线程安全
