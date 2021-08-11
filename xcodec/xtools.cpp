@@ -59,21 +59,20 @@ void XThread::Start() {
     ss << "XThread::Start()" << index_;
     LOGINFO(ss.str());
 }
+void XThread::Exit() {
+    stringstream ss;
+    ss << "XThread::Exit() begin" << index_;
+    LOGINFO(ss.str());
+    is_exit_ = true;
+}
 //等待线程退出
 void XThread::Wait() {
     stringstream ss;
     if (th_.joinable()) //判断子线程是否可以等待
         th_.join();     //等待子线程退出
     ss.str("");
-    ss << "XThread::Stop() end" << index_;
+    ss << "XThread::Wait() end" << index_;
     LOGINFO(ss.str());
-}
-//停止线程（设置退出标志，等待线程退出）
-void XThread::Stop() {
-    stringstream ss;
-    ss << "XThread::Stop() begin" << index_;
-    LOGINFO(ss.str());
-    is_exit_ = true;
 }
 
 //停止线程（设置退出标志，等待线程退出）
