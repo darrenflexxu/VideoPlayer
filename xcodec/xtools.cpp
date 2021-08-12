@@ -7,7 +7,7 @@ extern "C"
 #include <libavcodec/avcodec.h>
 #include <libavutil/rational.h>
 }
-//¸ù¾İÊ±¼ä»ùÊı¼ÆËã
+//æ ¹æ®æ—¶é—´åŸºæ•°è®¡ç®—
 XCODEC_API long long XRescale(long long pts,
                               AVRational* src_time_base,
                               AVRational* des_time_base) {
@@ -46,14 +46,14 @@ long long NowMs() {
     return clock() / (CLOCKS_PER_SEC / 1000);
 }
 
-//Æô¶¯Ïß³Ì
+//å¯åŠ¨çº¿ç¨‹
 void XThread::Start() {
     unique_lock<mutex> lock(m_);
     static int i = 0;
     i++;
     index_ = i;
     is_exit_ = false;
-    //Æô¶¯Ïß³Ì
+    //å¯åŠ¨çº¿ç¨‹
     th_ = thread(&XThread::Main, this);
     stringstream ss;
     ss << "XThread::Start()" << index_;
@@ -65,17 +65,17 @@ void XThread::Exit() {
     LOGINFO(ss.str());
     is_exit_ = true;
 }
-//µÈ´ıÏß³ÌÍË³ö
+//ç­‰å¾…çº¿ç¨‹é€€å‡º
 void XThread::Wait() {
     stringstream ss;
-    if (th_.joinable()) //ÅĞ¶Ï×ÓÏß³ÌÊÇ·ñ¿ÉÒÔµÈ´ı
-        th_.join();     //µÈ´ı×ÓÏß³ÌÍË³ö
+    if (th_.joinable()) //åˆ¤æ–­å­çº¿ç¨‹æ˜¯å¦å¯ä»¥ç­‰å¾…
+        th_.join();     //ç­‰å¾…å­çº¿ç¨‹é€€å‡º
     ss.str("");
     ss << "XThread::Wait() end" << index_;
     LOGINFO(ss.str());
 }
 
-//Í£Ö¹Ïß³Ì£¨ÉèÖÃÍË³ö±êÖ¾£¬µÈ´ıÏß³ÌÍË³ö£©
+//åœæ­¢çº¿ç¨‹ï¼ˆè®¾ç½®é€€å‡ºæ ‡å¿—ï¼Œç­‰å¾…çº¿ç¨‹é€€å‡ºï¼‰
 void XThread::Stop()
 {
     Exit();
@@ -83,7 +83,7 @@ void XThread::Stop()
 }
 
 
-//´´½¨¶ÔÏó
+//åˆ›å»ºå¯¹è±¡
 XPara* XPara::Create() {
     return new XPara();
 }
@@ -97,7 +97,7 @@ XPara::~XPara() {
         time_base = nullptr;
     }
 }
-//Ë½ÓĞÊÇ½ûÖ¹´´½¨Õ»ÖĞ¶ÔÏó
+//ç§æœ‰æ˜¯ç¦æ­¢åˆ›å»ºæ ˆä¸­å¯¹è±¡
 XPara::XPara() {
     para = avcodec_parameters_alloc();
     time_base = new AVRational();
@@ -126,28 +126,28 @@ void XAVPacketList::Clear() {
 
 void XAVPacketList::Push(AVPacket* pkt) {
     unique_lock<mutex> lock(mux_);
-    //Éú³ÉĞÂµÄAVPacket ¶ÔÏó ÒıÓÃ¼ÆÊı+1;
+    //ç”Ÿæˆæ–°çš„AVPacket å¯¹è±¡ å¼•ç”¨è®¡æ•°+1;
     auto p = av_packet_alloc();
-    av_packet_ref(p, pkt);//ÒıÓÃ¼ÆÊı ¼õÉÙÊı¾İ¸´ÖÆ£¬Ïß³Ì°²È«
+    av_packet_ref(p, pkt);//å¼•ç”¨è®¡æ•° å‡å°‘æ•°æ®å¤åˆ¶ï¼Œçº¿ç¨‹å®‰å…¨
     pkts_.push_back(p);
 
-    //³¬³ö×î´ó¿Õ¼ä£¬ÇåÀíÊı¾İ£¬µ½¹Ø¼üÖ¡Î»ÖÃ
+    //è¶…å‡ºæœ€å¤§ç©ºé—´ï¼Œæ¸…ç†æ•°æ®ï¼Œåˆ°å…³é”®å¸§ä½ç½®
     if (pkts_.size() > max_packets_) {
-        //´¦ÀíµÚÒ»Ö¡
+        //å¤„ç†ç¬¬ä¸€å¸§
         if (pkts_.front()->flags & AV_PKT_FLAG_KEY) {
-            //¹Ø¼üÖ¡
-            av_packet_free(&pkts_.front());//ÇåÀí
-            pkts_.pop_front();  //³ö¶Ó
+            //å…³é”®å¸§
+            av_packet_free(&pkts_.front());//æ¸…ç†
+            pkts_.pop_front();  //å‡ºé˜Ÿ
             return;
         }
-        //ÇåÀíËùÓĞ·Ç¹Ø¼üÖ¡Ö®Ç°µÄÊı¾İ
+        //æ¸…ç†æ‰€æœ‰éå…³é”®å¸§ä¹‹å‰çš„æ•°æ®
         while (!pkts_.empty()) {
             if (pkts_.front()->flags & AV_PKT_FLAG_KEY) {
-                //¹Ø¼üÖ¡
+                //å…³é”®å¸§
                 return;
             }
-            av_packet_free(&pkts_.front());//ÇåÀí
-            pkts_.pop_front();  //³ö¶Ó
+            av_packet_free(&pkts_.front());//æ¸…ç†
+            pkts_.pop_front();  //å‡ºé˜Ÿ
         }
     }
 }

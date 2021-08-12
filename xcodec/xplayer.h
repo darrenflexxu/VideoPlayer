@@ -7,32 +7,32 @@
 class XCODEC_API XPlayer :public XThread
 {
 public:
-    //»Øµ÷½ÓÊÕÒôÊÓÆµ°ü
+    //å›è°ƒæ¥æ”¶éŸ³è§†é¢‘åŒ…
     void Do(AVPacket* pkt) override;
     
-    //´ò¿ªÒôÊÓÆµ ³õÊ¼»¯²¥·ÅºÍäÖÈ¾
+    //æ‰“å¼€éŸ³è§†é¢‘ åˆå§‹åŒ–æ’­æ”¾å’Œæ¸²æŸ“
     bool Open(const char* url, void* winid);
     void Stop();
     
-    //Ö÷Ïß³Ì ´¦ÀíÍ¬²½
+    //ä¸»çº¿ç¨‹ å¤„ç†åŒæ­¥
     void Main()override;
     
-    //¿ªÆô ½â·â×° ÒôÊÓÆµ½âÂë ºÍ ´¦ÀíÍ¬²½µÄÏß³Ì
+    //å¼€å¯ è§£å°è£… éŸ³è§†é¢‘è§£ç  å’Œ å¤„ç†åŒæ­¥çš„çº¿ç¨‹
     void Start();
     
 
-    //äÖÈ¾ÊÓÆµ ²¥·ÅÒôÆµ
+    //æ¸²æŸ“è§†é¢‘ æ’­æ”¾éŸ³é¢‘
     void Update();
 
     void SetSpeed(float s);
 
-    //×ÜÊ±³¤ ºÁÃë
+    //æ€»æ—¶é•¿ æ¯«ç§’
     long long total_ms() { return total_ms_; }
 
-    //µ±Ç°²¥·ÅµÄÎ»ÖÃ ºÁÃë
+    //å½“å‰æ’­æ”¾çš„ä½ç½® æ¯«ç§’
     long long pos_ms() {return pos_ms_;}
 
-    //ÉèÖÃÊÓÆµ²¥·ÅÎ»ÖÃ£¬ºÁÃë
+    //è®¾ç½®è§†é¢‘æ’­æ”¾ä½ç½®ï¼Œæ¯«ç§’
     bool Seek(long long ms);
 
     void Pause(bool is_pause) override;
@@ -40,9 +40,9 @@ protected:
 
     long long total_ms_ = 0;
     long long pos_ms_ = 0;
-    XDemuxTask demux_;              //½â·â×°
-    XDecodeTask audio_decode_;      //ÒôÆµ½âÂë
-    XDecodeTask video_decode_;      //ÊÓÆµ½âÂë
-    XVideoView* view_ = nullptr;    //ÊÓÆµäÖÈ¾
+    XDemuxTask demux_;              //è§£å°è£…
+    XDecodeTask audio_decode_;      //éŸ³é¢‘è§£ç 
+    XDecodeTask video_decode_;      //è§†é¢‘è§£ç 
+    XVideoView* view_ = nullptr;    //è§†é¢‘æ¸²æŸ“
 };
 

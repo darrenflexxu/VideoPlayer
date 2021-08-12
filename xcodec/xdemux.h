@@ -4,17 +4,17 @@ class XCODEC_API XDemux :public XFormat
 {
 public:
     /// <summary>
-    /// ´ò¿ª½â·â×°
+    /// æ‰“å¼€è§£å°è£…
     /// </summary>
-    /// <param name="url">½â·â×°µØÖ· Ö§³Örtsp</param>
-    /// <returns>Ê§°Ü·µ»Ønullptr</returns>
+    /// <param name="url">è§£å°è£…åœ°å€ æ”¯æŒrtsp</param>
+    /// <returns>å¤±è´¥è¿”å›nullptr</returns>
     static AVFormatContext* Open(const char* url);
 
     /// <summary>
-    /// ¶ÁÈ¡Ò»Ö¡Êı¾İ
+    /// è¯»å–ä¸€å¸§æ•°æ®
     /// </summary>
-    /// <param name="pkt">Êä³öÊı¾İ</param>
-    /// <returns>ÊÇ·ñ³É¹¦</returns>
+    /// <param name="pkt">è¾“å‡ºæ•°æ®</param>
+    /// <returns>æ˜¯å¦æˆåŠŸ</returns>
     bool Read(AVPacket* pkt);
 
     bool Seek(long long pts,int stream_index);

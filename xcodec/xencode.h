@@ -5,14 +5,14 @@ class XCODEC_API XEncode:public XCodec
 public:
 
     //////////////////////////////////////////////////////////////
-    /// ±àÂëÊı¾İ Ïß³Ì°²È« Ã¿´ÎĞÂ´´½¨AVPacket
-    /// @para frame ¿Õ¼äÓÉÓÃ»§Î¬»¤
-    /// @return Ê§°Ü·¶Î§nullptr ·µ»ØµÄAVPacketÓÃ»§ĞèÒªÍ¨¹ıav_packet_free ÇåÀí
+    /// ç¼–ç æ•°æ® çº¿ç¨‹å®‰å…¨ æ¯æ¬¡æ–°åˆ›å»ºAVPacket
+    /// @para frame ç©ºé—´ç”±ç”¨æˆ·ç»´æŠ¤
+    /// @return å¤±è´¥èŒƒå›´nullptr è¿”å›çš„AVPacketç”¨æˆ·éœ€è¦é€šè¿‡av_packet_free æ¸…ç†
     AVPacket *Encode(const AVFrame* frame);
 
 
     //////////////////////////////////////////////////////////////
-    //·µ»ØËùÓĞ±àÂë»º´æÖĞAVPacket
+    //è¿”å›æ‰€æœ‰ç¼–ç ç¼“å­˜ä¸­AVPacket
     std::vector<AVPacket *> End();
 
 };

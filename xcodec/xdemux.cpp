@@ -3,8 +3,8 @@
 #include <thread>
 #include "xtools.h"
 using namespace std;
-extern "C" { //Ö¸¶¨º¯ÊıÊÇcÓïÑÔº¯Êı£¬º¯ÊıÃû²»°üº¬ÖØÔØ±ê×¢
-//ÒıÓÃffmpegÍ·ÎÄ¼ş
+extern "C" { //æŒ‡å®šå‡½æ•°æ˜¯cè¯­è¨€å‡½æ•°ï¼Œå‡½æ•°åä¸åŒ…å«é‡è½½æ ‡æ³¨
+//å¼•ç”¨ffmpegå¤´æ–‡ä»¶
 #include <libavformat/avformat.h>
 }
 void PrintErr(int err);
@@ -14,18 +14,18 @@ AVFormatContext* XDemux::Open(const char* url)
     AVFormatContext* c = nullptr;
 
     AVDictionary* opts = nullptr;
-    //av_dict_set(&opts, "rtsp_transport", "tcp", 0);//´«ÊäÃ½ÌåÁ÷ÎªtcpĞ­Òé£¬Ä¬ÈÏudp
-    av_dict_set(&opts, "stimeout", "1000000", 0);//Á¬½Ó³¬Ê±1Ãë
+    //av_dict_set(&opts, "rtsp_transport", "tcp", 0);//ä¼ è¾“åª’ä½“æµä¸ºtcpåè®®ï¼Œé»˜è®¤udp
+    av_dict_set(&opts, "stimeout", "1000000", 0);//è¿æ¥è¶…æ—¶1ç§’
 
-    //´ò¿ª·â×°ÉÏÏÂÎÄ
+    //æ‰“å¼€å°è£…ä¸Šä¸‹æ–‡
     auto re = avformat_open_input(&c, url, nullptr, &opts);
     if (opts)
         av_dict_free(&opts);
     BERR(re);
-    //»ñÈ¡Ã½ÌåĞÅÏ¢
+    //è·å–åª’ä½“ä¿¡æ¯
     re = avformat_find_stream_info(c, nullptr);
     BERR(re);
-    //´òÓ¡ÊäÈë·â×°ĞÅÏ¢
+    //æ‰“å°è¾“å…¥å°è£…ä¿¡æ¯
     av_dump_format(c, 0, url, 0);
 
     return c;
@@ -37,7 +37,7 @@ bool XDemux::Read(AVPacket* pkt)
     if (!c_)return false;
     auto re = av_read_frame(c_, pkt);
     BERR(re);
-    //¼ÆÊ± ÓÃÓÚ³¬Ê±ÅĞ¶Ï
+    //è®¡æ—¶ ç”¨äºè¶…æ—¶åˆ¤æ–­
     last_time_ = NowMs();
     return true;
 }

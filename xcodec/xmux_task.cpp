@@ -13,7 +13,7 @@ void XMuxTask::Main()
 {
     xmux_.WriteHead();
 
-    //ÕÒµ½¹Ø¼üÖ¡
+    //æ‰¾åˆ°å…³é”®å¸§
     while (!is_exit_)
     {
         unique_lock<mutex> lock(mux_);
@@ -24,13 +24,13 @@ void XMuxTask::Main()
             continue;
         }
         if(pkt->stream_index == xmux_.video_index()
-            && pkt->flags & AV_PKT_FLAG_KEY) //¹Ø¼üÖ¡
+            && pkt->flags & AV_PKT_FLAG_KEY) //å…³é”®å¸§
         {
             xmux_.Write(pkt);
             av_packet_free(&pkt);
             break;
         }
-        //¶ªµô·ÇÊÓÆµ¹Ø¼üÖ¡
+        //ä¸¢æ‰éè§†é¢‘å…³é”®å¸§
         av_packet_free(&pkt);
     }
 

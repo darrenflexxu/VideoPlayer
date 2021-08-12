@@ -4,12 +4,12 @@ struct AVBufferRef;
 class XCODEC_API XDecode :public XCodec
 {
 public:
-    bool Send(const AVPacket* pkt);  //·¢ËÍ½âÂë
-    bool Recv(AVFrame* frame);       //»ñÈ¡½âÂë
-    std::vector<AVFrame*> End();    //»ñÈ¡»º´æ
+    bool Send(const AVPacket* pkt);  //å‘é€è§£ç 
+    bool Recv(AVFrame* frame);       //è·å–è§£ç 
+    std::vector<AVFrame*> End();    //è·å–ç¼“å­˜
 
     ////////////////////////////////////////////////////
-    //// ³õÊ¼»¯Ó²¼ş¼ÓËÙ  4 AV_HWDEVICE_TYPE_DXVA2
+    //// åˆå§‹åŒ–ç¡¬ä»¶åŠ é€Ÿ  4 AV_HWDEVICE_TYPE_DXVA2
     bool InitHW(int type = 4);
 
 };

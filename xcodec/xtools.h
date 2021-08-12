@@ -1,6 +1,6 @@
 #pragma once
 
-//¼æÈİLinux  _WIN32 windows 32ÎªºÍ64Î»
+//å…¼å®¹Linux  _WIN32 windows 32ä¸ºå’Œ64ä½
 #ifdef _WIN32
 #ifdef XCODEC_EXPORTS
 #define XCODEC_API __declspec(dllexport)
@@ -20,7 +20,7 @@ struct AVCodecParameters;
 struct AVRational;
 struct AVFrame;
 struct AVCodecContext;
-//ÈÕÖ¾¼¶±ğ DEBUG INFO ERROR FATAL
+//æ—¥å¿—çº§åˆ« DEBUG INFO ERROR FATAL
 enum XLogLevel {
     XLOG_TYPE_DEBUG,
     XLOG_TYPE_INFO,
@@ -40,7 +40,7 @@ enum XLogLevel {
 
 XCODEC_API void MSleep(unsigned int ms);
 
-//»ñÈ¡µ±Ç°Ê±¼ä´Á ºÁÃë
+//è·å–å½“å‰æ—¶é—´æˆ³ æ¯«ç§’
 XCODEC_API long long NowMs();
 
 XCODEC_API void XFreeFrame(AVFrame** frame);
@@ -49,28 +49,28 @@ XCODEC_API void XFreePacket(AVPacket** packet);
 
 XCODEC_API void PrintErr(int err);
 
-//¸ù¾İÊ±¼ä»ùÊı¼ÆËã
+//æ ¹æ®æ—¶é—´åŸºæ•°è®¡ç®—
 XCODEC_API long long XRescale(long long pts,
                               AVRational* src_time_base,
                               AVRational* des_time_base);
 class XCODEC_API XThread {
 public:
-    //Æô¶¯Ïß³Ì
+    //å¯åŠ¨çº¿ç¨‹
     virtual void Start();
 
-    //ÉèÖÃÏß³ÌÍË³ö±êÖ¾
+    //è®¾ç½®çº¿ç¨‹é€€å‡ºæ ‡å¿—
     virtual void Exit();
 
-    //Í£Ö¹Ïß³Ì µÈ´ıÍË³ö£¬
+    //åœæ­¢çº¿ç¨‹ ç­‰å¾…é€€å‡ºï¼Œ
     virtual void Stop();
 
-    //µÈ´ıÏß³ÌÍË³ö
+    //ç­‰å¾…çº¿ç¨‹é€€å‡º
     virtual void Wait();
 
-    //Ö´ĞĞÈÎÎñ ĞèÒªÖØÔØ
+    //æ‰§è¡Œä»»åŠ¡ éœ€è¦é‡è½½
     virtual void Do(AVPacket* pkt) {}
 
-    //´«µİµ½ÏÂÒ»¸öÔğÈÎÁ´º¯Êı
+    //ä¼ é€’åˆ°ä¸‹ä¸€ä¸ªè´£ä»»é“¾å‡½æ•°
     virtual void Next(AVPacket* pkt) {
         std::unique_lock<std::mutex> lock(m_);
         if (next_)
@@ -78,12 +78,12 @@ public:
 
     }
 
-    //ÉèÖÃÔğÈÎÁ´ÏÂÒ»¸ö½Úµã£¨Ïß³Ì°²È«£©
+    //è®¾ç½®è´£ä»»é“¾ä¸‹ä¸€ä¸ªèŠ‚ç‚¹ï¼ˆçº¿ç¨‹å®‰å…¨ï¼‰
     void set_next(XThread* xt) {
         std::unique_lock<std::mutex> lock(m_);
         next_ = xt;
     }
-    //ÔİÍ£»òÕß²¥·Å
+    //æš‚åœæˆ–è€…æ’­æ”¾
     virtual void Pause(bool is_pause) { is_pause_ = is_pause; };
 
     bool is_pause() { return is_pause_; }
@@ -92,36 +92,36 @@ protected:
 
     bool is_pause_ = false;
 
-    //Ïß³ÌÈë¿Úº¯Êı
+    //çº¿ç¨‹å…¥å£å‡½æ•°
     virtual void Main() = 0;
-    //±êÖ¾Ïß³ÌÍË³ö
+    //æ ‡å¿—çº¿ç¨‹é€€å‡º
     bool is_exit_ = false;
-    //Ïß³ÌË÷ÒıºÅ
+    //çº¿ç¨‹ç´¢å¼•å·
     int index_ = 0;
 private:
     std::thread th_;
     std::mutex m_;
-    XThread *next_ = nullptr;//ÔğÈÎÁ´ÏÂÒ»¸ö½Úµã
+    XThread *next_ = nullptr;//è´£ä»»é“¾ä¸‹ä¸€ä¸ªèŠ‚ç‚¹
 };
 
 class XTools {
 };
-//ÒôÊÓÆµ²ÎÊı
+//éŸ³è§†é¢‘å‚æ•°
 class XCODEC_API XPara {
 public:
-    AVCodecParameters* para = nullptr;  //ÒôÊÓÆµ²ÎÊı
-    AVRational* time_base = nullptr;    //Ê±¼ä»ùÊı
-    long long total_ms = 0;             //×ÜÊ±³¤ ºÁÃë
+    AVCodecParameters* para = nullptr;  //éŸ³è§†é¢‘å‚æ•°
+    AVRational* time_base = nullptr;    //æ—¶é—´åŸºæ•°
+    long long total_ms = 0;             //æ€»æ—¶é•¿ æ¯«ç§’
 
-    //´´½¨¶ÔÏó
+    //åˆ›å»ºå¯¹è±¡
     static XPara* Create();
     ~XPara();
 private:
-    //Ë½ÓĞÊÇ½ûÖ¹´´½¨Õ»ÖĞ¶ÔÏó
+    //ç§æœ‰æ˜¯ç¦æ­¢åˆ›å»ºæ ˆä¸­å¯¹è±¡
     XPara();
 };
 /// <summary>
-/// Ïß³Ì°²È«avpacket list
+/// çº¿ç¨‹å®‰å…¨avpacket list
 /// </summary>
 class XCODEC_API XAVPacketList {
 public:
@@ -132,6 +132,6 @@ public:
 private:
     std::list<AVPacket*> pkts_;
 
-    int max_packets_ = 1000;//×î´óÁĞ±íÊıÁ¿£¬³¬³öÇåÀí
+    int max_packets_ = 1000;//æœ€å¤§åˆ—è¡¨æ•°é‡ï¼Œè¶…å‡ºæ¸…ç†
     std::mutex mux_;
 };

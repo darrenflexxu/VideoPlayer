@@ -20,7 +20,7 @@ void XDecodeTask::set_time_base(AVRational* time_base)
 }
 
 /// <summary>
-/// ÇåÀí»º´æ
+/// æ¸…ç†ç¼“å­˜
 /// </summary>
 void XDecodeTask::Clear()
 {
@@ -52,7 +52,7 @@ void XDecodeTask::Stop()
     }
 }
 /// <summary>
-/// ´ò¿ª½âÂëÆ÷
+/// æ‰“å¼€è§£ç å™¨
 /// </summary>
 bool XDecodeTask::Open(AVCodecParameters* para)
 {
@@ -69,7 +69,7 @@ bool XDecodeTask::Open(AVCodecParameters* para)
         LOGERROR("decode_.Create failed!");
         return false;
     }
-    //¸´ÖÆÊÓÆµ²ÎÊı
+    //å¤åˆ¶è§†é¢‘å‚æ•°
     avcodec_parameters_to_context(c, para);
     decode_.set_c(c);
     if (!decode_.Open())
@@ -82,12 +82,12 @@ bool XDecodeTask::Open(AVCodecParameters* para)
     return true;
 }
 
-//ÔğÈÎÁ´´¦Àíº¯Êı
+//è´£ä»»é“¾å¤„ç†å‡½æ•°
 void XDecodeTask::Do(AVPacket* pkt)
 {
     cout << "#" << flush;
 
-    if (!pkt || pkt->stream_index != stream_index_) //ÅĞ¶ÏÊÇ·ñÊÇÊÓÆµ
+    if (!pkt || pkt->stream_index != stream_index_) //åˆ¤æ–­æ˜¯å¦æ˜¯è§†é¢‘
     {
         return;
     }
@@ -117,7 +117,7 @@ AVFrame* XDecodeTask::GetFrame()
 
     if (!need_view_ || !frame_ || !frame_->buf[0])return nullptr;
     auto f = av_frame_alloc();
-    auto re = av_frame_ref(f, frame_);//ÒıÓÃ¼Ó1
+    auto re = av_frame_ref(f, frame_);//å¼•ç”¨åŠ 1
     if (re != 0)
     {
         av_frame_free(&f);
@@ -127,7 +127,7 @@ AVFrame* XDecodeTask::GetFrame()
     need_view_ = false;
     return f;
 }
-//Ïß³ÌÖ÷º¯Êı
+//çº¿ç¨‹ä¸»å‡½æ•°
 void XDecodeTask::Main()
 {
     {
@@ -139,13 +139,13 @@ void XDecodeTask::Main()
 
     while (!is_exit_)
     {
-        if (is_pause()) //ÔİÍ£
+        if (is_pause()) //æš‚åœ
         {
             MSleep(1);
             continue;
         }
         
-        //Í¬²½
+        //åŒæ­¥
         while (!is_exit_)
         {
             if (syn_pts_ >= 0 && cur_pts_ > syn_pts_)
@@ -163,7 +163,7 @@ void XDecodeTask::Main()
             continue;
         }
 
-        //·¢ËÍµ½½âÂëÏß³Ì
+        //å‘é€åˆ°è§£ç çº¿ç¨‹
         bool re = decode_.Send(pkt);
         av_packet_free(&pkt);
         if (!re)
@@ -178,7 +178,7 @@ void XDecodeTask::Main()
                 cout << "@" << flush;
                 need_view_ = true;
                 cur_pts_ = frame_->pts;
-                //×ª»»³ÉºÁÃë
+                //è½¬æ¢æˆæ¯«ç§’
                 if(time_base_)
                     cur_ms_ = av_rescale_q(frame_->pts,*time_base_, 
                     { 1,1000 });;
@@ -186,7 +186,7 @@ void XDecodeTask::Main()
             if (frame_cache_)
             {
                 auto f = av_frame_alloc();
-                av_frame_ref(f, frame_);//ÒıÓÃ¼ÆÊı¼Ó1
+                av_frame_ref(f, frame_);//å¼•ç”¨è®¡æ•°åŠ 1
                 frames_.push_back(f);
             }
         }

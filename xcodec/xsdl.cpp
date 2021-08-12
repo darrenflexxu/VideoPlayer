@@ -15,7 +15,7 @@ static bool InitVideo()
         cout << SDL_GetError() << endl;
         return false;
     }
-    //Éè¶¨Ëõ·ÅËã·¨£¬½â¾ö¾â³İÎÊÌâ,ÏßĞÔ²åÖµËã·¨
+    //è®¾å®šç¼©æ”¾ç®—æ³•ï¼Œè§£å†³é”¯é½¿é—®é¢˜,çº¿æ€§æ’å€¼ç®—æ³•
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1");
     return true;
 }
@@ -29,7 +29,7 @@ bool XSDL::IsExit()
 }
 void XSDL::Close()
 {
-    //È·±£Ïß³Ì°²È«
+    //ç¡®ä¿çº¿ç¨‹å®‰å…¨
     unique_lock<mutex> sdl_lock(mtx_);
     if (texture_)
     {
@@ -51,10 +51,10 @@ void XSDL::Close()
 bool XSDL::Init(int w, int h,Format fmt)
 {
     if (w <= 0 || h <= 0)return false;
-    //³õÊ¼»¯SDL ÊÓÆµ¿â
+    //åˆå§‹åŒ–SDL è§†é¢‘åº“
     InitVideo();
 
-    //È·±£Ïß³Ì°²È«
+    //ç¡®ä¿çº¿ç¨‹å®‰å…¨
     unique_lock<mutex> sdl_lock(mtx_);
     width_ = w;
     height_ = h;
@@ -65,12 +65,12 @@ bool XSDL::Init(int w, int h,Format fmt)
     if (render_)
         SDL_DestroyRenderer(render_);
 
-    ///1 ´´½¨´°¿Ú
+    ///1 åˆ›å»ºçª—å£
     if (!win_)
     {
         if (!win_id_)
         {
-            //ĞÂ½¨´°¿Ú
+            //æ–°å»ºçª—å£
             win_ = SDL_CreateWindow("",
                 SDL_WINDOWPOS_UNDEFINED,
                 SDL_WINDOWPOS_UNDEFINED,
@@ -79,7 +79,7 @@ bool XSDL::Init(int w, int h,Format fmt)
         }
         else
         {
-            //äÖÈ¾µ½¿Ø¼ş´°¿Ú
+            //æ¸²æŸ“åˆ°æ§ä»¶çª—å£
             win_ = SDL_CreateWindowFrom(win_id_);
         }
     }
@@ -89,7 +89,7 @@ bool XSDL::Init(int w, int h,Format fmt)
         return false;
     }
 
-    /// 2 ´´½¨äÖÈ¾Æ÷
+    /// 2 åˆ›å»ºæ¸²æŸ“å™¨
 
     render_ = SDL_CreateRenderer(win_, -1, SDL_RENDERER_ACCELERATED);
     if (!render_)
@@ -97,7 +97,7 @@ bool XSDL::Init(int w, int h,Format fmt)
         cerr << SDL_GetError() << endl;
         return false;
     }
-    //´´½¨²ÄÖÊ £¨ÏÔ´æ£©
+    //åˆ›å»ºæè´¨ ï¼ˆæ˜¾å­˜ï¼‰
     unsigned int sdl_fmt = SDL_PIXELFORMAT_RGBA8888;
     switch (fmt)
     {
@@ -121,9 +121,9 @@ bool XSDL::Init(int w, int h,Format fmt)
     }
 
     texture_ = SDL_CreateTexture(render_, 
-        sdl_fmt,                        //ÏñËØ¸ñÊ½
-        SDL_TEXTUREACCESS_STREAMING,    //Æµ·±ĞŞ¸ÄµÄäÖÈ¾£¨´øËø£©
-        w, h                            //²ÄÖÊ´óĞ¡
+        sdl_fmt,                        //åƒç´ æ ¼å¼
+        SDL_TEXTUREACCESS_STREAMING,    //é¢‘ç¹ä¿®æ”¹çš„æ¸²æŸ“ï¼ˆå¸¦é”ï¼‰
+        w, h                            //æè´¨å¤§å°
     );
     if (!texture_)
     {
@@ -138,13 +138,13 @@ bool XSDL::Draw(
     const unsigned  char* v, int v_pitch
 )
 {
-    //²ÎÊı¼ì²é
+    //å‚æ•°æ£€æŸ¥
     if (!y || !u || !v)return false;
     unique_lock<mutex> sdl_lock(mtx_);
     if (!texture_ || !render_ || !win_ || width_ <= 0 || height_ <= 0)
         return false;
     
-    //¸´ÖÆÄÚ´æµ½ÏÔÏÔ´æ
+    //å¤åˆ¶å†…å­˜åˆ°æ˜¾æ˜¾å­˜
     auto re = SDL_UpdateYUVTexture(texture_,
         NULL, 
         y,y_pitch,
@@ -155,17 +155,17 @@ bool XSDL::Draw(
         cout << SDL_GetError() << endl;
         return false;
     }
-    //Çå¿ÕÆÁÄ»
+    //æ¸…ç©ºå±å¹•
     SDL_RenderClear(render_);
 
-    //²ÄÖÊ¸´ÖÆµ½äÖÈ¾Æ÷
+    //æè´¨å¤åˆ¶åˆ°æ¸²æŸ“å™¨
 
     SDL_Rect rect;
     SDL_Rect* prect = nullptr;
-    if (scale_w_ > 0)  //ÓÃ»§ÊÖ¶¯ÉèÖÃËõ·Å
+    if (scale_w_ > 0)  //ç”¨æˆ·æ‰‹åŠ¨è®¾ç½®ç¼©æ”¾
     {
         rect.x = 0; rect.y = 0;
-        rect.w = scale_w_;//äÖÈ¾µÄ¿í¸ß£¬¿ÉËõ·Å
+        rect.w = scale_w_;//æ¸²æŸ“çš„å®½é«˜ï¼Œå¯ç¼©æ”¾
         rect.h = scale_w_;
         prect = &rect;
     }
@@ -201,24 +201,24 @@ bool XSDL::Draw(const unsigned char* data,int linesize)
     }
     if (linesize <= 0)
         return false;
-    //¸´ÖÆÄÚ´æµ½ÏÔÏÔ´æ
+    //å¤åˆ¶å†…å­˜åˆ°æ˜¾æ˜¾å­˜
     auto re = SDL_UpdateTexture(texture_, NULL, data, linesize);
     if (re != 0)
     {
         cout << SDL_GetError() << endl;
         return false;
     }
-    //Çå¿ÕÆÁÄ»
+    //æ¸…ç©ºå±å¹•
     SDL_RenderClear(render_);
 
-    //²ÄÖÊ¸´ÖÆµ½äÖÈ¾Æ÷
+    //æè´¨å¤åˆ¶åˆ°æ¸²æŸ“å™¨
 
     SDL_Rect rect;
     SDL_Rect* prect = nullptr;
-    if (scale_w_ > 0 )  //ÓÃ»§ÊÖ¶¯ÉèÖÃËõ·Å
+    if (scale_w_ > 0 )  //ç”¨æˆ·æ‰‹åŠ¨è®¾ç½®ç¼©æ”¾
     {
         rect.x = 0; rect.y = 0;
-        rect.w = scale_w_;//äÖÈ¾µÄ¿í¸ß£¬¿ÉËõ·Å
+        rect.w = scale_w_;//æ¸²æŸ“çš„å®½é«˜ï¼Œå¯ç¼©æ”¾
         rect.h = scale_w_;
         prect = &rect;
     }

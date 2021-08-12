@@ -48,7 +48,7 @@
 #include <mutex>
 struct XAudioSpec
 {
-    int freq = 44100;//ÒôÆµ²ÉÑùÂÊ
+    int freq = 44100;//éŸ³é¢‘é‡‡æ ·ç‡
     unsigned short format = AUDIO_S16SYS;
     unsigned char channels = 2;
     unsigned short samples = 1024;
@@ -57,26 +57,26 @@ struct XAudioSpec
 struct XData
 {
     std::vector<unsigned char> data;
-    int offset = 0; //Æ«ÒÆÎ»ÖÃ
+    int offset = 0; //åç§»ä½ç½®
     long long pts = 0;
 };
 
 /// <summary>
-/// ÒôÆµ²¥·Å µ¥¼şÄ£Ê½
+/// éŸ³é¢‘æ’­æ”¾ å•ä»¶æ¨¡å¼
 /// </summary>
 class XCODEC_API XAudioPlay
 {
 public:
     static XAudioPlay* Instance();
     
-    //ÔİÍ£
+    //æš‚åœ
     virtual void Pause(bool is_pause) = 0;
 
     virtual void Push(AVFrame* frame);
     virtual bool Open(AVCodecParameters* para);
     virtual bool Open(XPara &para);
 
-    //´ò¿ªÒôÆµ ¿ªÊ¼²¥·Å µ÷ÓÃ»Øµ÷º¯Êı
+    //æ‰“å¼€éŸ³é¢‘ å¼€å§‹æ’­æ”¾ è°ƒç”¨å›è°ƒå‡½æ•°
     virtual bool Open(XAudioSpec& spec) = 0;
     virtual void Close() = 0;
     virtual void Clear()
@@ -85,7 +85,7 @@ public:
         SetSpeed(speed_);
     }
 
-    //»ñÈ¡µ±Ç°µÄ²¥·ÅÎ»ÖÃ
+    //è·å–å½“å‰çš„æ’­æ”¾ä½ç½®
     virtual long long cur_pts() = 0;
 
     void Push(const unsigned char* data, int size,long long pts)
@@ -96,7 +96,7 @@ public:
         audio_datas_.back().data.assign(data, data + size);
     }
 
-    //²¥·ÅËÙ¶È
+    //æ’­æ”¾é€Ÿåº¦
     virtual void SetSpeed(float s)
     {
         speed_ = s;
@@ -107,13 +107,13 @@ public:
         spec_.freq = old_freq;
     }
 
-    //ÒôÁ¿
+    //éŸ³é‡
     void set_volume(int v) 
     { 
         volume_ = v; 
     }
     
-    //Ê±¼ä»ùÊı£¬ÓÃÓÚÉú²ú²¥·Å½ø¶È
+    //æ—¶é—´åŸºæ•°ï¼Œç”¨äºç”Ÿäº§æ’­æ”¾è¿›åº¦
     void set_time_base(double b) { time_base_ = b; }
 protected:
     double time_base_ = 0;
@@ -125,9 +125,9 @@ protected:
         auto ap = (XAudioPlay*)userdata;
         ap->Callback(stream, len);
     }
-    std::list<XData> audio_datas_;//ÒôÆµ»º³åÁĞ±í
+    std::list<XData> audio_datas_;//éŸ³é¢‘ç¼“å†²åˆ—è¡¨
     std::mutex mux_;
-    unsigned char volume_ = 128;// 0~128 ÒôÁ¿
+    unsigned char volume_ = 128;// 0~128 éŸ³é‡
     XAudioSpec spec_;
 };
 

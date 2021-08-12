@@ -3,8 +3,8 @@
 #include "xdemux.h"
 enum XSYN_TYPE
 {
-    XSYN_NONE = 0,  //²»×öÍ¬²½
-    XSYN_VIDEO = 1, //¸ù¾İÊÓÆµÍ¬²½£¬²»´¦ÀíÒôÆµ
+    XSYN_NONE = 0,  //ä¸åšåŒæ­¥
+    XSYN_VIDEO = 1, //æ ¹æ®è§†é¢‘åŒæ­¥ï¼Œä¸å¤„ç†éŸ³é¢‘
 };
 
 class XCODEC_API XDemuxTask :public XThread
@@ -13,24 +13,24 @@ public:
 
     bool Seek(long long ms);
 
-    ///ÒôÆµË÷Òı
+    ///éŸ³é¢‘ç´¢å¼•
     int audio_index() { return demux_.audio_index(); }
     
-    ///ÊÓÆµË÷Òı
+    ///è§†é¢‘ç´¢å¼•
     int video_index() { return demux_.video_index(); }
 
-    ///Èë¿ÚÏß³Ìº¯Êı
+    ///å…¥å£çº¿ç¨‹å‡½æ•°
     void Main();
 
     /// <summary>
-    /// ´ò¿ª½â·â×°
+    /// æ‰“å¼€è§£å°è£…
     /// </summary>
-    /// <param name="url">rtspµØÖ·</param>
-    /// <param name="timeout_ms">³¬Ê±Ê±¼ä µ¥Î»ºÁÃë</param>
+    /// <param name="url">rtspåœ°å€</param>
+    /// <param name="timeout_ms">è¶…æ—¶æ—¶é—´ å•ä½æ¯«ç§’</param>
     /// <returns></returns>
     bool Open(std::string url,int timeout_ms = 1000);
 
-    //¸´ÖÆÊÓÆµ²ÎÊı
+    //å¤åˆ¶è§†é¢‘å‚æ•°
     std::shared_ptr<XPara> CopyVideoPara()
     {
         return demux_.CopyVideoPara();
@@ -39,15 +39,15 @@ public:
     {
         return demux_.CopyAudioPara();
     }
-    ///ÉèÖÃÍ¬²½ÀàĞÍ£¬Ö»Ö§³ÖÊÓÆµ
+    ///è®¾ç½®åŒæ­¥ç±»å‹ï¼Œåªæ”¯æŒè§†é¢‘
     void set_syn_type(XSYN_TYPE t) { syn_type_ = t; }
 
-    ///Í£Ö¹Ïß³Ì²¢ÇåÀí×ÊÔ´£¬ĞèÒªWaitµÈ´ıÏß³Ì½áÊø
+    ///åœæ­¢çº¿ç¨‹å¹¶æ¸…ç†èµ„æºï¼Œéœ€è¦Waitç­‰å¾…çº¿ç¨‹ç»“æŸ
     void Stop();
 private:
     XDemux demux_;
     std::string url_;
-    int timeout_ms_ = 0;//³¬Ê±Ê±¼ä
+    int timeout_ms_ = 0;//è¶…æ—¶æ—¶é—´
     XSYN_TYPE syn_type_ = XSYN_NONE;
 };
 

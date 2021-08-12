@@ -19,7 +19,7 @@ void XDemuxTask::Stop()
 bool XDemuxTask::Open(std::string url, int timeout_ms)
 {
     LOGDEBUG("XDemuxTask::Open begin!");
-    demux_.set_c(nullptr);//∂œø™÷Æ«∞µƒ¡¨Ω”
+    demux_.set_c(nullptr);//Êñ≠ÂºÄ‰πãÂâçÁöÑËøûÊé•
     this->url_ = url;
     this->timeout_ms_ = timeout_ms;
     auto c = demux_.Open(url.c_str());
@@ -42,7 +42,7 @@ void XDemuxTask::Main()
 
         if (!demux_.Read(&pkt))
         {
-            //∂¡»° ß∞‹
+            //ËØªÂèñÂ§±Ë¥•
             cout << "-" << flush;
             if (!demux_.is_connected())
             {
@@ -53,7 +53,7 @@ void XDemuxTask::Main()
             continue;
         }
 
-        //≤•∑≈ÀŸ∂»øÿ÷∆
+        //Êí≠ÊîæÈÄüÂ∫¶ÊéßÂà∂
         cout << "." << flush;
         if (syn_type_ == XSYN_VIDEO &&
             pkt.stream_index == demux_.video_index())

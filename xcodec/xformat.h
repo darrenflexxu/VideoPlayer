@@ -1,7 +1,7 @@
 #pragma once
 #include "xtools.h"
 /// <summary>
-/// ·â×°ºÍ½â·â×°»ùÀà
+/// å°è£…å’Œè§£å°è£…åŸºç±»
 /// </summary>
 #include <mutex>
 struct AVFormatContext;
@@ -17,20 +17,20 @@ class XCODEC_API XFormat
 {
 public:
     /// <summary>
-    /// ¸´ÖÆ²ÎÊı Ïß³Ì°²È«
+    /// å¤åˆ¶å‚æ•° çº¿ç¨‹å®‰å…¨
     /// </summary>
-    /// <param name="stream_index">¶ÔÓ¦c_->streams ÏÂ±ê</param>
-    /// <param name="dst">Êä³ö²ÎÊı</param>
-    /// <returns>ÊÇ·ñ³É¹¦</returns>
+    /// <param name="stream_index">å¯¹åº”c_->streams ä¸‹æ ‡</param>
+    /// <param name="dst">è¾“å‡ºå‚æ•°</param>
+    /// <returns>æ˜¯å¦æˆåŠŸ</returns>
     bool CopyPara(int stream_index, AVCodecParameters* dst);
     bool CopyPara(int stream_index, AVCodecContext* dts);
 
-    //·µ»ØÖÇÄÜÖ¸Õë ¸´ÖÆÊÓÆµ²ÎÊı
+    //è¿”å›æ™ºèƒ½æŒ‡é’ˆ å¤åˆ¶è§†é¢‘å‚æ•°
     std::shared_ptr<XPara> CopyVideoPara();
     std::shared_ptr<XPara> CopyAudioPara();
     /// <summary>
-    /// ÉèÖÃÉÏÏÂÎÄ£¬²¢ÇÒÇåÀíÉÏ´ÎµÄÉèÖÃµÄÖµ£¬Èç¹û´«µİNULL£¬Ïàµ±ÓÚ¹Ø±ÕÉÏÏÂÎÄ3
-    /// Ïß³Ì°²È«
+    /// è®¾ç½®ä¸Šä¸‹æ–‡ï¼Œå¹¶ä¸”æ¸…ç†ä¸Šæ¬¡çš„è®¾ç½®çš„å€¼ï¼Œå¦‚æœä¼ é€’NULLï¼Œç›¸å½“äºå…³é—­ä¸Šä¸‹æ–‡3
+    /// çº¿ç¨‹å®‰å…¨
     /// </summary>
     /// <param name="c"></param>
     void set_c(AVFormatContext* c);
@@ -39,18 +39,18 @@ public:
     XRational video_time_base(){ return video_time_base_; }
     XRational audio_time_base() { return audio_time_base_; }
 
-    //¸ù¾İtimebase»»ËãÊ±¼ä
+    //æ ¹æ®timebaseæ¢ç®—æ—¶é—´
     bool RescaleTime(AVPacket *pkt,long long offset_pts, XRational time_base);
     bool RescaleTime(AVPacket* pkt, long long offset_pts, AVRational* time_base);
-    //°Ñpts dts duration Öµ×ªÎªºÁÃë
+    //æŠŠpts dts duration å€¼è½¬ä¸ºæ¯«ç§’
     long long RescaleToMs(long long pts, int index);
 
     int video_codec_id() { return video_codec_id_; }
 
-    //ÅĞ¶ÏÊÇ·ñ³¬Ê±
+    //åˆ¤æ–­æ˜¯å¦è¶…æ—¶
     bool IsTimeout()
     {
-        if (NowMs() - last_time_ > time_out_ms_) //³¬Ê±
+        if (NowMs() - last_time_ > time_out_ms_) //è¶…æ—¶
         {
             last_time_ = NowMs();
             is_connected_ = false;
@@ -60,20 +60,20 @@ public:
         return false;
     }
 
-    //Éè¶¨³¬Ê±Ê±¼ä
+    //è®¾å®šè¶…æ—¶æ—¶é—´
     void set_time_out_ms(int ms);
 
     bool is_connected() { return is_connected_; }
 protected:
-    int time_out_ms_ = 0;           //³¬Ê±Ê±¼ä ºÁÃë
-    long long last_time_ = 0;       //ÉÏ´Î½ÓÊÕµ½Êı¾İµÄÊ±¼ä
-    bool is_connected_ = false;     //ÊÇ·ñÁ¬½Ó³É¹¦
-    AVFormatContext* c_ = nullptr;  //·â×°½â·â×°ÉÏÏÂÎÄ
-    std::mutex mux_;                //c_ ×ÊÔ´»¥³â
-    int video_index_ = 0;           //videoºÍaudioÔÚstreamÖĞË÷Òı
+    int time_out_ms_ = 0;           //è¶…æ—¶æ—¶é—´ æ¯«ç§’
+    long long last_time_ = 0;       //ä¸Šæ¬¡æ¥æ”¶åˆ°æ•°æ®çš„æ—¶é—´
+    bool is_connected_ = false;     //æ˜¯å¦è¿æ¥æˆåŠŸ
+    AVFormatContext* c_ = nullptr;  //å°è£…è§£å°è£…ä¸Šä¸‹æ–‡
+    std::mutex mux_;                //c_ èµ„æºäº’æ–¥
+    int video_index_ = 0;           //videoå’Œaudioåœ¨streamä¸­ç´¢å¼•
     int audio_index_ = 1;
     XRational video_time_base_ = {1,25};
     XRational audio_time_base_ = {1,9000};
-    int video_codec_id_ = 0;       //±àÂëÆ÷ID
+    int video_codec_id_ = 0;       //ç¼–ç å™¨ID
 };
 

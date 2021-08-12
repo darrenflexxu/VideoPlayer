@@ -3,11 +3,11 @@
 #include <thread>
 #include "xtools.h"
 using namespace std;
-extern "C" { //Ö¸¶¨º¯ÊıÊÇcÓïÑÔº¯Êı£¬º¯ÊıÃû²»°üº¬ÖØÔØ±ê×¢
-//ÒıÓÃffmpegÍ·ÎÄ¼ş
+extern "C" { //æŒ‡å®šå‡½æ•°æ˜¯cè¯­è¨€å‡½æ•°ï¼Œå‡½æ•°åä¸åŒ…å«é‡è½½æ ‡æ³¨
+//å¼•ç”¨ffmpegå¤´æ–‡ä»¶
 #include <libavformat/avformat.h>
 }
-//Ô¤´¦ÀíÖ¸Áîµ¼Èë¿â
+//é¢„å¤„ç†æŒ‡ä»¤å¯¼å…¥åº“
 #pragma comment(lib,"avformat.lib")
 #pragma comment(lib,"avutil.lib")
 using namespace std;
@@ -15,22 +15,22 @@ using namespace std;
 static int TimeoutCallback(void* para)
 {
     auto xf = (XFormat*)para;
-    if (xf->IsTimeout())return 1;//³¬Ê±ÍË³öRead
-    return 0; //Õı³£×èÈû
+    if (xf->IsTimeout())return 1;//è¶…æ—¶é€€å‡ºRead
+    return 0; //æ­£å¸¸é˜»å¡
 }
 
 void XFormat::set_c(AVFormatContext* c)
 {
     unique_lock<mutex> lock(mux_);
-    if (c_) //ÇåÀíÔ­Öµ
+    if (c_) //æ¸…ç†åŸå€¼
     {
-        if (c_->oformat) //Êä³öÉÏÏÂÎÄ
+        if (c_->oformat) //è¾“å‡ºä¸Šä¸‹æ–‡
         {
             if (c_->pb)
                 avio_closep(&c_->pb);
             avformat_free_context(c_);
         }
-        else if (c_->iformat)  //ÊäÈëÉÏÏÂÎÄ
+        else if (c_->iformat)  //è¾“å…¥ä¸Šä¸‹æ–‡
         {
             avformat_close_input(&c_);
         }
@@ -47,23 +47,23 @@ void XFormat::set_c(AVFormatContext* c)
     }
     is_connected_ = true;
 
-    //¼ÆÊ± ÓÃÓÚ³¬Ê±ÅĞ¶Ï
+    //è®¡æ—¶ ç”¨äºè¶…æ—¶åˆ¤æ–­
     last_time_ = NowMs();
 
-    //Éè¶¨³¬Ê±´¦Àí»Øµ÷
+    //è®¾å®šè¶…æ—¶å¤„ç†å›è°ƒ
     if (time_out_ms_ > 0)
     {
         AVIOInterruptCB cb = { TimeoutCallback ,this };
         c_->interrupt_callback = cb;
     }
 
-    //ÓÃÓÚÇø·ÖÊÇ·ñÓĞÒôÆµ»òÕßÊÓÆµÁ÷
+    //ç”¨äºåŒºåˆ†æ˜¯å¦æœ‰éŸ³é¢‘æˆ–è€…è§†é¢‘æµ
     audio_index_ = -1; 
     video_index_ = -1;
-    //Çø·ÖÒôÊÓÆµstream Ë÷Òı
+    //åŒºåˆ†éŸ³è§†é¢‘stream ç´¢å¼•
     for (int i = 0; i < c->nb_streams; i++)
     {
-        //ÒôÆµ
+        //éŸ³é¢‘
         if (c->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO)
         {
             audio_index_ = i;
@@ -90,7 +90,7 @@ std::shared_ptr<XPara> XFormat::CopyAudioPara()
     re.reset(XPara::Create());
     *re->time_base = c_->streams[index]->time_base;
     avcodec_parameters_copy(re->para, c_->streams[index]->codecpar);
-    //×ª»»³ÉºÁÃë
+    //è½¬æ¢æˆæ¯«ç§’
     re->total_ms = av_rescale_q(c_->streams[index]->duration,
         c_->streams[index]->time_base, { 1,1000 });
 
@@ -108,7 +108,7 @@ std::shared_ptr<XPara> XFormat::CopyVideoPara()
     *re->time_base = c_->streams[index]->time_base;
     avcodec_parameters_copy(re->para, c_->streams[index]->codecpar);
 
-    //×ª»»³ÉºÁÃë
+    //è½¬æ¢æˆæ¯«ç§’
     re->total_ms = av_rescale_q(c_->streams[index]->duration,
         c_->streams[index]->time_base, { 1,1000 });
 
@@ -133,11 +133,11 @@ bool XFormat::CopyPara(int stream_index, AVCodecContext* dts)
 }
 
 /// <summary>
-/// ¸´ÖÆ²ÎÊı Ïß³Ì°²È«
+/// å¤åˆ¶å‚æ•° çº¿ç¨‹å®‰å…¨
 /// </summary>
-/// <param name="stream_index">¶ÔÓ¦c_->streams ÏÂ±ê</param>
-/// <param name="dst">Êä³ö²ÎÊı</param>
-/// <returns>ÊÇ·ñ³É¹¦</returns>
+/// <param name="stream_index">å¯¹åº”c_->streams ä¸‹æ ‡</param>
+/// <param name="dst">è¾“å‡ºå‚æ•°</param>
+/// <returns>æ˜¯å¦æˆåŠŸ</returns>
 bool XFormat::CopyPara(int stream_index, AVCodecParameters* dst)
 {
     unique_lock<mutex> lock(mux_);
@@ -154,14 +154,14 @@ bool XFormat::CopyPara(int stream_index, AVCodecParameters* dst)
     }
     return true;
 }
-//°Ñpts dts duration Öµ×ªÎªºÁÃë
+//æŠŠpts dts duration å€¼è½¬ä¸ºæ¯«ç§’
 long long XFormat::RescaleToMs(long long pts, int index)
 {
     unique_lock<mutex> lock(mux_);
     if (!c_ || index <0 || index > c_->nb_streams)return 0;
     auto in_timebase = c_->streams[index]->time_base;
 
-    AVRational out_timebase = { 1,1000 };//Êä³ötimebase ºÁÃë
+    AVRational out_timebase = { 1,1000 };//è¾“å‡ºtimebase æ¯«ç§’
     return av_rescale_q(pts, in_timebase, out_timebase);
 }
 bool XFormat::RescaleTime(AVPacket* pkt, long long offset_pts, AVRational* time_base)
@@ -188,12 +188,12 @@ bool XFormat::RescaleTime(AVPacket* pkt, long long offset_pts, XRational time_ba
     return RescaleTime(pkt, offset_pts,&in_time_base);
 }
 
-//Éè¶¨³¬Ê±Ê±¼ä
+//è®¾å®šè¶…æ—¶æ—¶é—´
 void XFormat::set_time_out_ms(int ms)
 {
     unique_lock<mutex> lock(mux_);
     this->time_out_ms_ = ms;
-    //ÉèÖÃ»Øµ÷º¯Êı£¬´¦Àí³¬Ê±ÍË³ö
+    //è®¾ç½®å›è°ƒå‡½æ•°ï¼Œå¤„ç†è¶…æ—¶é€€å‡º
     if (c_)
     {
         AVIOInterruptCB cb = { TimeoutCallback ,this };

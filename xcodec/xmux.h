@@ -1,13 +1,13 @@
 #pragma once
 #include "xformat.h"
 //////////////////////////////////////
-/// Ã½Ìå·â×°
+/// åª’ä½“å°è£…
 
 class XCODEC_API XMux :public XFormat
 {
 public:
     //////////////////////////////////////////////////
-    //// ´ò¿ª·â×°
+    //// æ‰“å¼€å°è£…
     static AVFormatContext* Open(const char* url,
         AVCodecParameters* video_para = nullptr,
         AVCodecParameters* audio_para = nullptr
@@ -19,7 +19,7 @@ public:
 
     bool WriteEnd();
 
-    //ÒôÊÓÆµÊ±¼ä»ù´¡
+    //éŸ³è§†é¢‘æ—¶é—´åŸºç¡€
     void set_src_video_time_base(AVRational* tb);
     void set_src_audio_time_base(AVRational* tb);
 
@@ -28,7 +28,7 @@ private:
     AVRational* src_video_time_base_ = nullptr;
     AVRational* src_audio_time_base_ = nullptr;
 
-    long long begin_video_pts_ = -1;//Ô­ÊÓÆµ¿ªÊ¼Ê±¼ä
-    long long begin_audio_pts_ = -1;//Ô­ÒôÆµ¿ªÊ¼Ê±¼ä
+    long long begin_video_pts_ = -1;//åŸè§†é¢‘å¼€å§‹æ—¶é—´
+    long long begin_audio_pts_ = -1;//åŸéŸ³é¢‘å¼€å§‹æ—¶é—´
 };
 

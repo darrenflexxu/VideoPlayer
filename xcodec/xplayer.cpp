@@ -1,6 +1,6 @@
 #include "xplayer.h"
 #include "xaudio_play.h"
-//ÔİÍ£»òÕß²¥·Å
+//æš‚åœæˆ–è€…æ’­æ”¾
 void XPlayer::Pause(bool is_pause)
 {
     XThread::Pause(is_pause);
@@ -9,7 +9,7 @@ void XPlayer::Pause(bool is_pause)
     video_decode_.Pause(is_pause);
     XAudioPlay::Instance()->Pause(is_pause);
 }
-//ÉèÖÃÊÓÆµ²¥·ÅÎ»ÖÃ£¬ºÁÃë
+//è®¾ç½®è§†é¢‘æ’­æ”¾ä½ç½®ï¼Œæ¯«ç§’
 bool XPlayer::Seek(long long ms)
 {
     demux_.Seek(ms);
@@ -38,25 +38,25 @@ void XPlayer::Stop()
 }
 bool XPlayer::Open(const char* url, void* winid)
 {
-    //½â·â×°
+    //è§£å°è£…
     if (!demux_.Open(url))
         return false;
-    //ÊÓÆµ½âÂë
+    //è§†é¢‘è§£ç 
     auto vp = demux_.CopyVideoPara();
     if (vp)
     {
-        //ÊÓÆµ×ÜÊ±³¤
+        //è§†é¢‘æ€»æ—¶é•¿
         this->total_ms_ = vp->total_ms;
 
         if (!video_decode_.Open(vp->para))
         {
             return false;
         }
-        //ÓÃÓÚ¹ıÂËÒôÆµ°ü
+        //ç”¨äºè¿‡æ»¤éŸ³é¢‘åŒ…
         video_decode_.set_stream_index(demux_.video_index());
-        //»º³å
+        //ç¼“å†²
         video_decode_.set_block_size(100);
-        //ÊÓÆµäÖÈ¾
+        //è§†é¢‘æ¸²æŸ“
         if (!view_)
             view_ = XVideoView::Create();
         view_->set_win_id(winid);
@@ -67,32 +67,32 @@ bool XPlayer::Open(const char* url, void* winid)
     auto ap = demux_.CopyAudioPara();
     if (ap)
     {
-        //ÒôÆµ½âÂë
+        //éŸ³é¢‘è§£ç 
         if (!audio_decode_.Open(ap->para))
         {
             return false;
         }
-        //»º³å
+        //ç¼“å†²
         audio_decode_.set_block_size(100);
 
-        //ÓÃÓÚ¹ıÂËÊÓÆµÊı¾İ
+        //ç”¨äºè¿‡æ»¤è§†é¢‘æ•°æ®
         audio_decode_.set_stream_index(demux_.audio_index());
 
-        //frame »º³å
+        //frame ç¼“å†²
         audio_decode_.set_frame_cache(true);
 
-        //³õÊ¼»¯ÒôÆµ²¥·Å
+        //åˆå§‹åŒ–éŸ³é¢‘æ’­æ”¾
         XAudioPlay::Instance()->Open(*ap);
 
-        //ÉèÖÃÊ±¼ä»ùÊı
+        //è®¾ç½®æ—¶é—´åŸºæ•°
         double time_base = 0;
     }
     else
     {
-        demux_.set_syn_type(XSYN_VIDEO);//¸ù¾İÊÓÆµÍ¬²½
+        demux_.set_syn_type(XSYN_VIDEO);//æ ¹æ®è§†é¢‘åŒæ­¥
     }
 
-    //½â·â×°Êı¾İ´«µ½µ±Ç°Àà
+    //è§£å°è£…æ•°æ®ä¼ åˆ°å½“å‰ç±»
     demux_.set_next(this);
     return true;
 }
@@ -114,10 +114,10 @@ void XPlayer::Start()
     XThread::Start();
 }
 
-//äÖÈ¾ÊÓÆµ ²¥·ÅÒôÆµ
+//æ¸²æŸ“è§†é¢‘ æ’­æ”¾éŸ³é¢‘
 void XPlayer::Update()
 {
-    //äÖÈ¾ÊÓÆµ
+    //æ¸²æŸ“è§†é¢‘
     if (view_)
     {
         auto f = video_decode_.GetFrame();
@@ -128,7 +128,7 @@ void XPlayer::Update()
         }
     }
 
-    //ÒôÆµ²¥·Å
+    //éŸ³é¢‘æ’­æ”¾
     auto au = XAudioPlay::Instance();
     auto f = audio_decode_.GetFrame();
     if (!f)return;

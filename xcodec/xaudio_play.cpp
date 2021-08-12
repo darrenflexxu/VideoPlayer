@@ -10,7 +10,7 @@ class CXAudioPlay :public XAudioPlay
 {
 public:
     
-    //ÔİÍ£
+    //æš‚åœ
     void Pause(bool is_pause)
     {
         if (is_pause)
@@ -20,7 +20,7 @@ public:
         }
         else
         {
-            //È¥µôÔİÍ£µÄÊÂ¼ş
+            //å»æ‰æš‚åœçš„äº‹ä»¶
             if(pause_begin>0)
                 last_ms_ += (NowMs() - pause_begin);
             SDL_PauseAudio(0);
@@ -30,7 +30,7 @@ public:
     bool Open(XAudioSpec& spec)
     {
         this->spec_ = spec;
-        //ÍË³öÉÏÒ»´ÎÒôÆµ
+        //é€€å‡ºä¸Šä¸€æ¬¡éŸ³é¢‘
         SDL_QuitSubSystem(SDL_INIT_AUDIO);
 
         SDL_AudioSpec sdl_spec;
@@ -46,7 +46,7 @@ public:
             cerr << SDL_GetError() << endl;
             return false;
         }
-        //¿ªÊ¼²¥·Å
+        //å¼€å§‹æ’­æ”¾
         SDL_PauseAudio(0);
         return true;
     }
@@ -55,9 +55,9 @@ public:
         SDL_QuitSubSystem(SDL_INIT_AUDIO);
         unique_lock<mutex> lock(mux_);
         audio_datas_.clear();
-        cur_pts_ = 0; //µ±Ç°²¥·ÅÎ»ÖÃ
-        last_ms_ = 0;  //ÉÏ´ÎµÄÊ±¼ä´Á
-        pause_begin = 0;//ÔİÍ£¿ªÊ¼Ê±¼ä´Á
+        cur_pts_ = 0; //å½“å‰æ’­æ”¾ä½ç½®
+        last_ms_ = 0;  //ä¸Šæ¬¡çš„æ—¶é—´æˆ³
+        pause_begin = 0;//æš‚åœå¼€å§‹æ—¶é—´æˆ³
     }
     void Callback(unsigned char* stream, int len)
     {
@@ -65,18 +65,18 @@ public:
         unique_lock<mutex> lock(mux_);
         if (audio_datas_.empty())return;
         auto buf = audio_datas_.front();
-        // 1 buf ´óÓÚstream»º³å  offset¼ÇÂ¼Î»ÖÃ
-        // 2 buf Ğ¡ÓÚstream »º³å  Æ´½Ó
-        int mixed_size = 0;     //ÒÑ¾­´¦ÀíµÄ×Ö½ÚÊı
-        int need_size = len;    //ĞèÒª´¦ÀíµÄ×Ö½ÚÊı
-        cur_pts_ = buf.pts;     //µ±Ç°²¥·ÅµÄpts
-        last_ms_ = NowMs();     //¼ÆÊ±¿ªÊ¼²¥·Å
+        // 1 buf å¤§äºstreamç¼“å†²  offsetè®°å½•ä½ç½®
+        // 2 buf å°äºstream ç¼“å†²  æ‹¼æ¥
+        int mixed_size = 0;     //å·²ç»å¤„ç†çš„å­—èŠ‚æ•°
+        int need_size = len;    //éœ€è¦å¤„ç†çš„å­—èŠ‚æ•°
+        cur_pts_ = buf.pts;     //å½“å‰æ’­æ”¾çš„pts
+        last_ms_ = NowMs();     //è®¡æ—¶å¼€å§‹æ’­æ”¾
 
         while (mixed_size < len)
         {
             if (audio_datas_.empty())break;
             buf = audio_datas_.front();
-            int size = buf.data.size() - buf.offset;//Ê£ÓàÎ´´¦ÀíµÄÊı¾İ
+            int size = buf.data.size() - buf.offset;//å‰©ä½™æœªå¤„ç†çš„æ•°æ®
             if (size > need_size)
             {
                 size = need_size;
@@ -97,16 +97,16 @@ public:
     {
         double ms = 0;
         if (last_ms_ > 0)
-            ms = NowMs() - last_ms_;//¾àÀëÉÏ´ÎĞ´Èë»º³åµÄ²¥·ÅÊ±¼äºÁÃë
-        //pts ºÁÃë»»ËãptsµÄÊ±¼ä»ùÊı
+            ms = NowMs() - last_ms_;//è·ç¦»ä¸Šæ¬¡å†™å…¥ç¼“å†²çš„æ’­æ”¾æ—¶é—´æ¯«ç§’
+        //pts æ¯«ç§’æ¢ç®—ptsçš„æ—¶é—´åŸºæ•°
         if(time_base_ > 0)
             ms = ms / (double)1000 / (double)time_base_;
         return cur_pts_ + speed_*ms;
     }
 private:
-    long long cur_pts_ = 0; //µ±Ç°²¥·ÅÎ»ÖÃ
-    long long last_ms_ = 0;  //ÉÏ´ÎµÄÊ±¼ä´Á
-    long long pause_begin = 0;//ÔİÍ£¿ªÊ¼Ê±¼ä´Á
+    long long cur_pts_ = 0; //å½“å‰æ’­æ”¾ä½ç½®
+    long long last_ms_ = 0;  //ä¸Šæ¬¡çš„æ—¶é—´æˆ³
+    long long pause_begin = 0;//æš‚åœå¼€å§‹æ—¶é—´æˆ³
 };
 
 void XAudioPlay::Push(AVFrame* frame)
@@ -123,7 +123,7 @@ void XAudioPlay::Push(AVFrame* frame)
         Push(frame->data[0], frame->nb_samples* sample_size, frame->pts);
         return;
     }
-    //ÔİÊ±Ö§³ÖË«Í¨µÀ
+    //æš‚æ—¶æ”¯æŒåŒé€šé“
     switch (frame->format)
     {
         //case AV_SAMPLE_FMT_S16P:        ///< signed 16 bits, planar

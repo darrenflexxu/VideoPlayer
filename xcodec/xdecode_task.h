@@ -5,19 +5,19 @@ class XCODEC_API XDecodeTask :public XThread
 {
 public:
     /// <summary>
-    /// ´ò¿ª½âÂëÆ÷
+    /// æ‰“å¼€è§£ç å™¨
     /// </summary>
     bool Open(AVCodecParameters* para);
 
-    //ÔğÈÎÁ´´¦Àíº¯Êı
+    //è´£ä»»é“¾å¤„ç†å‡½æ•°
     void Do(AVPacket* pkt) override; 
 
-    //Ïß³ÌÖ÷º¯Êı
+    //çº¿ç¨‹ä¸»å‡½æ•°
     void Main() override;
 
-    // Ïß³Ì°²È«£¬·µ»Øµ±Ç°ĞèÒªäÖÈ¾µÄAVFrame£¬Èç¹ûÃ»ÓĞ·µ»Ønullptr
-    // need_view_¿ØÖÆäÖÈ¾
-    // ·µ»Ø½á¹ûĞèÒªÓÃ XFreeFrame ÊÍ·Å
+    // çº¿ç¨‹å®‰å…¨ï¼Œè¿”å›å½“å‰éœ€è¦æ¸²æŸ“çš„AVFrameï¼Œå¦‚æœæ²¡æœ‰è¿”å›nullptr
+    // need_view_æ§åˆ¶æ¸²æŸ“
+    // è¿”å›ç»“æœéœ€è¦ç”¨ XFreeFrame é‡Šæ”¾
     AVFrame* GetFrame();
 
     void set_stream_index(int i) { stream_index_ = i; }
@@ -25,35 +25,35 @@ public:
     void set_frame_cache(bool is) { frame_cache_ = is; }
     bool is_open() { return is_open_; }
 
-    //ÉèÖÃÍ¬²½Ê±¼ä
+    //è®¾ç½®åŒæ­¥æ—¶é—´
     void set_syn_pts(long long p) { syn_pts_ = p; }
     void set_block_size(int s) { block_size_ = s; }
     /// <summary>
-    /// ÇåÀí»º´æ
+    /// æ¸…ç†ç¼“å­˜
     /// </summary>
     void Clear();
 
     void Stop();
 
-    //µ±Ç°²¥·ÅÎ»ÖÃµÄºÁÃë
+    //å½“å‰æ’­æ”¾ä½ç½®çš„æ¯«ç§’
     long long cur_ms() { return cur_ms_; };
 
     void set_time_base(AVRational* time_base);
 
 private:
-    long long cur_pts_ = -1;//µ±Ç°½âÂëµ½µÄpts£¨ÒÔ½âÂëÊı¾İÎª×¼£©
+    long long cur_pts_ = -1;//å½“å‰è§£ç åˆ°çš„ptsï¼ˆä»¥è§£ç æ•°æ®ä¸ºå‡†ï¼‰
     AVRational* time_base_ = nullptr;
-    long long cur_ms_ = 0;  //µ±Ç°²¥·ÅÎ»ÖÃµÄºÁÃë
-    int block_size_ = 0;    //×èÈû´óĞ¡
-    long long syn_pts_ = -1;//Í¬²½Ê±¼ä -1²»Í¬²½
+    long long cur_ms_ = 0;  //å½“å‰æ’­æ”¾ä½ç½®çš„æ¯«ç§’
+    int block_size_ = 0;    //é˜»å¡å¤§å°
+    long long syn_pts_ = -1;//åŒæ­¥æ—¶é—´ -1ä¸åŒæ­¥
     bool is_open_ = false;
     int stream_index_ = 0;
     std::mutex mux_;
     XDecode decode_;
     XAVPacketList pkt_list_;
-    AVFrame* frame_ = nullptr;      //½âÂëºó´æ´¢
-    bool need_view_ = false;        //ÊÇ·ñĞèÒªäÖÈ¾£¬Ã¿Ö¡Ö»äÖÈ¾Ò»´Î£¬Í¨¹ıGetFrame
-    std::list<AVFrame*> frames_;    //´æ´¢ÒôÆµ»º³å
-    bool frame_cache_ = false;      //ÊÇ·ñ»º³åframe¶ÓÁĞ
+    AVFrame* frame_ = nullptr;      //è§£ç åå­˜å‚¨
+    bool need_view_ = false;        //æ˜¯å¦éœ€è¦æ¸²æŸ“ï¼Œæ¯å¸§åªæ¸²æŸ“ä¸€æ¬¡ï¼Œé€šè¿‡GetFrame
+    std::list<AVFrame*> frames_;    //å­˜å‚¨éŸ³é¢‘ç¼“å†²
+    bool frame_cache_ = false;      //æ˜¯å¦ç¼“å†²frameé˜Ÿåˆ—
 };
 

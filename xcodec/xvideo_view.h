@@ -5,14 +5,14 @@
 #include "xtools.h"
 
 ////////////////////////////////////
-/// ÊÓÆµäÖÈ¾½Ó¿ÚÀà
-/// Òş²ØSDLÊµÏÖ
-/// äÖÈ¾·½°¸¿ÉÌæ´ú
-// Ïß³Ì°²È«
+/// è§†é¢‘æ¸²æŸ“æ¥å£ç±»
+/// éšè—SDLå®ç°
+/// æ¸²æŸ“æ–¹æ¡ˆå¯æ›¿ä»£
+// çº¿ç¨‹å®‰å…¨
 class XCODEC_API XVideoView
 {
 public:
-    enum Format  //Ã¶¾ÙµÄÖµºÍffmpegÖĞÒ»ÖÂ
+    enum Format  //æšä¸¾çš„å€¼å’Œffmpegä¸­ä¸€è‡´
     {
         YUV420P = 0,
         NV12 = 23,
@@ -27,27 +27,27 @@ public:
     static XVideoView* Create(RenderType type=SDL);
 
     ////////////////////////////////////////////////
-    /// ³õÊ¼»¯äÖÈ¾´°¿Ú Ïß³Ì°²È« ¿É¶à´Îµ÷ÓÃ
-    /// @para w ´°¿Ú¿í¶È
-    /// @para h ´°¿Ú¸ß¶È
-    /// @para fmt »æÖÆµÄÏñËØ¸ñÊ½
-    /// @para win_id ´°¿Ú¾ä±ú£¬Èç¹ûÎª¿Õ£¬´´½¨ĞÂ´°¿Ú
-    /// @return ÊÇ·ñ´´½¨³É¹¦
+    /// åˆå§‹åŒ–æ¸²æŸ“çª—å£ çº¿ç¨‹å®‰å…¨ å¯å¤šæ¬¡è°ƒç”¨
+    /// @para w çª—å£å®½åº¦
+    /// @para h çª—å£é«˜åº¦
+    /// @para fmt ç»˜åˆ¶çš„åƒç´ æ ¼å¼
+    /// @para win_id çª—å£å¥æŸ„ï¼Œå¦‚æœä¸ºç©ºï¼Œåˆ›å»ºæ–°çª—å£
+    /// @return æ˜¯å¦åˆ›å»ºæˆåŠŸ
     virtual bool Init(int w, int h,
         Format fmt = RGBA) = 0;
     bool Init(AVCodecParameters* para);
-    //ÇåÀíËùÓĞÉêÇëµÄ×ÊÔ´£¬°üÀ¨¹Ø±Õ´°¿Ú
+    //æ¸…ç†æ‰€æœ‰ç”³è¯·çš„èµ„æºï¼ŒåŒ…æ‹¬å…³é—­çª—å£
     virtual void Close() = 0;
 
-    //´¦Àí´°¿ÚÍË³öÊÂ¼ş
+    //å¤„ç†çª—å£é€€å‡ºäº‹ä»¶
     virtual bool IsExit() = 0;
 
     //////////////////////////////////////////////////
-    /// äÖÈ¾Í¼Ïñ Ïß³Ì°²È«
-    ///@para data äÖÈ¾µÄ¶ş½øÖÆÊı¾İ
-    ///@para linesize Ò»ĞĞÊı¾İµÄ×Ö½ÚÊı£¬¶ÔÓÚYUV420P¾ÍÊÇYÒ»ĞĞ×Ö½ÚÊı
-    /// linesize<=0 ¾Í¸ù¾İ¿í¶ÈºÍÏñËØ¸ñÊ½×Ô¶¯Ëã³ö´óĞ¡
-    /// @return äÖÈ¾ÊÇ·ñ³É¹¦
+    /// æ¸²æŸ“å›¾åƒ çº¿ç¨‹å®‰å…¨
+    ///@para data æ¸²æŸ“çš„äºŒè¿›åˆ¶æ•°æ®
+    ///@para linesize ä¸€è¡Œæ•°æ®çš„å­—èŠ‚æ•°ï¼Œå¯¹äºYUV420På°±æ˜¯Yä¸€è¡Œå­—èŠ‚æ•°
+    /// linesize<=0 å°±æ ¹æ®å®½åº¦å’Œåƒç´ æ ¼å¼è‡ªåŠ¨ç®—å‡ºå¤§å°
+    /// @return æ¸²æŸ“æ˜¯å¦æˆåŠŸ
     virtual bool Draw(const unsigned  char* data, int linesize = 0) = 0;
     virtual bool Draw(
         const unsigned  char* y, int y_pitch,
@@ -56,7 +56,7 @@ public:
         ) = 0;
 
     
-    //ÏÔÊ¾Ëõ·Å
+    //æ˜¾ç¤ºç¼©æ”¾
     void Scale(int w, int h)
     {
         scale_w_ = w;
@@ -67,32 +67,32 @@ public:
 
     int render_fps() { return render_fps_; }
 
-    //´ò¿ªÎÄ¼ş
+    //æ‰“å¼€æ–‡ä»¶
     bool Open(std::string filepath);
 
 
     //////////////////////////////////////
-    /// ¶ÁÈ¡Ò»Ö¡Êı¾İ£¬²¢Î¬»¤AVFrame¿Õ¼ä
-    /// Ã¿´Îµ÷ÓÃ»á¸²¸ÇÉÏÒ»´ÎÊı¾İ
+    /// è¯»å–ä¸€å¸§æ•°æ®ï¼Œå¹¶ç»´æŠ¤AVFrameç©ºé—´
+    /// æ¯æ¬¡è°ƒç”¨ä¼šè¦†ç›–ä¸Šä¸€æ¬¡æ•°æ®
     AVFrame* Read();
     void set_win_id(void* win) { win_id_ = win; }
     virtual ~XVideoView();
 protected:
-    void* win_id_ = nullptr; //´°¿Ú¾ä±ú
-    int render_fps_ = 0;       //ÏÔÊ¾Ö¡ÂÊ
-    int width_ = 0;             //²ÄÖÊ¿í¸ß
+    void* win_id_ = nullptr; //çª—å£å¥æŸ„
+    int render_fps_ = 0;       //æ˜¾ç¤ºå¸§ç‡
+    int width_ = 0;             //æè´¨å®½é«˜
     int height_ = 0;
-    Format fmt_ = RGBA;         //ÏñËØ¸ñÊ½
-    std::mutex mtx_;            //È·±£Ïß³Ì°²È«
-    int scale_w_ = 0;           //ÏÔÊ¾´óĞ¡
+    Format fmt_ = RGBA;         //åƒç´ æ ¼å¼
+    std::mutex mtx_;            //ç¡®ä¿çº¿ç¨‹å®‰å…¨
+    int scale_w_ = 0;           //æ˜¾ç¤ºå¤§å°
     int scale_h_ = 0;
-    long long beg_ms_ = 0;       //¼ÆÊ±¿ªÊ¼Ê±¼ä
-    int count_ = 0;              //Í³¼ÆÏÔÊ¾´ÎÊı
+    long long beg_ms_ = 0;       //è®¡æ—¶å¼€å§‹æ—¶é—´
+    int count_ = 0;              //ç»Ÿè®¡æ˜¾ç¤ºæ¬¡æ•°
     
 private:
     std::ifstream ifs_;
     AVFrame* frame_ = nullptr;
-    unsigned char* cache_ = nullptr;//¸´ÖÆNV12»º³å
+    unsigned char* cache_ = nullptr;//å¤åˆ¶NV12ç¼“å†²
 };
 
 #endif

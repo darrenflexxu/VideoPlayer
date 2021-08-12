@@ -3,8 +3,8 @@
 #include <iostream>
 #include <thread>
 using namespace std;
-extern "C" { //Ö¸¶¨º¯ÊıÊÇcÓïÑÔº¯Êı£¬º¯ÊıÃû²»°üº¬ÖØÔØ±ê×¢
-//ÒıÓÃffmpegÍ·ÎÄ¼ş
+extern "C" { //æŒ‡å®šå‡½æ•°æ˜¯cè¯­è¨€å‡½æ•°ï¼Œå‡½æ•°åä¸åŒ…å«é‡è½½æ ‡æ³¨
+//å¼•ç”¨ffmpegå¤´æ–‡ä»¶
 #include <libavformat/avformat.h>
 }
 void PrintErr(int err);
@@ -38,29 +38,29 @@ XMux::~XMux()
 }
 
 //////////////////////////////////////////////////
-//// ´ò¿ª·â×°
+//// æ‰“å¼€å°è£…
 AVFormatContext* XMux::Open(const char* url,
     AVCodecParameters* video_para ,
     AVCodecParameters* audio_para )
 {
     AVFormatContext* c = nullptr;
-    //´´½¨ÉÏÏÂÎÄ
+    //åˆ›å»ºä¸Šä¸‹æ–‡
     auto re = avformat_alloc_output_context2(&c, NULL, NULL, url);
     BERR(re);
 
-    //Ìí¼ÓÊÓÆµÒôÆµÁ÷
+    //æ·»åŠ è§†é¢‘éŸ³é¢‘æµ
     if (video_para)
     {
-        auto vs = avformat_new_stream(c, NULL);   //ÊÓÆµÁ÷
+        auto vs = avformat_new_stream(c, NULL);   //è§†é¢‘æµ
         avcodec_parameters_copy(vs->codecpar, video_para);
     }
     if (audio_para)
     {
-        auto as = avformat_new_stream(c, NULL);   //ÒôÆµÁ÷
+        auto as = avformat_new_stream(c, NULL);   //éŸ³é¢‘æµ
         avcodec_parameters_copy(as->codecpar, audio_para);
     }
 
-    //´ò¿ªIO
+    //æ‰“å¼€IO
     re = avio_open(&c->pb, url, AVIO_FLAG_WRITE);
     BERR(re);
     av_dump_format(c, 0, url, 1);
@@ -71,7 +71,7 @@ bool XMux::Write(AVPacket* pkt)
     if (!pkt)return false;
     unique_lock<mutex> lock(mux_);
     if (!c_)return false;
-    //Ã»¶ÁÈ¡µ½pts ÖØ¹¹¿¼ÂÇÍ¨¹ıduration ¼ÆËã
+    //æ²¡è¯»å–åˆ°pts é‡æ„è€ƒè™‘é€šè¿‡duration è®¡ç®—
     if (pkt->pts == AV_NOPTS_VALUE)
     {
         pkt->pts = 0;
@@ -96,7 +96,7 @@ bool XMux::Write(AVPacket* pkt)
     }
 
     cout << pkt->pts << " " << flush;
-    //Ğ´ÈëÒ»Ö¡Êı¾İ£¬ÄÚ²¿»º³åÅÅĞòdts£¬Í¨¹ıpkt=null ¿ÉÒÔĞ´Èë»º³å
+    //å†™å…¥ä¸€å¸§æ•°æ®ï¼Œå†…éƒ¨ç¼“å†²æ’åºdtsï¼Œé€šè¿‡pkt=null å¯ä»¥å†™å…¥ç¼“å†²
     auto re = av_interleaved_write_frame(c_,pkt);
     BERR(re);
     return true;
@@ -107,7 +107,7 @@ bool XMux::WriteEnd()
     unique_lock<mutex> lock(mux_);
     if (!c_)return false;
     int re = 0;
-    //auto re = av_interleaved_write_frame(c_, nullptr);//Ğ´ÈëÅÅĞò»º³å
+    //auto re = av_interleaved_write_frame(c_, nullptr);//å†™å…¥æ’åºç¼“å†²
     //BERR(re);
     re = av_write_trailer(c_);
     BERR(re);
@@ -117,11 +117,11 @@ bool XMux::WriteHead()
 {
     unique_lock<mutex> lock(mux_);
     if (!c_)return false;
-    //»á¸Ä±ätimebase
+    //ä¼šæ”¹å˜timebase
     auto re = avformat_write_header(c_, nullptr);
     BERR(re);
 
-    //´òÓ¡Êä³öÉÏÏÂÎÄ
+    //æ‰“å°è¾“å‡ºä¸Šä¸‹æ–‡
     av_dump_format(c_, 0, c_->url, 1);
     this->begin_audio_pts_ = -1;
     this->begin_video_pts_ = -1;

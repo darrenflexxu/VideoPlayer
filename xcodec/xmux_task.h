@@ -6,13 +6,13 @@ class XCODEC_API XMuxTask :public XThread
 public:
     void Main() override;
     /// <summary>
-    /// 打开封装文件
+    /// 鎵撳紑灏佽鏂囦欢
     /// </summary>
-    /// <param name="url">输出地址</param>
-    /// <param name="video_para">视频参数</param>
-    /// <param name="video_time_base">视频时间基数</param>
-    /// <param name="audio_para">音频参数</param>
-    /// <param name="audio_time_base">音频的时间基础</param>
+    /// <param name="url">杈撳嚭鍦板潃</param>
+    /// <param name="video_para">瑙嗛鍙傛暟</param>
+    /// <param name="video_time_base">瑙嗛鏃堕棿鍩烘暟</param>
+    /// <param name="audio_para">闊抽鍙傛暟</param>
+    /// <param name="audio_time_base">闊抽鐨勬椂闂村熀纭�</param>
     /// <returns></returns>
     bool Open(const char* url,
         AVCodecParameters* video_para = nullptr,
@@ -21,7 +21,7 @@ public:
         AVRational *audio_time_base = nullptr
         );
 
-    //接收数据
+    //鎺ユ敹鏁版嵁
     void Do(AVPacket* pkt);
 private:
     XMux xmux_;

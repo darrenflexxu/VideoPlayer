@@ -6,7 +6,7 @@ extern "C"
 #include <libavcodec/avcodec.h>
 #include <libavutil/opt.h>
 }
-bool XDecode::Send(const AVPacket* pkt)  //·¢ËÍ½âÂë
+bool XDecode::Send(const AVPacket* pkt)  //å‘é€è§£ç 
 {
     unique_lock<mutex> lock(mux_);
     if (!c_)return false;
@@ -15,21 +15,21 @@ bool XDecode::Send(const AVPacket* pkt)  //·¢ËÍ½âÂë
     return true;
 }
 
-bool XDecode::Recv(AVFrame* frame)      //»ñÈ¡½âÂë
+bool XDecode::Recv(AVFrame* frame)      //è·å–è§£ç 
 {
     unique_lock<mutex> lock(mux_);
     if (!c_)return false;
     auto f = frame;
-    if (c_->hw_device_ctx) //Ó²¼ş¼ÓËÙ
+    if (c_->hw_device_ctx) //ç¡¬ä»¶åŠ é€Ÿ
     {
         f = av_frame_alloc();
     }
     auto re = avcodec_receive_frame(c_, f);
     if (re == 0)
     {
-        if (c_->hw_device_ctx) //GPU½âÂë
+        if (c_->hw_device_ctx) //GPUè§£ç 
         {
-            //ÏÔ´æ×ªÄÚ´æ GPU =¡· CPU
+            //æ˜¾å­˜è½¬å†…å­˜ GPU =ã€‹ CPU
             re = av_hwframe_transfer_data(frame, f, 0); 
             av_frame_free(&f);
             if (re != 0)
@@ -49,7 +49,7 @@ bool XDecode::InitHW(int type)
     unique_lock<mutex> lock(mux_);
     if (!c_)return false;
     ;
-    AVBufferRef* ctx = nullptr; //Ó²¼ş¼ÓËÙÉÏÏÂÎÄ
+    AVBufferRef* ctx = nullptr; //ç¡¬ä»¶åŠ é€Ÿä¸Šä¸‹æ–‡
     auto re = av_hwdevice_ctx_create(&ctx, (AVHWDeviceType)type,NULL,NULL,0);
     if (re != 0)
     {
@@ -57,16 +57,16 @@ bool XDecode::InitHW(int type)
         return false;
     }
     c_->hw_device_ctx = ctx;
-    cout << "Ó²¼ş¼ÓËÙ£º" << type << endl;
+    cout << "ç¡¬ä»¶åŠ é€Ÿï¼š" << type << endl;
     return true;
 }
-std::vector<AVFrame*> XDecode::End()    //»ñÈ¡»º´æ
+std::vector<AVFrame*> XDecode::End()    //è·å–ç¼“å­˜
 {
     std::vector<AVFrame*> res;
     unique_lock<mutex> lock(mux_);
     if (!c_)return res;
 
-    ///È¡³ö»º´æÊı¾İ
+    ///å–å‡ºç¼“å­˜æ•°æ®
     int ret = avcodec_send_packet(c_, NULL);
     while (ret >= 0)
     {

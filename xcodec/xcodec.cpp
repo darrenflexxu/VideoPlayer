@@ -6,18 +6,18 @@ extern "C"
 #include <libavcodec/avcodec.h>
 #include <libavutil/opt.h>
 }
-//Ô¤´¦ÀíÖ¸Áîµ¼Èë¿â
+//é¢„å¤„ç†æŒ‡ä»¤å¯¼å…¥åº“
 #pragma comment(lib,"avcodec.lib")
 #pragma comment(lib,"avutil.lib")
 
 
 //////////////////////////////////////////
-/// ´´½¨±àÂëÉÏÏÂÎÄ
-/// @para codec_id ±àÂëÆ÷IDºÅ£¬¶ÔÓ¦ffmpeg
-/// @return ±àÂëÉÏÏÂÎÄ ,Ê§°Ü·µ»Ønullptr
+/// åˆ›å»ºç¼–ç ä¸Šä¸‹æ–‡
+/// @para codec_id ç¼–ç å™¨IDå·ï¼Œå¯¹åº”ffmpeg
+/// @return ç¼–ç ä¸Šä¸‹æ–‡ ,å¤±è´¥è¿”å›nullptr
 AVCodecContext* XCodec::Create(int codec_id,bool isencode)
 {
-    //1 ÕÒµ½±àÂëÆ÷
+    //1 æ‰¾åˆ°ç¼–ç å™¨
     AVCodec *codec = nullptr;
     if(isencode)
         codec = avcodec_find_encoder((AVCodecID)codec_id);
@@ -28,14 +28,14 @@ AVCodecContext* XCodec::Create(int codec_id,bool isencode)
         cerr << "avcodec_find_encoder failed!" << codec_id << endl;
         return nullptr;
     }
-    //´´½¨ÉÏÏÂÎÄ
+    //åˆ›å»ºä¸Šä¸‹æ–‡
     auto c = avcodec_alloc_context3(codec);
     if (!c)
     {
         cerr << "avcodec_alloc_context3 failed!" << codec_id << endl;
         return nullptr;
     }
-    //ÉèÖÃ²ÎÊıÄ¬ÈÏÖµ
+    //è®¾ç½®å‚æ•°é»˜è®¤å€¼
     c->time_base = { 1,25 };
     c->pix_fmt = AV_PIX_FMT_YUV420P;
     c->thread_count = 16;
@@ -43,9 +43,9 @@ AVCodecContext* XCodec::Create(int codec_id,bool isencode)
 }
 
 //////////////////////////////////////////
-/// ÉèÖÃ¶ÔÏóµÄ±àÂëÆ÷ÉÏÏÂÎÄ ÉÏÏÂÎÄ´«µİµ½¶ÔÏóÖĞ£¬×ÊÔ´ÓÉXEncodeÎ¬»¤
-/// ¼ÓËø Ïß³Ì°²È«
-/// @para c ±àÂëÆ÷ÉÏÏÂÎÄ Èç¹ûc_²»Îªnullptr£¬ÔòÏÈÇåÀí×ÊÔ´
+/// è®¾ç½®å¯¹è±¡çš„ç¼–ç å™¨ä¸Šä¸‹æ–‡ ä¸Šä¸‹æ–‡ä¼ é€’åˆ°å¯¹è±¡ä¸­ï¼Œèµ„æºç”±XEncodeç»´æŠ¤
+/// åŠ é” çº¿ç¨‹å®‰å…¨
+/// @para c ç¼–ç å™¨ä¸Šä¸‹æ–‡ å¦‚æœc_ä¸ä¸ºnullptrï¼Œåˆ™å…ˆæ¸…ç†èµ„æº
 void XCodec::set_c(AVCodecContext* c)
 {
     unique_lock<mutex>lock(mux_);
@@ -91,7 +91,7 @@ void XCodec::Clear()
 
 
 //////////////////////////////////////////////////////////////
-/// ´ò¿ª±àÂëÆ÷ Ïß³Ì°²È«
+/// æ‰“å¼€ç¼–ç å™¨ çº¿ç¨‹å®‰å…¨
 bool XCodec::Open()
 {
     unique_lock<mutex>lock(mux_);
@@ -107,7 +107,7 @@ bool XCodec::Open()
 
 
 ///////////////////////////////////////////////////////////////
-//¸ù¾İAVCodecContext ´´½¨Ò»¸öAVFrame£¬ĞèÒªµ÷ÓÃÕßÊÍ·Åav_frame_free
+//æ ¹æ®AVCodecContext åˆ›å»ºä¸€ä¸ªAVFrameï¼Œéœ€è¦è°ƒç”¨è€…é‡Šæ”¾av_frame_free
 AVFrame* XCodec::CreateFrame()
 {
     unique_lock<mutex>lock(mux_);

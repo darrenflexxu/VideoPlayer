@@ -28,20 +28,20 @@ bool XVideoView::Init(AVCodecParameters* para)
 AVFrame* XVideoView::Read()
 {
 	if (width_ <= 0 || height_ <= 0 || !ifs_)return NULL;
-	//AVFrame¿Õ¼äÒÑ¾­ÉêÇë£¬Èç¹û²ÎÊı·¢Éú±ä»¯£¬ĞèÒªÊÍ·Å¿Õ¼ä
+	//AVFrameç©ºé—´å·²ç»ç”³è¯·ï¼Œå¦‚æœå‚æ•°å‘ç”Ÿå˜åŒ–ï¼Œéœ€è¦é‡Šæ”¾ç©ºé—´
 	if (frame_)
 	{
 		if (frame_->width != width_
 			|| frame_->height != height_ 
 			|| frame_->format != fmt_)
 		{
-			//ÊÍ·ÅAVFrame¶ÔÏó¿Õ¼ä£¬ºÍbufÒıÓÃ¼ÆÊı¼õÒ»
+			//é‡Šæ”¾AVFrameå¯¹è±¡ç©ºé—´ï¼Œå’Œbufå¼•ç”¨è®¡æ•°å‡ä¸€
 			av_frame_free(&frame_);
 		}
 	}
 	if (!frame_)
 	{
-		//·ÖÅä¶ÔÏó¿Õ¼äºÍÏñËØ¿Õ¼ä
+		//åˆ†é…å¯¹è±¡ç©ºé—´å’Œåƒç´ ç©ºé—´
 		frame_ = av_frame_alloc();
 		frame_->width = width_;
 		frame_->height = height_;
@@ -54,7 +54,7 @@ AVFrame* XVideoView::Read()
 			frame_->linesize[2] = width_ / 2;//V
 		}
 
-		//Éú³ÉAVFrame¿Õ¼ä£¬Ê¹ÓÃÄ¬ÈÏ¶ÔÆë
+		//ç”ŸæˆAVFrameç©ºé—´ï¼Œä½¿ç”¨é»˜è®¤å¯¹é½
 		auto re = av_frame_get_buffer(frame_, 0);
 		if (re != 0)
 		{
@@ -68,7 +68,7 @@ AVFrame* XVideoView::Read()
 	}
 	if (!frame_)return NULL;
 
-	//¶ÁÈ¡Ò»Ö¡Êı¾İ
+	//è¯»å–ä¸€å¸§æ•°æ®
 	if (frame_->format == AV_PIX_FMT_YUV420P)
 	{
 		ifs_.read((char*)frame_->data[0], 
@@ -92,7 +92,7 @@ AVFrame* XVideoView::Read()
 
 }
 
-//´ò¿ªÎÄ¼ş
+//æ‰“å¼€æ–‡ä»¶
 bool XVideoView::Open(std::string filepath)
 {
 	if (ifs_.is_open())
@@ -128,8 +128,8 @@ bool XVideoView::DrawFrame(AVFrame* frame)
 	{
 		beg_ms_ = clock();
 	}
-	//¼ÆËãÏÔÊ¾Ö¡ÂÊ
-	else if((clock() - beg_ms_)/(CLOCKS_PER_SEC/1000)>=1000) //Ò»Ãë¼ÆËãÒ»´Îfps
+	//è®¡ç®—æ˜¾ç¤ºå¸§ç‡
+	else if((clock() - beg_ms_)/(CLOCKS_PER_SEC/1000)>=1000) //ä¸€ç§’è®¡ç®—ä¸€æ¬¡fps
 	{
 		render_fps_ = count_;
 		count_ = 0;
@@ -155,7 +155,7 @@ bool XVideoView::DrawFrame(AVFrame* frame)
 			memcpy(cache_, frame->data[0], frame->linesize[0] * frame->height); //Y
 			memcpy(cache_ + frame->linesize[0] * frame->height, frame->data[1], frame->linesize[1] * frame->height / 2); //UV
 		}
-		else //ÖğĞĞ¸´ÖÆ
+		else //é€è¡Œå¤åˆ¶
 		{
 			for (int i = 0; i < frame->height; i++) //Y
 			{
@@ -166,7 +166,7 @@ bool XVideoView::DrawFrame(AVFrame* frame)
 			}
 			for (int i = 0; i < frame->height/2; i++)  //UV
 			{
-				auto p = cache_ + frame->height * frame->width;// ÒÆÎ»Y
+				auto p = cache_ + frame->height * frame->width;// ç§»ä½Y
 				memcpy(p + i * frame->width,
 					frame->data[1] + i * frame->linesize[1],
 					frame->width
