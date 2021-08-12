@@ -40,6 +40,7 @@ FIND_PACKAGE(Qt5Quick REQUIRED)
 include_directories("${PROJECT_SOURCE_DIR}/FramelessHelper"
 "${PROJECT_SOURCE_DIR}/VideoPlayer/Interface"
 "${PROJECT_SOURCE_DIR}/Form"
+"${PROJECT_SOURCE_DIR}/xvideoview"
 )
 
 add_subdirectory(VideoPlayer)
@@ -99,6 +100,15 @@ ENDIF()
 add_definitions(-DUNICODE)
 
 ADD_EXECUTABLE(${PROJECT_NAME} ${SRC} ${HEADER} ${UI} ${QRC} ${QM_FILES}) 
+
+FILE(GLOB XVIDEO_VIEW_SRC "${PROJECT_SOURCE_DIR}/xvideoview/*.cpp")
+FILE(GLOB XVIDEO_VIEW_HEADER "${PROJECT_SOURCE_DIR}/xvideoview/*.h")
+FILE(GLOB XVIDEO_VIEW_QRC "${PROJECT_SOURCE_DIR}/xvideoview/*.qrc")
+FILE(GLOB XVIDEO_VIEW_UI "${PROJECT_SOURCE_DIR}/xvideoview/*.ui")
+
+add_executable(XVideoView ${XVIDEO_VIEW_SRC} ${XVIDEO_VIEW_HEADER} ${XVIDEO_VIEW_UI} ${XVIDEO_VIEW_QRC})
+
+TARGET_LINK_LIBRARIES(XVideoView XCodec Qt5::Widgets Qt5::Core Qt5::Gui)
 
 TARGET_LINK_LIBRARIES(${PROJECT_NAME} Qt5::Widgets Qt5::Core Qt5::Gui Qt5::Qml Qt5::Quick VideoPlayer)
 

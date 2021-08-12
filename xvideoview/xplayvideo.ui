@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>XPlayVideo</class>
+ <widget class="QWidget" name="XPlayVideo">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>600</width>
+    <height>400</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>XPlayVideo</string>
+  </property>
+  <widget class="QWidget" name="video" native="true">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>600</width>
+     <height>400</height>
+    </rect>
+   </property>
+  </widget>
+  <widget class="QLabel" name="speedtxt">
+   <property name="geometry">
+    <rect>
+     <x>210</x>
+     <y>10</y>
+     <width>51</width>
+     <height>16</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>1</string>
+   </property>
+  </widget>
+  <widget class="QLabel" name="label">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>10</y>
+     <width>81</width>
+     <height>16</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>播放速度：</string>
+   </property>
+  </widget>
+  <widget class="QSlider" name="speed">
+   <property name="geometry">
+    <rect>
+     <x>100</x>
+     <y>10</y>
+     <width>81</width>
+     <height>16</height>
+    </rect>
+   </property>
+   <property name="minimum">
+    <number>1</number>
+   </property>
+   <property name="maximum">
+    <number>20</number>
+   </property>
+   <property name="singleStep">
+    <number>1</number>
+   </property>
+   <property name="pageStep">
+    <number>2</number>
+   </property>
+   <property name="value">
+    <number>10</number>
+   </property>
+   <property name="orientation">
+    <enum>Qt::Horizontal</enum>
+   </property>
+  </widget>
+  <widget class="QSlider" name="pos">
+   <property name="geometry">
+    <rect>
+     <x>80</x>
+     <y>340</y>
+     <width>511</width>
+     <height>41</height>
+    </rect>
+   </property>
+   <property name="minimum">
+    <number>1</number>
+   </property>
+   <property name="maximum">
+    <number>999</number>
+   </property>
+   <property name="pageStep">
+    <number>100</number>
+   </property>
+   <property name="orientation">
+    <enum>Qt::Horizontal</enum>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="play">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>330</y>
+     <width>64</width>
+     <height>64</height>
+    </rect>
+   </property>
+   <property name="autoFillBackground">
+    <bool>false</bool>
+   </property>
+   <property name="styleSheet">
+    <string notr="true">background-image: url(:/XViewer/img/play.png);
+background-color: rgba(255, 255, 255, 0);</string>
+   </property>
+   <property name="text">
+    <string/>
+   </property>
+   <property name="flat">
+    <bool>true</bool>
+   </property>
+  </widget>
+ </widget>
+ <layoutdefault spacing="6" margin="11"/>
+ <resources>
+  <include location="xviewer.qrc"/>
+ </resources>
+ <connections>
+  <connection>
+   <sender>speed</sender>
+   <signal>sliderReleased()</signal>
+   <receiver>XPlayVideo</receiver>
+   <slot>SetSpeed()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>102</x>
+     <y>12</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>255</x>
+     <y>-47</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>pos</sender>
+   <signal>sliderReleased()</signal>
+   <receiver>XPlayVideo</receiver>
+   <slot>PlayPos()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>138</x>
+     <y>380</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>241</x>
+     <y>-64</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>play</sender>
+   <signal>clicked()</signal>
+   <receiver>XPlayVideo</receiver>
+   <slot>Pause()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>45</x>
+     <y>361</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>171</x>
+     <y>-26</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>pos</sender>
+   <signal>sliderMoved(int)</signal>
+   <receiver>XPlayVideo</receiver>
+   <slot>Move()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>224</x>
+     <y>372</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>217</x>
+     <y>-4</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+ <slots>
+  <slot>SetSpeed()</slot>
+  <slot>PlayPos()</slot>
+  <slot>Pause()</slot>
+  <slot>Move()</slot>
+ </slots>
+</ui>
