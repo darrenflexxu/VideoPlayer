@@ -147,7 +147,7 @@ bool XVideoView::DrawFrame(AVFrame* frame)
 	case AV_PIX_FMT_NV12:
 		if (!cache_)
 		{
-			cache_ = new unsigned char[4096 * 2160 * 1.5];
+			cache_ = new unsigned char[4096 * 2160 * 3 / 2];
 		}
 		linesize = frame->width;
 		if (frame->linesize[0] == frame->width)

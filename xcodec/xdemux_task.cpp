@@ -49,7 +49,7 @@ void XDemuxTask::Main()
                 Open(url_, timeout_ms_);
             }
 
-            this_thread::sleep_for(1ms);
+            this_thread::sleep_for(std::chrono::milliseconds(1));
             continue;
         }
 
@@ -67,6 +67,6 @@ void XDemuxTask::Main()
         Next(&pkt);
         av_packet_unref(&pkt);
 
-        this_thread::sleep_for(1ms);
+        this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 }

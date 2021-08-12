@@ -159,7 +159,7 @@ void XDecodeTask::Main()
         auto pkt = pkt_list_.Pop();
         if (!pkt)
         {
-            this_thread::sleep_for(1ms);
+            this_thread::sleep_for(std::chrono::milliseconds(1));
             continue;
         }
 
@@ -168,7 +168,7 @@ void XDecodeTask::Main()
         av_packet_free(&pkt);
         if (!re)
         {
-            this_thread::sleep_for(1ms);
+            this_thread::sleep_for(std::chrono::milliseconds(1));
             continue;
         }
         {
@@ -190,7 +190,7 @@ void XDecodeTask::Main()
                 frames_.push_back(f);
             }
         }
-        this_thread::sleep_for(1ms);
+        this_thread::sleep_for(std::chrono::milliseconds(1));
     }
     {
     unique_lock<mutex> lock(mux_);

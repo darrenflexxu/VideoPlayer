@@ -37,7 +37,7 @@ void XFreePacket(AVPacket ** packet) {
 void MSleep(unsigned int ms) {
     auto beg = clock();
     for (int i = 0; i < ms; i++) {
-        this_thread::sleep_for(1ms);
+        this_thread::sleep_for(std::chrono::milliseconds(1));
         if ((clock() - beg) / (CLOCKS_PER_SEC / 1000) >= ms)
             break;
     }

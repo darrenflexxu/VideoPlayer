@@ -160,7 +160,6 @@ bool XAudioPlay::Open(AVCodecParameters* para)
     spec.channels = para->channels;
     spec.freq = para->sample_rate;
 
-    AVSampleFormat;
     switch (para->format)
     {
     case AV_SAMPLE_FMT_S16:         ///< signed 16 bits
