@@ -120,6 +120,28 @@ XVideoView::~XVideoView()
 		delete cache_;
 	cache_ = nullptr;
 }
+
+void yuv420sp_to_yuv420p(unsigned char* yuv420sp, unsigned char* yuv420p, int width, int height) {
+    int i, j;
+    int y_size = width * height;
+
+    unsigned char* y = yuv420sp;
+    unsigned char* uv = yuv420sp + y_size;
+
+    unsigned char* y_tmp = yuv420p;
+    unsigned char* u_tmp = yuv420p + y_size;
+    unsigned char* v_tmp = yuv420p + y_size * 5 / 4;
+
+    // y
+    memcpy(y_tmp, y, y_size);
+
+    // u
+    for (j = 0, i = 0; j < y_size / 2; j += 2, i++) {
+        u_tmp[i] = uv[j];
+        v_tmp[i] = uv[j + 1];
+    }
+}
+
 bool XVideoView::DrawFrame(AVFrame* frame)
 {
 	if (!frame || !frame->data[0])return false;
@@ -152,8 +174,11 @@ bool XVideoView::DrawFrame(AVFrame* frame)
 		linesize = frame->width;
 		if (frame->linesize[0] == frame->width)
 		{
-			memcpy(cache_, frame->data[0], frame->linesize[0] * frame->height); //Y
-			memcpy(cache_ + frame->linesize[0] * frame->height, frame->data[1], frame->linesize[1] * frame->height / 2); //UV
+            auto temp_cache = new unsigned char[4096 * 2160 * 3 / 2];
+			memcpy(temp_cache, frame->data[0], frame->linesize[0] * frame->height); //Y
+			memcpy(temp_cache + frame->linesize[0] * frame->height, frame->data[1], frame->linesize[1] * frame->height / 2); //UV
+            yuv420sp_to_yuv420p(temp_cache, cache_, frame->width, frame->height);
+            delete temp_cache;
 		}
 		else //逐行复制
 		{
