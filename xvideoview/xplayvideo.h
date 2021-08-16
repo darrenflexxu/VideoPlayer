@@ -24,5 +24,5 @@ public slots:
 private:
     Ui::XPlayVideo ui;
     XPlayer player;
-
+    bool moved_ = false;
 };

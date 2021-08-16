@@ -1,8 +1,6 @@
 ﻿#include <QApplication>
-#include <QWidget>
 #include <QDebug>
-#include <QLayout>
-#include <QLabel>
+#include <QFileDialog>
 #include "xcodec/xplayer.h"
 #include "xplayvideo.h"
 
@@ -10,7 +8,13 @@ int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
     XPlayVideo play_video;
-    play_video.Open("C:/xdf/国际汉语录制视频/邱蕾 421302199004175182+北京的气候.mp4");
+    QString s = QFileDialog::getOpenFileName(
+        nullptr, QStringLiteral("选择要播放的文件"),
+        "",//初始目录
+        QStringLiteral("视频文件 (*.flv *.rmvb *.avi *.MP4 *.mkv);;")
+        + QStringLiteral("音频文件 (*.mp3 *.wma *.wav);;")
+        + QStringLiteral("所有文件 (*.*)"));
+    play_video.Open(s.toStdString().c_str());
     play_video.show();
     
     return a.exec();

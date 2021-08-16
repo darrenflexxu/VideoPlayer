@@ -17,7 +17,10 @@ void XPlayVideo::timerEvent(QTimerEvent* ev) {
     auto pos = player.pos_ms();
     auto total = player.total_ms();
     ui.pos->setMaximum(total);
-    ui.pos->setValue(pos);
+
+    if (!moved_) {
+        ui.pos->setValue(pos);
+    }
 }
 void XPlayVideo::Close() {
     player.Stop();
@@ -29,11 +32,13 @@ void XPlayVideo::Pause() {
 void XPlayVideo::Move()        //进度条拖动
 {
     player.Pause(true);
+    moved_ = true;
 }
 void XPlayVideo::PlayPos()     //控制播放进度
 {
     player.Seek(ui.pos->value());
     player.Pause(false);
+    moved_ = false;
 }
 void XPlayVideo::SetSpeed() {
     float speed = 1;
