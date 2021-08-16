@@ -7,10 +7,10 @@
 void XPlayVideo::timerEvent(QTimerEvent* ev) {
     if (player.is_pause()) {
         ui.play->setStyleSheet(
-            "background-image: url(:/XViewer/img/play.png);");
+            "background: url(:/XViewer/img/play.png) no-repeat;");
     } else {
         ui.play->setStyleSheet(
-            "background-image: url(:/XViewer/img/pause.png);");
+            "background: url(:/XViewer/img/pause.png) no-repeat;");
     }
     if (player.is_pause())return;
     player.Update();
@@ -71,15 +71,13 @@ XPlayVideo::XPlayVideo(QWidget *parent)
     auto main_splitter = new QSplitter(Qt::Vertical, this);
     main_splitter->addWidget(ui.video);
     main_layout->addWidget(main_splitter);
-    auto control_layout = new QHBoxLayout(this);
+    auto control_layout = new QSplitter(Qt::Horizontal, this);
     control_layout->addWidget(ui.play);
     control_layout->addWidget(ui.pos);
-    main_layout->addLayout(control_layout);
-    auto speed_layout = new QHBoxLayout(this);
-    speed_layout->addWidget(ui.speed);
-    speed_layout->addWidget(ui.label);
-    speed_layout->addWidget(ui.speedtxt);
-    main_layout->addLayout(speed_layout);
+    control_layout->addWidget(ui.speed);
+    control_layout->addWidget(ui.label);
+    control_layout->addWidget(ui.speedtxt);
+    main_layout->addWidget(control_layout);
     setLayout(main_layout);
 }
 
