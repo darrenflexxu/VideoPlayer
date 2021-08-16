@@ -2,6 +2,7 @@
 #include <QDebug>
 #include <QLayout>
 #include <QSplitter>
+#include <QCheckBox>
 
 
 void XPlayVideo::timerEvent(QTimerEvent* ev) {
@@ -34,6 +35,14 @@ void XPlayVideo::Move()        //进度条拖动
     player.Pause(true);
     moved_ = true;
 }
+void XPlayVideo::EnableGPUDecode(int enable) {
+    gpu_decode_ = enable;
+    ReOpen();
+}
+void XPlayVideo::EnableGPUDirectRender(int enable) {
+    gpu_direct_render_ = enable;
+    ReOpen();
+}
 void XPlayVideo::PlayPos()     //控制播放进度
 {
     player.Seek(ui.pos->value());
@@ -55,15 +64,20 @@ void XPlayVideo::closeEvent(QCloseEvent* ev) {
     Close();
 }
 bool XPlayVideo::Open(const char* url) {
-    player.set_gpu_decode(true);
-    player.set_gpu_direct_render_(false);
+    player.set_gpu_decode(gpu_decode_);
+    player.set_gpu_direct_render_(gpu_direct_render_);
 
     if (!player.Open(url, (void*)ui.video->winId()))
         return false;
     player.Start();
     player.Pause(false);//播放状态
     startTimer(10);
+    url_ = QString::fromStdString(url);
     return true;
+}
+bool XPlayVideo::ReOpen() {
+    Close();
+    return Open(url_.toStdString().c_str());
 }
 XPlayVideo::XPlayVideo(QWidget *parent)
     : QWidget(parent) {
@@ -78,6 +92,14 @@ XPlayVideo::XPlayVideo(QWidget *parent)
     control_layout->addWidget(ui.speed);
     control_layout->addWidget(ui.label);
     control_layout->addWidget(ui.speedtxt);
+    auto gpu_decode_button = new QCheckBox(tr("GPU Decode"), this);
+    gpu_decode_button->setChecked(gpu_decode_);
+    connect(gpu_decode_button, &QCheckBox::stateChanged, this, &XPlayVideo::EnableGPUDecode);
+    control_layout->addWidget(gpu_decode_button);
+    auto gpu_direct_render_button = new QCheckBox(tr("GPU Render"), this);
+    gpu_direct_render_button->setChecked(gpu_direct_render_);
+    connect(gpu_direct_render_button, &QCheckBox::stateChanged, this, &XPlayVideo::EnableGPUDirectRender);
+    control_layout->addWidget(gpu_direct_render_button);
     main_layout->addWidget(control_layout);
     setLayout(main_layout);
 }
