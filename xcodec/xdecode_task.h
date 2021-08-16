@@ -26,6 +26,7 @@ public:
     bool is_open() { return is_open_; }
 
     void set_gpu_decode(bool gpu) { gpu_decode_ = gpu; }
+    void set_gpu_direct_render(bool gpu_render) { gpu_direct_render_ = gpu_render; }
 
     //设置同步时间
     void set_syn_pts(long long p) { syn_pts_ = p; }
@@ -41,6 +42,8 @@ public:
     long long cur_ms() { return cur_ms_; };
 
     void set_time_base(AVRational* time_base);
+
+    AVCodecContext* GetCodecContext() const;
 
 private:
     long long cur_pts_ = -1;//当前解码到的pts（以解码数据为准）
@@ -58,5 +61,6 @@ private:
     std::list<AVFrame*> frames_;    //存储音频缓冲
     bool frame_cache_ = false;      //是否缓冲frame队列
     bool gpu_decode_ = false;
+    bool gpu_direct_render_ = false;
 };
 

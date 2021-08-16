@@ -2,12 +2,46 @@
 #include "xtools.h"
 #include <thread>
 #include <iostream>
+#ifdef WIN32
+#include <windows.h>
+#include <d3d9.h>
+#endif
 using namespace std;
 extern "C"
 {
 #include <libavcodec/avcodec.h>
 }
 #pragma comment(lib,"avutil.lib")
+
+struct DXVA2DevicePriv {
+    HMODULE d3dlib;
+    HMODULE dxva2lib;
+    HANDLE device_handle;
+    IDirect3D9* d3d9;
+    IDirect3DDevice9* d3d9device;
+};
+
+void DrawFrameWithHandle(AVFrame* frame, AVCodecContext* c, void* hwnd, int width, int height, IDirect3DSurface9*& back) {
+    if (!frame->data[3] || !c || !hwnd || !c->hw_device_ctx)return;
+    static std::mutex mtx;
+    std::unique_lock<std::mutex> lock(mtx);
+    auto surface = (IDirect3DSurface9*)frame->data[3];
+    auto ctx = (AVHWDeviceContext*)c->hw_device_ctx->data;
+    auto priv = (DXVA2DevicePriv*)ctx->user_opaque;
+    auto device = priv->d3d9device;
+    RECT viewport;
+    viewport.left = 0;
+    viewport.right = width;
+    viewport.top = 0;
+    viewport.bottom = height;
+    //device->SetRenderState(D3DRS_LIGHTING, FALSE);
+    //设置显示窗口句柄
+    device->Present(0, 0, (HWND)hwnd, 0);
+    //后台缓冲表面
+    if (!back)
+        device->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &back);
+    device->StretchRect(surface, 0, back, 0, D3DTEXF_LINEAR);
+}
 
 bool XVideoView::Init(AVCodecParameters* para)
 {
@@ -142,8 +176,12 @@ void yuv420sp_to_yuv420p(unsigned char* yuv420sp, unsigned char* yuv420p, int wi
     }
 }
 
-bool XVideoView::DrawFrame(AVFrame* frame)
+bool XVideoView::DrawFrame(AVFrame* frame, AVCodecContext* ctx)
 {
+    if (gpu_render_direct_ && frame->format == AV_PIX_FMT_DXVA2_VLD && frame->data[3]) {
+        DrawFrameWithHandle(frame, ctx, win_id_, width_, height_, back_);
+        return true;
+    }
 	if (!frame || !frame->data[0])return false;
 	count_++;
 	if (beg_ms_ <= 0)

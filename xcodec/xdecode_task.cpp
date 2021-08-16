@@ -19,6 +19,10 @@ void XDecodeTask::set_time_base(AVRational* time_base)
     time_base_->num = time_base->num;
 }
 
+AVCodecContext * XDecodeTask::GetCodecContext() const {
+    return decode_.get_codec_context();
+}
+
 /// <summary>
 /// 清理缓存
 /// </summary>
@@ -74,6 +78,7 @@ bool XDecodeTask::Open(AVCodecParameters* para)
     decode_.set_c(c);
 
     if (gpu_decode_) {
+        decode_.set_gpu_direct_render(gpu_direct_render_);
         decode_.InitHW();
     }
 
@@ -178,6 +183,8 @@ void XDecodeTask::Main()
         }
         {
             unique_lock<mutex> lock(mux_);
+            decode_.set_gpu_direct_render(gpu_decode_ && gpu_direct_render_);
+
             if(decode_.Recv(frame_))
             { 
                 cout << "@" << flush;

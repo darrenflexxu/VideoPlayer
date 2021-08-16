@@ -56,6 +56,10 @@ void XCodec::set_c(AVCodecContext* c)
     this->c_ = c;
 }
 
+AVCodecContext * XCodec::get_codec_context() const {
+    return c_;
+}
+
 
 bool XCodec::SetOpt(const char* key, const char* val)
 {

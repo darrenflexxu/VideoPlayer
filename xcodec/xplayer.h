@@ -38,6 +38,7 @@ public:
     void Pause(bool is_pause) override;
 
     void set_gpu_decode(bool gpu) { gpu_decode_ = gpu; }
+    void set_gpu_direct_render_(bool gpu_render) { gpu_direct_render_ = gpu_render; }
 
 protected:
 
@@ -48,5 +49,6 @@ protected:
     XDecodeTask video_decode_;      //视频解码
     XVideoView* view_ = nullptr;    //视频渲染
     bool gpu_decode_ = false;
+    bool gpu_direct_render_ = false;
 };
 

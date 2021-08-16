@@ -4,6 +4,8 @@
 #include <fstream>
 #include "xtools.h"
 
+struct IDirect3DSurface9;
+
 ////////////////////////////////////
 /// 视频渲染接口类
 /// 隐藏SDL实现
@@ -63,7 +65,7 @@ public:
         scale_h_ = h;
     }
 
-    bool DrawFrame(AVFrame* frame);
+    bool DrawFrame(AVFrame* frame, AVCodecContext* ctx);
 
     int render_fps() { return render_fps_; }
 
@@ -76,6 +78,7 @@ public:
     /// 每次调用会覆盖上一次数据
     AVFrame* Read();
     void set_win_id(void* win) { win_id_ = win; }
+    void set_gpu_render_direct(bool gpu_render) { gpu_render_direct_ = gpu_render; }
     virtual ~XVideoView();
 protected:
     void* win_id_ = nullptr; //窗口句柄
@@ -93,6 +96,8 @@ private:
     std::ifstream ifs_;
     AVFrame* frame_ = nullptr;
     unsigned char* cache_ = nullptr;//复制NV12缓冲
+    bool gpu_render_direct_ = false;
+    IDirect3DSurface9* back_ = nullptr;
 };
 
 #endif

@@ -125,7 +125,8 @@ void XPlayer::Update()
         auto f = video_decode_.GetFrame();
         if (f)
         {
-            view_->DrawFrame(f);
+            view_->set_gpu_render_direct(gpu_decode_ && gpu_direct_render_);
+            view_->DrawFrame(f, video_decode_.GetCodecContext());
             XFreeFrame(&f);
         }
     }

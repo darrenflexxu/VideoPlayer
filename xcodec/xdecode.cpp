@@ -20,14 +20,14 @@ bool XDecode::Recv(AVFrame* frame)      //获取解码
     unique_lock<mutex> lock(mux_);
     if (!c_)return false;
     auto f = frame;
-    if (c_->hw_device_ctx) //硬件加速
+    if (c_->hw_device_ctx && !gpu_direct_render_) //硬件加速
     {
         f = av_frame_alloc();
     }
     auto re = avcodec_receive_frame(c_, f);
     if (re == 0)
     {
-        if (c_->hw_device_ctx) //GPU解码
+        if (c_->hw_device_ctx && !gpu_direct_render_) //GPU解码
         {
             //显存转内存 GPU =》 CPU
             re = av_hwframe_transfer_data(frame, f, 0); 
@@ -41,7 +41,7 @@ bool XDecode::Recv(AVFrame* frame)      //获取解码
         }
         return true;
     }
-    if (c_->hw_device_ctx)
+    if (c_->hw_device_ctx && !gpu_direct_render_)
         av_frame_free(&f);
     return false;
 }

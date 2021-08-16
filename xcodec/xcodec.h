@@ -20,6 +20,7 @@ public:
     /// 加锁 线程安全
     /// @para c 编码器上下文 如果c_不为nullptr，则先清理资源
     void set_c(AVCodecContext* c);
+    AVCodecContext* get_codec_context() const;
 
     /////////////////////////////////////////////
     /// 设置编码参数，线程安全
