@@ -49,6 +49,7 @@ bool XPlayer::Open(const char* url, void* winid)
         this->total_ms_ = vp->total_ms;
 
         video_decode_.set_gpu_decode(gpu_decode_);
+        video_decode_.set_gpu_direct_render(gpu_direct_render_);
 
         if (!video_decode_.Open(vp->para))
         {
