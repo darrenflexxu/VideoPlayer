@@ -72,6 +72,11 @@ bool XDecodeTask::Open(AVCodecParameters* para)
     //复制视频参数
     avcodec_parameters_to_context(c, para);
     decode_.set_c(c);
+
+    if (gpu_decode_) {
+        decode_.InitHW();
+    }
+
     if (!decode_.Open())
     {
         LOGERROR("decode_.Open() failed!");

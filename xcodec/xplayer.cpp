@@ -48,6 +48,8 @@ bool XPlayer::Open(const char* url, void* winid)
         //视频总时长
         this->total_ms_ = vp->total_ms;
 
+        video_decode_.set_gpu_decode(gpu_decode_);
+
         if (!video_decode_.Open(vp->para))
         {
             return false;

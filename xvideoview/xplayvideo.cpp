@@ -55,6 +55,8 @@ void XPlayVideo::closeEvent(QCloseEvent* ev) {
     Close();
 }
 bool XPlayVideo::Open(const char* url) {
+    player.set_gpu_decode(true);
+
     if (!player.Open(url, (void*)ui.video->winId()))
         return false;
     player.Start();

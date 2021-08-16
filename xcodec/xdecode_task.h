@@ -25,6 +25,8 @@ public:
     void set_frame_cache(bool is) { frame_cache_ = is; }
     bool is_open() { return is_open_; }
 
+    void set_gpu_decode(bool gpu) { gpu_decode_ = gpu; }
+
     //设置同步时间
     void set_syn_pts(long long p) { syn_pts_ = p; }
     void set_block_size(int s) { block_size_ = s; }
@@ -55,5 +57,6 @@ private:
     bool need_view_ = false;        //是否需要渲染，每帧只渲染一次，通过GetFrame
     std::list<AVFrame*> frames_;    //存储音频缓冲
     bool frame_cache_ = false;      //是否缓冲frame队列
+    bool gpu_decode_ = false;
 };
 

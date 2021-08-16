@@ -31,6 +31,7 @@ bool XDecode::Recv(AVFrame* frame)      //获取解码
         {
             //显存转内存 GPU =》 CPU
             re = av_hwframe_transfer_data(frame, f, 0); 
+            frame->pts = f->pts;
             av_frame_free(&f);
             if (re != 0)
             {
@@ -57,6 +58,7 @@ bool XDecode::InitHW(int type)
         return false;
     }
     c_->hw_device_ctx = ctx;
+    c_->pix_fmt = AV_PIX_FMT_DXVA2_VLD;
     cout << "硬件加速：" << type << endl;
     return true;
 }

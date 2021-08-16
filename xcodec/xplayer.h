@@ -36,6 +36,9 @@ public:
     bool Seek(long long ms);
 
     void Pause(bool is_pause) override;
+
+    void set_gpu_decode(bool gpu) { gpu_decode_ = gpu; }
+
 protected:
 
     long long total_ms_ = 0;
@@ -44,5 +47,6 @@ protected:
     XDecodeTask audio_decode_;      //音频解码
     XDecodeTask video_decode_;      //视频解码
     XVideoView* view_ = nullptr;    //视频渲染
+    bool gpu_decode_ = false;
 };
 
