@@ -4,18 +4,19 @@
 #include "xcodec/xplayer.h"
 #include "xplayvideo.h"
 
+
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
-    XPlayVideo play_video;
+    auto play_video = new XPlayVideo();;
     QString s = QFileDialog::getOpenFileName(
         nullptr, QStringLiteral("选择要播放的文件"),
         "",//初始目录
         QStringLiteral("视频文件 (*.flv *.rmvb *.avi *.MP4 *.mkv);;")
         + QStringLiteral("音频文件 (*.mp3 *.wma *.wav);;")
         + QStringLiteral("所有文件 (*.*)"));
-    play_video.Open(s.toStdString().c_str());
-    play_video.show();
+    play_video->Open(s.toStdString().c_str());
+    play_video->show();
     
     return a.exec();
 }

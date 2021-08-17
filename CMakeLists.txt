@@ -94,6 +94,7 @@ endforeach()
 
 link_directories("${ThirdParty}/ffmpeg/lib"
 "${ThirdParty}/SDL2/lib"
+"${ThirdParty}/GLEW/lib"
 )
 ENDIF()
 

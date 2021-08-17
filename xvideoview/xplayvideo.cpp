@@ -37,11 +37,11 @@ void XPlayVideo::Move()        //进度条拖动
 }
 void XPlayVideo::EnableGPUDecode(int enable) {
     gpu_decode_ = enable;
-    ReOpen();
+    emit ReOpen();
 }
 void XPlayVideo::EnableGPUDirectRender(int enable) {
     gpu_direct_render_ = enable;
-    ReOpen();
+    emit ReOpen();
 }
 void XPlayVideo::PlayPos()     //控制播放进度
 {
@@ -72,13 +72,9 @@ bool XPlayVideo::Open(const char* url) {
     player.Start();
     player.Pause(false);//播放状态
     startTimer(10);
-    url_ = QString::fromStdString(url);
     return true;
 }
-bool XPlayVideo::ReOpen() {
-    Close();
-    return Open(url_.toStdString().c_str());
-}
+
 XPlayVideo::XPlayVideo(QWidget *parent)
     : QWidget(parent) {
     ui.setupUi(this);    

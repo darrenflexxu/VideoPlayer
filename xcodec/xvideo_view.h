@@ -65,7 +65,7 @@ public:
         scale_h_ = h;
     }
 
-    bool DrawFrame(AVFrame* frame, AVCodecContext* ctx);
+    virtual bool DrawFrame(AVFrame* frame, AVCodecContext* ctx);
 
     int render_fps() { return render_fps_; }
 
