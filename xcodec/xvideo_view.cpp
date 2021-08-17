@@ -1,5 +1,6 @@
 #include "xsdl.h"
 #include "xtools.h"
+#include "xshader.h"
 #include <thread>
 #include <iostream>
 #ifdef WIN32
@@ -143,6 +144,8 @@ XVideoView* XVideoView::Create(RenderType type)
 	case XVideoView::SDL:
 		return new XSDL();
 		break;
+    case XVideoView::Shader:
+        return new XShader();
 	default:
 		break;
 	}

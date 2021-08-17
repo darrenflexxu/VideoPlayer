@@ -61,7 +61,7 @@ bool XPlayer::Open(const char* url, void* winid)
         video_decode_.set_block_size(100);
         //视频渲染
         if (!view_)
-            view_ = XVideoView::Create();
+            view_ = XVideoView::Create(XVideoView::Shader);
         view_->set_win_id(winid);
         if (!view_->Init(vp->para))
             return false;

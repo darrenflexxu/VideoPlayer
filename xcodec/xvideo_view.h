@@ -24,7 +24,8 @@ public:
     };
     enum RenderType
     {
-        SDL = 0
+        SDL = 0,
+        Shader,
     };
     static XVideoView* Create(RenderType type=SDL);
 

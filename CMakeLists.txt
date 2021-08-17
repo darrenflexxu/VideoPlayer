@@ -121,4 +121,11 @@ add_custom_command(
         COMMAND ${CMAKE_COMMAND} -E copy_directory
                 ${ThirdParty}/bin/
                 \$\(OutDir\))
+				
+
+add_custom_command(
+        TARGET XVideoView POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+                ${ThirdParty}/bin/
+                \$\(OutDir\))
 ENDIF()
