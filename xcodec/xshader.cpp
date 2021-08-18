@@ -1,38 +1,10 @@
 #include "xshader.h"
 #include <Windows.h>
 #include <string>
-
-#if TEXTURE_ROTATE  
-static const GLfloat vertexVertices[] = {
-  -1.0f, -0.5f,
-  0.5f, -1.0f,
-  -0.5f, 1.0f,
-  1.0f, 0.5f,
-};
-#else  
-static const GLfloat vertexVertices[] = {
-  -1.0f, -1.0f, 0.0f,
-  1.0f, -1.0f, 0.0f,
-  1.0f, 1.0f, 0.0f,
-  -1.0f, 1.0f, 0.0f
-};
-#endif  
-
-#if TEXTURE_HALF  
-static const GLfloat textureVertices[] = {
-  0.0f, 1.0f,
-  0.5f, 1.0f,
-  0.0f, 0.0f,
-  0.5f, 0.0f,
-};
-#else  
-static const GLfloat textureVertices[] = {
-  0.0f, 1.0f,
-  1.0f, 1.0f,
-  1.0f, 0.0f,
-  0.0f, 0.0f,
-};
-#endif  
+extern "C"
+{
+#include <libavcodec/avcodec.h>
+}
 
 XShader::XShader() {
 }
@@ -48,16 +20,17 @@ bool XShader::Init(int w, int h, Format fmt) {
   GetClientRect(hwnd, &rect);
   ctx_ = std::make_shared<GLContext>();
   ctx_->setup(hwnd, dc);
-  InitShader();
-  pixel_w = w;
-  pixel_h = h;
   width_ = rect.right - rect.left;
   height_ = rect.bottom - rect.top;
+  pix_w_ = w;
+  pix_h_ = h;
+  yv12_ = std::make_shared<XShaderYV12>(w, h);
+  nv12_ = std::make_shared<XShaderNV12>(w, h);
   return true;
 }
 
 bool XShader::Draw(const unsigned char* data, int linesize) {
-  return Draw(data, linesize, data + linesize * pixel_h, linesize / 4, data + linesize * pixel_h + linesize * pixel_h / 4 , linesize / 4);
+  return Draw(data, linesize, data + linesize * pix_h_, linesize / 4, data + linesize * pix_h_ + linesize * pix_h_ / 4 , linesize / 4);
 }
 
 bool XShader::Draw(
@@ -76,57 +49,7 @@ bool XShader::Draw(
     height_ = height;
     glViewport(0, 0, width, height);
   }
-
-  //Clear
-  glClear(GL_COLOR_BUFFER_BIT);
-
-  glLinkProgram(p);
-
-  glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
-  glVertexAttribPointer(
-    0,                                // attribute. No particular reason for 1, but must match the layout in the shader.
-    3,                                // size : U+V => 2
-    GL_FLOAT,                         // type
-    GL_FALSE,                         // normalized?
-    0,                                // stride
-    (void*)0                          // array buffer offset
-  );
-  glEnableVertexAttribArray(0);
-
-
-  //     glVertexAttribPointer(1, 2, GL_FLOAT, 0, 0, textureVertices); 
-  glBindBuffer(GL_ARRAY_BUFFER, uvbuffer);
-  glVertexAttribPointer(
-    1,                                // attribute. No particular reason for 1, but must match the layout in the shader.
-    2,                                // size : U+V => 2
-    GL_FLOAT,                         // type
-    GL_FALSE,                         // normalized?
-    0,                                // stride
-    (void*)0                          // array buffer offset
-  );
-  glEnableVertexAttribArray(1);
-
-  //Y  
-  glActiveTexture(GL_TEXTURE0);
-  glBindTexture(GL_TEXTURE_2D, id_y);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, pixel_w, pixel_h, 0, GL_RED, GL_UNSIGNED_BYTE, y);
-  //   glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &MVP[0][0]);
-  glUniform1i(textureUniformY, 0);
-
-  //U  
-  glActiveTexture(GL_TEXTURE1);
-  glBindTexture(GL_TEXTURE_2D, id_u);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, pixel_w / 2, pixel_h / 2, 0, GL_RED, GL_UNSIGNED_BYTE, u);
-  glUniform1i(textureUniformU, 1);
-
-  //V  
-  glActiveTexture(GL_TEXTURE2);
-  glBindTexture(GL_TEXTURE_2D, id_v);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, pixel_w / 2, pixel_h / 2, 0, GL_RED, GL_UNSIGNED_BYTE, v);
-  glUniform1i(textureUniformV, 2);
-
-  // Draw  
-  glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+  yv12_->Draw(y, y_pitch, u, u_pitch, v, v_pitch); 
   // Show  
   if (ctx_) {
     ctx_->swapBuffer();
@@ -134,155 +57,64 @@ bool XShader::Draw(
   return true;
 }
 
-bool XShader::IsExit() {
-  return false;
+bool XShader::DrawFrame(AVFrame* frame, AVCodecContext* ctx) {
+  if (!frame || !frame->data[0])return false;
+  count_++;
+  if (beg_ms_ <= 0) {
+    beg_ms_ = clock();
+  }
+  //计算显示帧率
+  else if ((clock() - beg_ms_) / (CLOCKS_PER_SEC / 1000) >= 1000) //一秒计算一次fps
+  {
+    render_fps_ = count_;
+    count_ = 0;
+    beg_ms_ = clock();
+  }
+  HWND hwnd = (HWND)win_id_;
+  RECT rect;
+  GetClientRect(hwnd, &rect);
+  int width = rect.right - rect.left;
+  int height = rect.bottom - rect.top;
+
+  if (width != width_ || height != height_) {
+    width_ = width;
+    height_ = height;
+    glViewport(0, 0, width, height);
+  }
+
+  int linesize = 0;
+  switch (frame->format) {
+  case AV_PIX_FMT_YUV420P:
+  case AV_PIX_FMT_YUVJ420P:
+  {
+    yv12_->Draw(frame->data[0], frame->linesize[0],//Y
+      frame->data[1], frame->linesize[1],   //U
+      frame->data[2], frame->linesize[2]    //V
+    );
+    break;
+  }
+  case AV_PIX_FMT_NV12:
+  {
+    nv12_->Draw(frame->data[0], frame->linesize[0], //Y
+      frame->data[1], frame->linesize[1] //UV
+    );
+    break;
+  }
+  case AV_PIX_FMT_BGRA:
+  case AV_PIX_FMT_ARGB:
+  case AV_PIX_FMT_RGBA:
+    return Draw(frame->data[0], frame->linesize[0]);
+  default:
+    break;
+  }
+
+  // Show  
+  if (ctx_) {
+    ctx_->swapBuffer();
+  }
+  return true;
 }
 
-EXTERN_C IMAGE_DOS_HEADER __ImageBase;
-
-//Init Shader  
-int XShader::InitShader() {
-  char pBuf[MAX_PATH] = {0};                                 //存放路径的变量     
-  GetCurrentDirectory(MAX_PATH, pBuf);                   //获取程序的当前目录
-  std::string app_path = pBuf;
-  // Dark blue background
-  glClearColor(0.0f, 0.0f, 0.4f, 0.0f);
-
-  GLuint VertexArrayID;
-  glGenVertexArrays(1, &VertexArrayID);
-  glBindVertexArray(VertexArrayID);
-
-  glGenBuffers(1, &uvbuffer);
-  glBindBuffer(GL_ARRAY_BUFFER, uvbuffer);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(textureVertices), textureVertices, GL_STATIC_DRAW);
-
-  glGenBuffers(1, &vertexbuffer);
-  glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(vertexVertices), vertexVertices, GL_STATIC_DRAW);
-
-  GLint vertCompiled, fragCompiled, linked;
-
-  GLint v, f;
-  const char* vs, * fs;
-  //Shader: step1  
-  v = glCreateShader(GL_VERTEX_SHADER);
-  f = glCreateShader(GL_FRAGMENT_SHADER);
-  //Get source code  
-//     vs = textFileRead("Shader.vsh");  
-//     fs = textFileRead("Shader.fsh");  
-
-  std::string strfv;
-  std::ifstream fvStream(app_path + "\\Shader.vsh", std::ios::in);
-  if (fvStream.is_open()) {
-    std::stringstream svStream;
-    svStream << fvStream.rdbuf();
-    strfv = svStream.str();
-    fvStream.close();
-    //       std::cout<<"vetex shader "<<strfv<<std::endl;
-  } else {
-    std::cerr << "vetex shader open failed." << std::endl;
-  }
-
-  std::string strff;
-  std::ifstream ffStream(app_path + "\\Shader.fsh", std::ios::in);
-  if (ffStream.is_open()) {
-    std::stringstream sfStream;
-    sfStream << ffStream.rdbuf();
-    strff = sfStream.str();
-    ffStream.close();
-    //       std::cout<<"fragment shader "<<strff<<std::endl;
-  } else {
-    std::cerr << "fragment shader open failed. " << std::endl;
-  }
-
-  vs = strfv.c_str();
-  fs = strff.c_str();
-
-  GLint Result = GL_FALSE;
-  int InfoLogLength;
-
-  //Shader: step2  
-  glShaderSource(v, 1, &vs, NULL);
-  glShaderSource(f, 1, &fs, NULL);
-  //Shader: step3  
-  glCompileShader(v);
-  //Debug  
-  glGetShaderiv(v, GL_COMPILE_STATUS, &Result);
-  glGetShaderiv(v, GL_INFO_LOG_LENGTH, &InfoLogLength);
-  if (InfoLogLength > 0) {
-    std::vector<char> VertexShaderErrorMessage(InfoLogLength + 1);
-    glGetShaderInfoLog(v, InfoLogLength, NULL, &VertexShaderErrorMessage[0]);
-    std::printf("%s\n", &VertexShaderErrorMessage[0]);
-  }
-
-  glCompileShader(f);
-  glGetShaderiv(f, GL_COMPILE_STATUS, &Result);
-  glGetShaderiv(f, GL_INFO_LOG_LENGTH, &InfoLogLength);
-  if (InfoLogLength > 0) {
-    std::vector<char> VertexShaderErrorMessage(InfoLogLength + 1);
-    glGetShaderInfoLog(f, InfoLogLength, NULL, &VertexShaderErrorMessage[0]);
-    std::printf("%s\n", &VertexShaderErrorMessage[0]);
-  }
-
-  //Program: Step1  
-  p = glCreateProgram();
-  //Program: Step2  
-  glAttachShader(p, v);
-  glAttachShader(p, f);
-
-  /* glBindAttribLocation(p, ATTRIB_VERTEX, "vertexIn");
-   glBindAttribLocation(p, ATTRIB_TEXTURE, "textureIn"); */
-   //Program: Step3  
-
-  glLinkProgram(p);
-  //Debug  
-  glGetShaderiv(p, GL_COMPILE_STATUS, &Result);
-  glGetShaderiv(p, GL_INFO_LOG_LENGTH, &InfoLogLength);
-  if (InfoLogLength > 0) {
-    std::vector<char> VertexShaderErrorMessage(InfoLogLength + 1);
-    glGetShaderInfoLog(p, InfoLogLength, NULL, &VertexShaderErrorMessage[0]);
-    std::printf("%s\n", &VertexShaderErrorMessage[0]);
-  }
-
-  //Program: Step4  
-  glUseProgram(p);
-
-
-  //Get Uniform Variables Location  
-  textureUniformY = glGetUniformLocation(p, "tex_y");
-  textureUniformU = glGetUniformLocation(p, "tex_u");
-  textureUniformV = glGetUniformLocation(p, "tex_v");
-
-  //     //Set Arrays  
-  //     glVertexAttribPointer(ATTRIB_VERTEX, 3, GL_FLOAT, 0, 0, vertexVertices);  
-  //     //Enable it  
-  //     glEnableVertexAttribArray(ATTRIB_VERTEX);      
-  //     
-
-      /*glVertexAttribPointer(ATTRIB_TEXTURE, 2, GL_FLOAT, 0, 0, textureVertices);
-      glEnableVertexAttribArray(ATTRIB_TEXTURE); */
-
-
-      //Init Texture  
-  glGenTextures(1, &id_y);
-  glBindTexture(GL_TEXTURE_2D, id_y);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-  glGenTextures(1, &id_u);
-  glBindTexture(GL_TEXTURE_2D, id_u);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-  glGenTextures(1, &id_v);
-  glBindTexture(GL_TEXTURE_2D, id_v);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  return 0;
+bool XShader::IsExit() {
+  return false;
 }

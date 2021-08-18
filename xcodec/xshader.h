@@ -13,6 +13,8 @@
 #include <vector>
 #include "xvideo_view.h"
 #include "GLContext.h"
+#include "xshader_yv12.h"
+#include "xshader_nv12.h"
 
 extern "C"{
 // Include GLEW
@@ -23,20 +25,13 @@ extern "C"{
 #define ATTRIB_TEXTURE 4 
 
 class XShader :public XVideoView {
-  GLuint id_y;
-  GLuint id_u;
-  GLuint id_v; // Texture id  
-  GLuint textureUniformY, textureUniformU,textureUniformV; 
-  GLuint vertexbuffer, uvbuffer;
-  GLuint p;
-
-  GLsizei pixel_w;
-  GLsizei pixel_h;
   std::shared_ptr<GLContext> ctx_;
+  std::shared_ptr<XShaderYV12> yv12_;
+  std::shared_ptr<XShaderNV12> nv12_;
   int width_ = 0;
   int height_ = 0;
-
-  int InitShader();
+  int pix_h_ = 0;
+  int pix_w_ = 0;
 public:
   XShader();
 
@@ -65,6 +60,9 @@ public:
       const unsigned  char* v, int v_pitch
   ) override;
 
+  bool DrawFrame(AVFrame* frame, AVCodecContext* ctx) override;
+
   bool IsExit() override;
 };
 #endif
+
