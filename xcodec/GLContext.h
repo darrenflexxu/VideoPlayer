@@ -1,18 +1,19 @@
 #pragma once
+
 #include <windows.h>
 #include <GL/glew.h>
-#include <iostream>
 
-class GLContext
-{
+class GLContext {
+protected:
+  int         _format;
+  HWND        _hWnd;
+  HDC         _hDC;
+  HGLRC       _hRC;
 public:
-    GLContext();
-    ~GLContext();
-    void Setup(HWND,HDC);
-    void SetupPixelFormat(HDC);
-private:
-    HWND hWnd;
-    HDC hDC;
-    HGLRC hRC;
-    int format;
+  GLContext();
+  ~GLContext();
+
+  bool    setup(HWND hWnd, HDC hDC);
+  void    shutdown();
+  void    swapBuffer();
 };

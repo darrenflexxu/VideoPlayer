@@ -12,6 +12,7 @@
 #include <iostream>
 #include <vector>
 #include "xvideo_view.h"
+#include "GLContext.h"
 
 extern "C"{
 // Include GLEW
@@ -31,6 +32,9 @@ class XShader :public XVideoView {
 
   GLsizei pixel_w;
   GLsizei pixel_h;
+  std::shared_ptr<GLContext> ctx_;
+  int width_ = 0;
+  int height_ = 0;
 
   int InitShader();
 public:
@@ -38,21 +42,21 @@ public:
 
   void Close() override;
   ////////////////////////////////////////////////
-  /// ³õÊ¼»¯äÖÈ¾´°¿Ú Ïß³Ì°²È«
-  /// @para w ´°¿Ú¿í¶È
-  /// @para h ´°¿Ú¸ß¶È
-  /// @para fmt »æÖÆµÄÏñËØ¸ñÊ½
-  /// @para win_id ´°¿Ú¾ä±ú£¬Èç¹ûÎª¿Õ£¬´´½¨ĞÂ´°¿Ú
-  /// @return ÊÇ·ñ´´½¨³É¹¦
+  /// åˆå§‹åŒ–æ¸²æŸ“çª—å£ çº¿ç¨‹å®‰å…¨
+  /// @para w çª—å£å®½åº¦
+  /// @para h çª—å£é«˜åº¦
+  /// @para fmt ç»˜åˆ¶çš„åƒç´ æ ¼å¼
+  /// @para win_id çª—å£å¥æŸ„ï¼Œå¦‚æœä¸ºç©ºï¼Œåˆ›å»ºæ–°çª—å£
+  /// @return æ˜¯å¦åˆ›å»ºæˆåŠŸ
   bool Init(int w, int h,
             Format fmt = RGBA) override;
 
   //////////////////////////////////////////////////
-  /// äÖÈ¾Í¼Ïñ Ïß³Ì°²È«
-  ///@para data äÖÈ¾µÄ¶ş½øÖÆÊı¾İ
-  ///@para linesize Ò»ĞĞÊı¾İµÄ×Ö½ÚÊı£¬¶ÔÓÚYUV420P¾ÍÊÇYÒ»ĞĞ×Ö½ÚÊı
-  /// linesize<=0 ¾Í¸ù¾İ¿í¶ÈºÍÏñËØ¸ñÊ½×Ô¶¯Ëã³ö´óĞ¡
-  /// @return äÖÈ¾ÊÇ·ñ³É¹¦
+  /// æ¸²æŸ“å›¾åƒ çº¿ç¨‹å®‰å…¨
+  ///@para data æ¸²æŸ“çš„äºŒè¿›åˆ¶æ•°æ®
+  ///@para linesize ä¸€è¡Œæ•°æ®çš„å­—èŠ‚æ•°ï¼Œå¯¹äºYUV420På°±æ˜¯Yä¸€è¡Œå­—èŠ‚æ•°
+  /// linesize<=0 å°±æ ¹æ®å®½åº¦å’Œåƒç´ æ ¼å¼è‡ªåŠ¨ç®—å‡ºå¤§å°
+  /// @return æ¸²æŸ“æ˜¯å¦æˆåŠŸ
   bool Draw(const unsigned  char* data,
             int linesize = 0) override;
   bool Draw(

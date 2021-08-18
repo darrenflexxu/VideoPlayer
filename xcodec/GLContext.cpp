@@ -1,62 +1,91 @@
 #include "GLContext.h"
+#include <iostream>
 
-GLContext::GLContext()
-{
-    this->hWnd = 0;
-    this->hDC = 0;
-    this->hRC = 0;
-    this->format = 0;
-}
-GLContext::~GLContext()
-{
+GLContext::GLContext() {
+    _format = 0;
+    _hWnd = 0;
+    _hDC = 0;
+    _hRC = 0;
 }
 
-void GLContext::SetupPixelFormat(HDC hDC) {
-    int pixelFormat;
+GLContext::~GLContext() {
+    shutdown();
+}
 
+bool GLContext::setup(HWND hWnd, HDC hDC) {
+
+    _hWnd = hWnd;
+    _hDC = hDC;
+    unsigned PixelFormat;
     PIXELFORMATDESCRIPTOR pfd =
     {
-        sizeof(PIXELFORMATDESCRIPTOR),  // size
-        1,                          // version
-        PFD_SUPPORT_OPENGL |        // OpenGL window
-        PFD_DRAW_TO_WINDOW |        // render to window
-        PFD_DOUBLEBUFFER,           // support double-buffering
-        PFD_TYPE_RGBA,              // color type
-        32,                         // prefered color depth
-        0, 0, 0, 0, 0, 0,           // color bits (ignored)
-        0,                          // no alpha buffer
-        0,                          // alpha bits (ignored)
-        0,                          // no accumulation buffer
-        0, 0, 0, 0,                 // accum bits (ignored)
-        16,                         // depth buffer
-        0,                          // no stencil buffer
-        0,                          // no auxiliary buffers
-        PFD_MAIN_PLANE,             // main layer
-        0,                          // reserved
-        0, 0, 0,                    // no layer, visible, damage masks
+        sizeof(PIXELFORMATDESCRIPTOR),
+        1,
+        PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,
+        PFD_TYPE_RGBA,
+        32,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        24,
+        8,
+        0,
+        PFD_MAIN_PLANE,
+        0,
+        0,
+        0,
+        0
     };
 
-    pixelFormat = ChoosePixelFormat(hDC, &pfd);
-    SetPixelFormat(hDC, pixelFormat, &pfd);
-}
+    if (_format == 0) {
+        PixelFormat = ChoosePixelFormat(_hDC, &pfd);
+    } else {
+        PixelFormat = _format;
+    }
 
-void GLContext::Setup(HWND hwnd, HDC hdc) {
-    this->hWnd = hwnd;
-    this->hDC = hdc;
-    SetupPixelFormat(hDC);
-    hRC = wglCreateContext(hDC);
-    wglMakeCurrent(hDC, hRC);
-
-    //initialize glew
+    if (!SetPixelFormat(_hDC, PixelFormat, &pfd)) {
+        return  false;
+    }
+    _hRC = wglCreateContext(_hDC);
+    if (!wglMakeCurrent(_hDC, _hRC)) {
+        return  false;
+    }
     glewExperimental = GL_TRUE;
     glewInit();
-    if (AllocConsole())
-    {
+    if (AllocConsole()) {
         freopen("CONOUT$", "w+t", stdout);
         freopen("CONOUT$", "w+t", stderr);
-        const GLubyte* Devise = glGetString(GL_RENDERER);    //返回一个渲染器标识符，通常是个硬件平台  
+        const GLubyte* Devise = glGetString(GL_RENDERER);
         const GLubyte* str = glGetString(GL_VERSION);
         printf("OpenGL实现的版本号：%s\n", str);
         printf("硬件平台：%s\n", Devise);
     }
+    return  true;
+}
+
+void    GLContext::shutdown() {
+    if (_hRC != NULL) {
+        wglMakeCurrent(NULL, NULL);
+        wglDeleteContext(_hRC);
+        _hRC = NULL;
+    }
+
+    if (_hDC != NULL) {
+        ReleaseDC(_hWnd, _hDC);
+        _hDC = NULL;
+    }
+}
+
+void GLContext::swapBuffer() {
+    SwapBuffers(_hDC);
 }
