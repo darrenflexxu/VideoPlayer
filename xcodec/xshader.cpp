@@ -58,7 +58,7 @@ bool XShader::Draw(
 }
 
 bool XShader::DrawFrame(AVFrame* frame, AVCodecContext* ctx) {
-  if (!frame || !frame->data[0])return false;
+  if (!frame || !frame->data[0])return XVideoView::DrawFrame(frame, ctx);
   count_++;
   if (beg_ms_ <= 0) {
     beg_ms_ = clock();
