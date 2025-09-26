@@ -24,8 +24,6 @@ bool XShader::Init(int w, int h, Format fmt) {
   height_ = rect.bottom - rect.top;
   pix_w_ = w;
   pix_h_ = h;
-  yv12_ = std::make_shared<XShaderYV12>(w, h);
-  nv12_ = std::make_shared<XShaderNV12>(w, h);
   return true;
 }
 
@@ -87,6 +85,9 @@ bool XShader::DrawFrame(AVFrame* frame, AVCodecContext* ctx) {
   case AV_PIX_FMT_YUV420P:
   case AV_PIX_FMT_YUVJ420P:
   {
+    if (!yv12_) {
+      yv12_ = std::make_shared<XShaderYV12>(pix_w_, pix_h_);
+    }
     yv12_->Draw(frame->data[0], frame->linesize[0],//Y
       frame->data[1], frame->linesize[1],   //U
       frame->data[2], frame->linesize[2]    //V
@@ -95,6 +96,9 @@ bool XShader::DrawFrame(AVFrame* frame, AVCodecContext* ctx) {
   }
   case AV_PIX_FMT_NV12:
   {
+    if (!nv12_) {
+      nv12_ = std::make_shared<XShaderNV12>(pix_w_, pix_h_);
+    }
     nv12_->Draw(frame->data[0], frame->linesize[0], //Y
       frame->data[1], frame->linesize[1] //UV
     );

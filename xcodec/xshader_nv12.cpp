@@ -69,14 +69,16 @@ bool XShaderNV12::Draw(
   //Y  
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, id_y);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, pixel_w, pixel_h, 0, GL_RED, GL_UNSIGNED_BYTE, y);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, y_pitch, pixel_h, 0, GL_RED,
+               GL_UNSIGNED_BYTE, y);
   //   glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &MVP[0][0]);
   glUniform1i(textureUniformY, 0);
 
   //UV  
   glActiveTexture(GL_TEXTURE1);
   glBindTexture(GL_TEXTURE_2D, id_uv);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RG, pixel_w / 2, pixel_h / 2, 0, GL_RG, GL_UNSIGNED_BYTE, uv);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RG, u_pitch, pixel_h / 2, 0, GL_RG,
+               GL_UNSIGNED_BYTE, uv);
   glUniform1i(textureUniformUV, 1);
 
   // Draw  

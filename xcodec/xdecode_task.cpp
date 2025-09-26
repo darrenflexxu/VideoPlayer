@@ -197,9 +197,7 @@ void XDecodeTask::Main()
             }
             if (frame_cache_)
             {
-                auto f = av_frame_alloc();
-                av_frame_ref(f, frame_);//引用计数加1
-                frames_.push_back(f);
+                frames_.push_back(av_frame_clone(frame_));
             }
         }
         this_thread::sleep_for(std::chrono::milliseconds(1));
