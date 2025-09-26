@@ -45,6 +45,7 @@ bool XDecode::Recv(AVFrame* frame)      //获取解码
         av_frame_free(&f);
     return false;
 }
+
 bool XDecode::InitHW(int type)
 {
     unique_lock<mutex> lock(mux_);
@@ -58,7 +59,16 @@ bool XDecode::InitHW(int type)
         return false;
     }
     c_->hw_device_ctx = ctx;
-    c_->pix_fmt = AV_PIX_FMT_DXVA2_VLD;
+
+    for (int i = 0;; i++) {
+      const AVCodecHWConfig* config = avcodec_get_hw_config(c_->codec, i);
+
+      if (config && config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX &&
+          config->device_type == (AVHWDeviceType)type) {
+        c_->pix_fmt = config->pix_fmt;
+        break;
+      }
+    }
     cout << "硬件加速：" << type << endl;
     return true;
 }

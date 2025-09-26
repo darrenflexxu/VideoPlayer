@@ -10,6 +10,9 @@ extern "C"
 #include "libavformat/avformat.h"
 #include <libavutil/time.h>
 #include "libavutil/pixfmt.h"
+#include <libavutil/imgutils.h>
+#include <libavutil/opt.h>
+#include <libavutil/channel_layout.h>
 #include "libswscale/swscale.h"
 #include "libswresample/swresample.h"
 
@@ -123,13 +126,13 @@ private:
     ///视频相关
     AVFormatContext *format_ctx_ = nullptr;
     AVCodecContext *codec_ctx_ = nullptr;
-    AVCodec *codec_ = nullptr;
+    const AVCodec *codec_ = nullptr;
     AVHWDeviceType hw_device_type_ = AV_HWDEVICE_TYPE_NONE;
     AVPixelFormat hw_pix_fmt_ = AV_PIX_FMT_NONE;
     AVBufferRef* hw_device_ctx_ = nullptr;
     ///音频相关
     AVCodecContext *audio_codec_ctx_;
-    AVCodec *audio_codec_;
+    const AVCodec *audio_codec_;
     AVFrame *audio_frame_;
     ///以下变量用于音频重采样
     /// 由于ffmpeg解码出来后的pcm数据有可能是带平面的pcm，因此这里统一做重采样处理，
@@ -143,7 +146,12 @@ private:
     int audio_tgt_channels_; ///av_get_channel_layout_nb_channels(out_ch_layout);
     unsigned int audio_buf_size_;
     unsigned int audio_buf_index_;
-    DECLARE_ALIGNED(16, uint8_t, audio_buf_)[AVCODEC_MAX_AUDIO_FRAME_SIZE * 4];
+
+#ifdef _MSC_VER
+    __declspec(align(16)) uint8_t audio_buf_[AVCODEC_MAX_AUDIO_FRAME_SIZE * 4];
+#else
+    uint8_t audio_buf_[MAX_AUDIO_FRAME_SIZE * 4] __attribute__((aligned(16)));
+#endif
     ///视频帧队列
     Cond *condition_video_;
     std::list<AVPacket> video_pack_list_;

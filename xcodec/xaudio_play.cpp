@@ -114,7 +114,7 @@ void XAudioPlay::Push(AVFrame* frame)
     if (!frame || !frame->data[0])return;
     vector<unsigned char> buf;
     int sample_size = av_get_bytes_per_sample((AVSampleFormat)frame->format);
-    int channels = frame->channels;
+    int channels = frame->ch_layout.nb_channels;
     unsigned char* L = frame->data[0];
     unsigned char* R = frame->data[1];
     unsigned char* data = nullptr;
@@ -157,7 +157,7 @@ bool XAudioPlay::Open(XPara &para)
 bool XAudioPlay::Open(AVCodecParameters* para)
 {
     XAudioSpec spec;
-    spec.channels = para->channels;
+  spec.channels = para->ch_layout.nb_channels;
     spec.freq = para->sample_rate;
 
     switch (para->format)

@@ -18,7 +18,7 @@ extern "C"
 AVCodecContext* XCodec::Create(int codec_id,bool isencode)
 {
     //1 找到编码器
-    AVCodec *codec = nullptr;
+    const AVCodec *codec = nullptr;
     if(isencode)
         codec = avcodec_find_encoder((AVCodecID)codec_id);
     else

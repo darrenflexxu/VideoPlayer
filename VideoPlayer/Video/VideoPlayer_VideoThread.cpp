@@ -17,10 +17,13 @@ void VideoPlayer::decodeVideoThread() {
     swFrame = av_frame_alloc();
     pFrameYUV = av_frame_alloc();
     ///由于解码后的数据不一定都是yuv420p，因此需要将解码后的数据统一转换成YUV420P    
-    numBytes = avpicture_get_size(AV_PIX_FMT_YUV420P, codec_ctx_->width, codec_ctx_->height);
+    numBytes = av_image_get_buffer_size(AV_PIX_FMT_YUV420P, codec_ctx_->width,
+                                        codec_ctx_->height,
+                                        /*align*/ 1);
     out_buffer_yuv = (uint8_t *)av_malloc(numBytes * sizeof(uint8_t));
-    avpicture_fill((AVPicture *)pFrameYUV, out_buffer_yuv, AV_PIX_FMT_YUV420P,
-                   codec_ctx_->width, codec_ctx_->height);
+    av_image_fill_arrays(pFrameYUV->data, pFrameYUV->linesize, out_buffer_yuv,
+                         AV_PIX_FMT_YUV420P, codec_ctx_->width,
+                         codec_ctx_->height, 1);
 
     while (1) {
         if (is_quit_) {

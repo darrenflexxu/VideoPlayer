@@ -34,6 +34,6 @@ private:
     Ui::XPlayVideo ui;
     XPlayer player;
     bool moved_ = false;
-    bool gpu_decode_ = true;
+    bool gpu_decode_ = false;
     bool gpu_direct_render_ = false;
 };
