@@ -233,7 +233,7 @@ void VideoPlayer::readVideoFile() {
         ret = avcodec_parameters_to_context(
             codec_ctx_, format_ctx_->streams[videoStream]->codecpar);
 
-        for (int i = AV_HWDEVICE_TYPE_DXVA2 + 1; i < 10; i++) {
+        for (int i = AV_HWDEVICE_TYPE_NONE + 1; i < 10; i++) {
           ret = av_hwdevice_ctx_create(&hw_device_ctx_, AVHWDeviceType(i), NULL,
                                        NULL, 0);
 

@@ -58,7 +58,7 @@ bool XDecode::InitHW(int type)
         PrintErr(re);
         return false;
     }
-    c_->hw_device_ctx = ctx;
+    c_->hw_device_ctx = av_buffer_ref(ctx);
 
     for (int i = 0;; i++) {
       const AVCodecHWConfig* config = avcodec_get_hw_config(c_->codec, i);
