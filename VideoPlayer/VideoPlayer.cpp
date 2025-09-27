@@ -225,35 +225,23 @@ void VideoPlayer::readVideoFile() {
   if (videoStream >= 0) {
     /// 查找视频解码器
     if (video_player_callback_->OnEnableGPUDecode()) {
-      auto ret = av_find_best_stream(format_ctx_, AVMEDIA_TYPE_VIDEO, -1, -1,
-                                     &codec_, 0);
+      AVStream* stream = format_ctx_->streams[videoStream];
+      AVCodecParameters* codecpar = stream->codecpar;
+      if (codecpar->codec_id == AV_CODEC_ID_H264) {
+        codec_ = avcodec_find_decoder_by_name("h264_qsv");
+      } else if (codecpar->codec_id == AV_CODEC_ID_HEVC) {
+        codec_ = avcodec_find_decoder_by_name("hevc_qsv");
+      }
 
-      if (ret >= 0) {
+      if (codec_ != nullptr) {
         codec_ctx_ = avcodec_alloc_context3(codec_);
-        ret = avcodec_parameters_to_context(
+        auto ret = avcodec_parameters_to_context(
             codec_ctx_, format_ctx_->streams[videoStream]->codecpar);
-
-        for (int i = AV_HWDEVICE_TYPE_NONE + 1; i < 10; i++) {
-          ret = av_hwdevice_ctx_create(&hw_device_ctx_, AVHWDeviceType(i), NULL,
-                                       NULL, 0);
-
-          if (ret >= 0) {
-            hw_device_type_ = AVHWDeviceType(i);
-            codec_ctx_->hw_device_ctx = av_buffer_ref(hw_device_ctx_);
-            break;
-          }
-        }
-
-        for (int i = 0;; i++) {
-          const AVCodecHWConfig* config = avcodec_get_hw_config(codec_, i);
-
-          if (config &&
-              config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX &&
-              config->device_type == hw_device_type_) {
-            hw_pix_fmt_ = config->pix_fmt;
-            break;
-          }
-        }
+        ret = av_hwdevice_ctx_create(&hw_device_ctx_, AV_HWDEVICE_TYPE_QSV,
+                                          NULL, NULL, 0);
+        hw_device_type_ = AV_HWDEVICE_TYPE_QSV;
+        hw_pix_fmt_ = AV_PIX_FMT_QSV;
+        codec_ctx_->hw_device_ctx = av_buffer_ref(hw_device_ctx_);
       }
     }
 
