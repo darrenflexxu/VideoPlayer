@@ -10,7 +10,7 @@ public:
 
     ////////////////////////////////////////////////////
     //// 初始化硬件加速  4 AV_HWDEVICE_TYPE_DXVA2
-    bool InitHW(int type = 4);
+    bool InitHW();
 
     void set_gpu_direct_render(bool gpu_render) { gpu_direct_render_ = gpu_render; }
 

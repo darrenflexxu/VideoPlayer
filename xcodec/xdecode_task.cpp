@@ -67,7 +67,7 @@ bool XDecodeTask::Open(AVCodecParameters* para)
     }
     unique_lock<mutex> lock(mux_);
     is_open_ = false;
-    auto c = decode_.Create(para->codec_id, false);
+    auto c = decode_.Create(para->codec_id, false, gpu_decode_);
     if (!c)
     {
         LOGERROR("decode_.Create failed!");

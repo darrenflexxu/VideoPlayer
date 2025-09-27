@@ -15,14 +15,25 @@ extern "C"
 /// 创建编码上下文
 /// @para codec_id 编码器ID号，对应ffmpeg
 /// @return 编码上下文 ,失败返回nullptr
-AVCodecContext* XCodec::Create(int codec_id,bool isencode)
-{
+AVCodecContext* XCodec::Create(int codec_id, bool isencode, bool gpu) {
     //1 找到编码器
     const AVCodec *codec = nullptr;
     if(isencode)
         codec = avcodec_find_encoder((AVCodecID)codec_id);
-    else
+    else {
+      auto id = (AVCodecID) codec_id;
+      if (gpu) {
+        if (id == AV_CODEC_ID_H264) {
+          codec = avcodec_find_decoder_by_name("h264_qsv");
+        } else if (id == AV_CODEC_ID_HEVC) {
+          codec = avcodec_find_decoder_by_name("hevc_qsv");
+        }
+      } 
+      
+      if (!codec){
         codec = avcodec_find_decoder((AVCodecID)codec_id);
+      }
+    }
     if (!codec)
     {
         cerr << "avcodec_find_encoder failed!" << codec_id << endl;

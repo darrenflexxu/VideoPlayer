@@ -13,7 +13,7 @@ public:
     /// 创建编解码上下文
     /// @para codec_id 编码器ID号，对应ffmpeg
     /// @return 编码上下文 ,失败返回nullptr
-    static AVCodecContext* Create(int codec_id,bool is_encode);
+    static AVCodecContext* Create(int codec_id,bool is_encode, bool gpu);
 
     //////////////////////////////////////////
     /// 设置对象的编码器上下文 上下文传递到对象中，资源由XEncode维护
