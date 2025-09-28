@@ -109,10 +109,15 @@ std::shared_ptr<XPara> XFormat::CopyVideoPara()
     *re->time_base = c_->streams[index]->time_base;
     avcodec_parameters_copy(re->para, c_->streams[index]->codecpar);
 
-    //转换成毫秒
-    re->total_ms = av_rescale_q(c_->streams[index]->duration,
-        c_->streams[index]->time_base, { 1,1000 });
-
+    if (c_->streams[index]->duration < 0) {
+      // 转换成毫秒
+      re->total_ms =
+          c_->duration * c_->streams[index]->time_base.den / AV_TIME_BASE;
+    } else {
+      // 转换成毫秒
+      re->total_ms = av_rescale_q(c_->streams[index]->duration,
+                                  c_->streams[index]->time_base, {1, 1000});
+    }
     return re;
 }
 
