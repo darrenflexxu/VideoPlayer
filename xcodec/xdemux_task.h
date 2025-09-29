@@ -30,6 +30,8 @@ public:
     /// <returns></returns>
     bool Open(std::string url,int timeout_ms = 1000);
 
+    void ClearEOF();
+
     //复制视频参数
     std::shared_ptr<XPara> CopyVideoPara()
     {
@@ -49,5 +51,6 @@ private:
     std::string url_;
     int timeout_ms_ = 0;//超时时间
     XSYN_TYPE syn_type_ = XSYN_NONE;
+    bool is_eof_ = false;
 };
 

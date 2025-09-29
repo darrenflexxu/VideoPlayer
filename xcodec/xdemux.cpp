@@ -31,11 +31,14 @@ AVFormatContext* XDemux::Open(const char* url)
     return c;
 }
 
-bool XDemux::Read(AVPacket* pkt)
-{
+bool XDemux::Read(AVPacket* pkt, int* errorCode) {
     unique_lock<mutex> lock(mux_);
     if (!c_)return false;
     auto re = av_read_frame(c_, pkt);
+
+    if (errorCode) {
+      *errorCode = re;
+    }
     BERR(re);
     //计时 用于超时判断
     last_time_ = NowMs();

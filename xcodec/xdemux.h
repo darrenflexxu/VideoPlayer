@@ -15,7 +15,7 @@ public:
     /// </summary>
     /// <param name="pkt">输出数据</param>
     /// <returns>是否成功</returns>
-    bool Read(AVPacket* pkt);
+    bool Read(AVPacket* pkt, int* errorCode);
 
     bool Seek(long long pts,int stream_index);
 

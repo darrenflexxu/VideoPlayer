@@ -22,13 +22,19 @@ void XPlayVideo::timerEvent(QTimerEvent* ev) {
     if (!moved_) {
         ui.pos->setValue(pos);
     }
+
+    if (player.IsFinish()) {
+      player.Pause(true);
+      player.Seek(0);
+      ui.pos->setValue(0);
+      player.ClearFinish();
+    }
 }
 void XPlayVideo::Close() {
     player.Stop();
 }
 void XPlayVideo::Pause() {
     player.Pause(!player.is_pause());
-
 }
 void XPlayVideo::Move()        //进度条拖动
 {

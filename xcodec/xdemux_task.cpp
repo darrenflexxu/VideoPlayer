@@ -29,9 +29,13 @@ bool XDemuxTask::Open(std::string url, int timeout_ms)
     LOGDEBUG("XDemuxTask::Open end!");
     return true;
 }
+void XDemuxTask::ClearEOF() {
+  is_eof_ = false;
+}
 void XDemuxTask::Main()
 {
     AVPacket pkt;
+
     while (!is_exit_)
     {
         if (is_pause())
@@ -39,14 +43,21 @@ void XDemuxTask::Main()
             MSleep(1);
             continue;
         }
+        int errorCode = 0;
 
-        if (!demux_.Read(&pkt))
+        if (!demux_.Read(&pkt, &errorCode))
         {
             //读取失败
             cout << "-" << flush;
             if (!demux_.is_connected())
             {
                 Open(url_, timeout_ms_);
+            }
+
+            if (errorCode == AVERROR_EOF && !is_eof_) {
+              is_eof_ = true;
+              pkt.stream_index = demux_.video_index();
+              Next(&pkt);
             }
 
             this_thread::sleep_for(std::chrono::milliseconds(1));

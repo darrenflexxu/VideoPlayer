@@ -20,6 +20,9 @@ public:
     // 返回结果需要用 XFreeFrame 释放
     AVFrame* GetFrame();
 
+    bool IsVideoFinish();
+    void ClearFinish();
+
     void set_stream_index(int i) { stream_index_ = i; }
 
     void set_frame_cache(bool is) { frame_cache_ = is; }

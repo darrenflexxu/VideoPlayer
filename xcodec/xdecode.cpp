@@ -20,6 +20,27 @@ bool XDecode::Send(const AVPacket* pkt)  // 发送解码
 bool XDecode::Recv(AVFrame* frame)  // 获取解码
 {
   unique_lock<mutex> lock(mux_);
+  return RecvFrame(frame);
+}
+
+bool XDecode::InitHW() {
+  unique_lock<mutex> lock(mux_);
+  if (!c_)
+    return false;
+  ;
+  AVBufferRef* ctx = nullptr;  // 硬件加速上下文
+  auto re = av_hwdevice_ctx_create(&ctx, AV_HWDEVICE_TYPE_QSV, NULL, NULL, 0);
+  if (re != 0) {
+    PrintErr(re);
+    return false;
+  }
+  c_->hw_device_ctx = av_buffer_ref(ctx);
+  c_->pix_fmt = AV_PIX_FMT_YUV420P;
+  cout << "硬件加速：" << endl;
+  return true;
+}
+
+bool XDecode::RecvFrame(AVFrame* frame) {
   if (!c_)
     return false;
   auto f = frame;
@@ -47,8 +68,7 @@ bool XDecode::Recv(AVFrame* frame)  // 获取解码
       av_frame_get_buffer(yuv420p_frame, 1);  // 分配数据缓冲
       // 格式转换
       sws_scale(sws_ctx, (const uint8_t* const*)frame->data, frame->linesize, 0,
-                frame->height, yuv420p_frame->data,
-                yuv420p_frame->linesize);
+                frame->height, yuv420p_frame->data, yuv420p_frame->linesize);
       // 之后 yuv420p_frame 就是你要的 YUV420P（420P）格式了
       av_frame_unref(frame);
       av_frame_move_ref(frame, yuv420p_frame);
@@ -67,22 +87,6 @@ bool XDecode::Recv(AVFrame* frame)  // 获取解码
   return false;
 }
 
-bool XDecode::InitHW() {
-  unique_lock<mutex> lock(mux_);
-  if (!c_)
-    return false;
-  ;
-  AVBufferRef* ctx = nullptr;  // 硬件加速上下文
-  auto re = av_hwdevice_ctx_create(&ctx, AV_HWDEVICE_TYPE_QSV, NULL, NULL, 0);
-  if (re != 0) {
-    PrintErr(re);
-    return false;
-  }
-  c_->hw_device_ctx = av_buffer_ref(ctx);
-  c_->pix_fmt = AV_PIX_FMT_YUV420P;
-  cout << "硬件加速：" << endl;
-  return true;
-}
 std::vector<AVFrame*> XDecode::End()  // 获取缓存
 {
   std::vector<AVFrame*> res;
@@ -94,8 +98,8 @@ std::vector<AVFrame*> XDecode::End()  // 获取缓存
   int ret = avcodec_send_packet(c_, NULL);
   while (ret >= 0) {
     auto frame = av_frame_alloc();
-    ret = avcodec_receive_frame(c_, frame);
-    if (ret < 0) {
+
+    if (!RecvFrame(frame)) {
       av_frame_free(&frame);
       break;
     }

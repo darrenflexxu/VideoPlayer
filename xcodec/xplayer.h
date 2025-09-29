@@ -20,6 +20,9 @@ public:
     //开启 解封装 音视频解码 和 处理同步的线程
     void Start();
     
+    bool IsFinish();
+
+    void ClearFinish();
 
     //渲染视频 播放音频
     void Update();

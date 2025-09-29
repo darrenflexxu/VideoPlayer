@@ -117,6 +117,15 @@ void XPlayer::Start()
     XThread::Start();
 }
 
+bool XPlayer::IsFinish() {
+  return video_decode_.IsVideoFinish();
+}
+
+void XPlayer::ClearFinish() {
+  demux_.ClearEOF();
+  video_decode_.ClearFinish();
+}
+
 //渲染视频 播放音频
 void XPlayer::Update()
 {

@@ -137,6 +137,13 @@ AVFrame* XDecodeTask::GetFrame()
     need_view_ = false;
     return f;
 }
+bool XDecodeTask::IsVideoFinish() {
+  return frame_cache_ && frames_.empty();
+}
+void XDecodeTask::ClearFinish() {
+  frame_cache_ = false;
+  frames_.clear();
+}
 //线程主函数
 void XDecodeTask::Main()
 {
@@ -173,8 +180,21 @@ void XDecodeTask::Main()
             continue;
         }
 
-        //发送到解码线程
-        bool re = decode_.Send(pkt);
+        if (pkt->size == 0) {
+          auto list = decode_.End();
+
+          if (!list.empty()) {
+            cur_pts_ = list.back()->pts;  // 转换成毫秒
+            if (time_base_)
+              cur_ms_ = av_rescale_q(list.back()->pts, *time_base_, {1, 1000});
+          }
+          frames_.insert(frames_.end(), list.begin(), list.end());
+          frame_cache_ = true;
+          continue;
+        }
+        // 发送到解码线程
+        auto re = decode_.Send(pkt);
+        
         av_packet_free(&pkt);
         if (!re)
         {

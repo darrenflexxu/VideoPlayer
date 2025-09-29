@@ -15,6 +15,8 @@ public:
     void set_gpu_direct_render(bool gpu_render) { gpu_direct_render_ = gpu_render; }
 
 private:
+    bool RecvFrame(AVFrame* frame);
+
     bool gpu_direct_render_ = false;
 };
 
