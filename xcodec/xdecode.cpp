@@ -35,10 +35,45 @@ bool XDecode::InitHW() {
     return false;
   }
   c_->hw_device_ctx = av_buffer_ref(ctx);
-  c_->pix_fmt = AV_PIX_FMT_YUV420P;
+  c_->pix_fmt = AV_PIX_FMT_QSV;
   cout << "硬件加速：" << endl;
   return true;
 }
+
+class MyDecoder {
+ public:
+  SwsContext* get_or_create_sws(int srcW,
+                                int srcH,
+                                AVPixelFormat srcFmt,
+                                int dstW,
+                                int dstH,
+                                AVPixelFormat dstFmt) {
+    if (sws_ctx_ && srcW == srcW_ && srcH == srcH_ && dstW == dstW_ &&
+        dstH == dstH_ && srcFmt == srcFmt_ && dstFmt == dstFmt_) {
+      return sws_ctx_;
+    }
+    if (sws_ctx_)
+      sws_freeContext(sws_ctx_);
+    sws_ctx_ = sws_getContext(srcW, srcH, srcFmt, dstW, dstH, dstFmt,
+                              SWS_BICUBIC, nullptr, nullptr, nullptr);
+    srcW_ = srcW;
+    srcH_ = srcH;
+    dstW_ = dstW;
+    dstH_ = dstH;
+    srcFmt_ = srcFmt;
+    dstFmt_ = dstFmt;
+    return sws_ctx_;
+  }
+  ~MyDecoder() {
+    if (sws_ctx_)
+      sws_freeContext(sws_ctx_);
+  }
+
+ private:
+  SwsContext* sws_ctx_ = nullptr;
+  int srcW_ = 0, srcH_ = 0, dstW_ = 0, dstH_ = 0;
+  AVPixelFormat srcFmt_ = AV_PIX_FMT_NONE, dstFmt_ = AV_PIX_FMT_NONE;
+};
 
 bool XDecode::RecvFrame(AVFrame* frame) {
   if (!c_)
@@ -55,11 +90,10 @@ bool XDecode::RecvFrame(AVFrame* frame) {
       // 显存转内存 GPU =》 CPU
       re = av_hwframe_transfer_data(frame, f, 0);
       // 创建 swsContext
-      struct SwsContext* sws_ctx = sws_getContext(
+      static MyDecoder decoder;
+      struct SwsContext* sws_ctx = decoder.get_or_create_sws(
           frame->width, frame->height, (enum AVPixelFormat)frame->format,
-          frame->width, frame->height, AV_PIX_FMT_YUV420P, SWS_BICUBIC, NULL,
-          NULL, NULL);
-
+          frame->width, frame->height, AV_PIX_FMT_YUV420P);
       // 准备输出帧
       AVFrame* yuv420p_frame = av_frame_alloc();
       yuv420p_frame->format = AV_PIX_FMT_YUV420P;
@@ -70,10 +104,10 @@ bool XDecode::RecvFrame(AVFrame* frame) {
       sws_scale(sws_ctx, (const uint8_t* const*)frame->data, frame->linesize, 0,
                 frame->height, yuv420p_frame->data, yuv420p_frame->linesize);
       // 之后 yuv420p_frame 就是你要的 YUV420P（420P）格式了
-      av_frame_unref(frame);
-      av_frame_move_ref(frame, yuv420p_frame);
+      av_frame_replace(frame, yuv420p_frame);
       av_frame_free(&yuv420p_frame);
       frame->pts = f->pts;
+      frame->pkt_dts = f->pkt_dts;
       av_frame_free(&f);
       if (re != 0) {
         PrintErr(re);

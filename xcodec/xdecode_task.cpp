@@ -205,6 +205,10 @@ void XDecodeTask::Main()
             unique_lock<mutex> lock(mux_);
             decode_.set_gpu_direct_render(gpu_decode_ && gpu_direct_render_);
 
+            if (frame_) {
+              av_frame_unref(frame_);
+            }
+
             if(decode_.Recv(frame_))
             { 
                 cout << "@" << flush;
