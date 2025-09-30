@@ -1,6 +1,7 @@
 #version 330 core
 
 in vec2 textureOut;
+out vec4 FragColor;
 uniform sampler2D tex_y;
 uniform sampler2D tex_u;
 uniform sampler2D tex_v;
@@ -15,5 +16,5 @@ void main(void)
   rgb = mat3( 1,       1,         1,
               0,       -0.39465,  2.03211,
               1.13983, -0.58060,  0) * yuv;    
-  gl_FragColor = vec4(rgb, 1);
+  FragColor = vec4(rgb, 1);
 }
