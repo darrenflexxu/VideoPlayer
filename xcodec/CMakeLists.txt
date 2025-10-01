@@ -5,6 +5,7 @@ include_directories(.
 "${ThirdParty}/ffmpeg/include"
 "${ThirdParty}/SDL2/include"
 "${ThirdParty}/GLEW/include"
+"${OpenCV_INCLUDE_DIRS}"
 )
 
 link_directories("${ThirdParty}/ffmpeg/lib"
@@ -16,4 +17,4 @@ add_definitions(-DXCODEC_EXPORTS)
 
 ADD_LIBRARY(XCodec SHARED ${VIDEO_PLAYER_SRC} ${VIDEO_PLAYER_HEADER})
 
-TARGET_LINK_LIBRARIES(XCodec avcodec avdevice avfilter avformat avutil postproc swresample swscale SDL2 glew32 opengl32)
+TARGET_LINK_LIBRARIES(XCodec avcodec avdevice avfilter avformat avutil postproc swresample swscale SDL2 glew32 opengl32 "${OpenCV_LIBS}")

@@ -12,7 +12,8 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/Bin)
 set(ThirdParty "${PROJECT_SOURCE_DIR}/thirdparty")
 
 IF(WIN32)
-SET(CMAKE_PREFIX_PATH C:/Qt/Qt5.12.12/5.12.12/msvc2017_64/lib/cmake)
+SET(CMAKE_PREFIX_PATH C:/Qt/Qt5.12.12/5.12.12/msvc2017_64/lib/cmake;${ThirdParty}/opencv/lib)
+find_package(OpenCV REQUIRED)
 ELSE(WIN32)
 SET(CMAKE_PREFIX_PATH /usr/local/Qt-5.9.9/lib/cmake)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -fPIC")
@@ -127,5 +128,8 @@ add_custom_command(
         TARGET XVideoView POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory
                 ${ThirdParty}/bin/
+                \$\(OutDir\)
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+                ${ThirdParty}/opencv/bin/
                 \$\(OutDir\))
 ENDIF()

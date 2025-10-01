@@ -1,4 +1,4 @@
-#include "xaudio_play.h"
+﻿#include "xaudio_play.h"
 #include <iostream>
 #include <SDL.h>
 extern "C"

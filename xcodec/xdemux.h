@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "xformat.h"
 class XCODEC_API XDemux :public XFormat
 {

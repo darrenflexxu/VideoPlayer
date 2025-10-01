@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "xtools.h"
 #define AUDIO_U8        0x0008  /**< Unsigned 8-bit samples */
 #define AUDIO_S8        0x8008  /**< Signed 8-bit samples */

@@ -77,7 +77,7 @@ endif()
 # Extract the directory where *this* file has been installed (determined at cmake run-time)
 # Get the absolute path with no ../.. relative marks, to eliminate implicit linker warnings
 get_filename_component(OpenCV_CONFIG_PATH "${CMAKE_CURRENT_LIST_DIR}" REALPATH)
-get_filename_component(OpenCV_INSTALL_PATH "${OpenCV_CONFIG_PATH}/../../../" REALPATH)
+get_filename_component(OpenCV_INSTALL_PATH "${OpenCV_CONFIG_PATH}/../" REALPATH)
 
 # Search packages for host system instead of packages for target system.
 # in case of cross compilation this macro should be defined by toolchain file

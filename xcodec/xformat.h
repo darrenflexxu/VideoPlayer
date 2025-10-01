@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "xtools.h"
 /// <summary>
 /// 封装和解封装基类
