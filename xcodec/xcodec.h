@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "xtools.h"
 #include <mutex>
 #include <vector>

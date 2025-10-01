@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "xcodec.h"
 struct AVBufferRef;
 class XCODEC_API XDecode :public XCodec

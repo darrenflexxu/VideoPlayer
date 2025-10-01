@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 //兼容Linux  _WIN32 windows 32为和64位
 #ifdef _WIN32

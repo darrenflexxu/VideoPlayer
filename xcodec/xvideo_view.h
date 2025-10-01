@@ -1,4 +1,4 @@
-#ifndef XVIDEO_VIEW_H
+﻿#ifndef XVIDEO_VIEW_H
 #define XVIDEO_VIEW_H
 #include <mutex>
 #include <fstream>

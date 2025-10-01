@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "xtools.h"
 #include "xdemux_task.h"
 #include "xdecode_task.h"

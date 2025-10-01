@@ -1,5 +1,6 @@
-#include "xplayer.h"
+﻿#include "xplayer.h"
 #include "xaudio_play.h"
+#include "xvideo_filterproc.h"
 //暂停或者播放
 void XPlayer::Pause(bool is_pause)
 {
@@ -130,16 +131,15 @@ void XPlayer::ClearFinish() {
 void XPlayer::Update()
 {
     //渲染视频
-    if (view_)
-    {
-        auto f = video_decode_.GetFrame();
-        if (f)
-        {
-            view_->set_gpu_render_direct(gpu_decode_ && gpu_direct_render_);
-            view_->DrawFrame(f, video_decode_.GetCodecContext());
-            XFreeFrame(&f);
-        }
+  if (view_) {
+    auto f = video_decode_.GetFrame();
+    if (f) {
+      view_->set_gpu_render_direct(gpu_decode_ && gpu_direct_render_);
+      XVideoFilterProc::GetInstance()->FaceDetect(f);
+      view_->DrawFrame(f, video_decode_.GetCodecContext());
+      XFreeFrame(&f);
     }
+  }
 
     //音频播放
     auto au = XAudioPlay::Instance();
