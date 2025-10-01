@@ -125,6 +125,7 @@ bool XPlayer::IsFinish() {
 void XPlayer::ClearFinish() {
   demux_.ClearEOF();
   video_decode_.ClearFinish();
+  XVideoFilterProc::GetInstance()->Clear();
 }
 
 //渲染视频 播放音频
@@ -135,7 +136,7 @@ void XPlayer::Update()
     auto f = video_decode_.GetFrame();
     if (f) {
       view_->set_gpu_render_direct(gpu_decode_ && gpu_direct_render_);
-      XVideoFilterProc::GetInstance()->FaceDetect(f);
+      XVideoFilterProc::GetInstance()->Action(f);
       view_->DrawFrame(f, video_decode_.GetCodecContext());
       XFreeFrame(&f);
     }

@@ -1,14 +1,19 @@
 ﻿#pragma once
 
+#include <vector>
 #include "xtools.h"
 
 class XCODEC_API XVideoFilterProc {
  public:
+   enum FilterType {
+     kFaceDect = 0
+  };
   struct Context;
 
   static XVideoFilterProc* GetInstance();
 
-  bool FaceDetect(AVFrame* video_frame);
+  bool Action(AVFrame* video_frame, const std::vector<FilterType>& types = {});
+  void Clear();
 
  private:
   XVideoFilterProc();

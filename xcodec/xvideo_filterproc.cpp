@@ -1,6 +1,6 @@
 ﻿#include "xvideo_filterproc.h"
 #include <opencv2/opencv.hpp>
-#include <opencv2/core/ocl.hpp>
+#include <opencv2/video/tracking.hpp>
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavutil/imgutils.h>
@@ -144,13 +144,15 @@ bool CVUMatToAVFrame(const cv::UMat& inUMat, AVFrame* frame) {
 
 struct XVideoFilterProc::Context {
   Context() {
-    cv::ocl::setUseOpenCL(true);
     if (!faceCascade.load("haarcascade_frontalface_default.xml")) {
       std::cout << "错误：无法加载 Haar 级联分类器！" << std::endl;
     }
   }
 
   cv::CascadeClassifier faceCascade;
+  cv::Mat prevFrame;
+  std::vector<cv::Ptr<cv::Tracker>> trackers;
+  std::vector<cv::Rect> bboxes;
 };
 
 XVideoFilterProc::XVideoFilterProc() {
@@ -162,28 +164,78 @@ XVideoFilterProc* XVideoFilterProc::GetInstance() {
   return &kProc;
 }
 
-bool XVideoFilterProc::FaceDetect(AVFrame* video_frame) {
-  try {  // 转换为灰度图像
-    cv::Mat gray;
-    auto frame = AVFrameToCVMat(video_frame);
-    cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
-    // 检测人脸
-    int div = 6;
-    cv::Mat small;
-    cv::resize(gray, small, cv::Size(), 1.0 / (double)div, 1.0 / (double)div);
-    cv::Size min_size(40 / div, 40 / div);  // 你实际需求
-    std::vector<cv::Rect> faces;
-    ctx_->faceCascade.detectMultiScale(small, faces, 1.2, 3, 0, min_size);
+void XVideoFilterProc::Clear() {
+  ctx_ = std::make_shared<Context>();
+}
 
-    for (auto& f : faces) {
-      // 因为 resize 了，所以坐标要放大回原尺寸
-      f.x *= div;
-      f.y *= div;
-      f.width *= div;
-      f.height *= div;
-      cv::rectangle(frame, f, cv::Scalar(0, 255, 0), div);
+bool XVideoFilterProc::Action(AVFrame* video_frame,
+                                  const std::vector<FilterType>& types) {
+  try {
+    if (types.empty()) {
+      return true;
+    }
+    auto frame = AVFrameToCVMat(video_frame);
+    for (auto type : types) {
+      if (type == kFaceDect) {
+        cv::Mat gray;
+        cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
+        // 检测人脸
+        int div = 6;
+        cv::Mat small;
+        cv::resize(gray, small, cv::Size(), 1.0 / (double)div,
+                   1.0 / (double)div);
+        cv::Size min_size(40 / div, 40 / div);  // 你实际需求
+        std::vector<cv::Rect> faces;
+        ctx_->faceCascade.detectMultiScale(small, faces, 1.2, 3, 0, min_size);
+
+        for (auto& f : faces) {
+          // 因为 resize 了，所以坐标要放大回原尺寸
+          f.x *= div;
+          f.y *= div;
+          f.width *= div;
+          f.height *= div;
+          cv::rectangle(frame, f, cv::Scalar(0, 255, 0), div);
+        }
+      }
     }
     return CVMatToAVFrame(frame, video_frame);
+#if 0
+    if (ctx_->prevFrame.empty()) {
+      ctx_->prevFrame = AVFrameToCVMat(video_frame);
+      cv::cvtColor(ctx_->prevFrame, ctx_->prevFrame, cv::COLOR_BGR2GRAY);
+      return true;
+    }
+    auto frame = AVFrameToCVMat(video_frame);
+    cv::Mat grayFrame;
+    cv::cvtColor(frame, grayFrame, cv::COLOR_BGR2GRAY);
+    cv::Mat diffFrame;
+    cv::absdiff(grayFrame, ctx_->prevFrame, diffFrame);
+    cv::threshold(diffFrame, diffFrame, 30, 255, cv::THRESH_BINARY);
+    ctx_->prevFrame = grayFrame.clone();
+    return CVMatToAVFrame(diffFrame, video_frame);
+#endif
+#if 0
+    auto frame = AVFrameToCVMat(video_frame);
+
+    if (ctx_->prevFrame.empty()) {
+      ctx_->prevFrame = frame;
+      cv::selectROIs("Tracking", frame, ctx_->bboxes);
+
+      for (const auto& box : ctx_->bboxes) {
+        auto tracker = cv::TrackerMIL::create();
+        tracker->init(frame, box);
+        ctx_->trackers.push_back(tracker);
+      }
+      return true;
+    }
+
+    for (size_t i = 0; i < ctx_->trackers.size(); ++i) {
+      ctx_->trackers[i]->update(frame, ctx_->bboxes[i]);
+      cv::rectangle(frame, ctx_->bboxes[i], cv::Scalar(255, 0, 0), 2);
+    }
+    return CVMatToAVFrame(frame, video_frame);
+#endif
+    return true;
   } catch (...) {
     return false;
   }
