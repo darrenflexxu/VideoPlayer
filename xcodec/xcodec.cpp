@@ -16,41 +16,50 @@ extern "C"
 /// @para codec_id 编码器ID号，对应ffmpeg
 /// @return 编码上下文 ,失败返回nullptr
 AVCodecContext* XCodec::Create(int codec_id, bool isencode, bool gpu) {
-    //1 找到编码器
-    const AVCodec *codec = nullptr;
-    if(isencode)
-        codec = avcodec_find_encoder((AVCodecID)codec_id);
-    else {
-      auto id = (AVCodecID) codec_id;
-      if (gpu) {
-        if (id == AV_CODEC_ID_H264) {
-          codec = avcodec_find_decoder_by_name("h264_qsv");
-        } else if (id == AV_CODEC_ID_HEVC) {
-          codec = avcodec_find_decoder_by_name("hevc_qsv");
-        }
-      } 
-      
-      if (!codec){
-        codec = avcodec_find_decoder((AVCodecID)codec_id);
+  // 1 找到编码器
+  const AVCodec* codec = nullptr;
+  if (isencode) {
+    auto id = (AVCodecID)codec_id;
+    if (gpu) {
+      if (id == AV_CODEC_ID_H264) {
+        codec = avcodec_find_encoder_by_name("h264_qsv");
+      } else if (id == AV_CODEC_ID_HEVC) {
+        codec = avcodec_find_encoder_by_name("hevc_qsv");
       }
     }
-    if (!codec)
-    {
-        cerr << "avcodec_find_encoder failed!" << codec_id << endl;
-        return nullptr;
+
+    if (!codec) {
+      codec = avcodec_find_encoder((AVCodecID)codec_id);
     }
-    //创建上下文
-    auto c = avcodec_alloc_context3(codec);
-    if (!c)
-    {
-        cerr << "avcodec_alloc_context3 failed!" << codec_id << endl;
-        return nullptr;
+  } else {
+    auto id = (AVCodecID)codec_id;
+    if (gpu) {
+      if (id == AV_CODEC_ID_H264) {
+        codec = avcodec_find_decoder_by_name("h264_qsv");
+      } else if (id == AV_CODEC_ID_HEVC) {
+        codec = avcodec_find_decoder_by_name("hevc_qsv");
+      }
     }
-    //设置参数默认值
-    c->time_base = { 1,25 };
-    c->pix_fmt = AV_PIX_FMT_YUV420P;
-    c->thread_count = 16;
-    return c;
+
+    if (!codec) {
+      codec = avcodec_find_decoder((AVCodecID)codec_id);
+    }
+  }
+  if (!codec) {
+    cerr << "avcodec_find_encoder failed!" << codec_id << endl;
+    return nullptr;
+  }
+  // 创建上下文
+  auto c = avcodec_alloc_context3(codec);
+  if (!c) {
+    cerr << "avcodec_alloc_context3 failed!" << codec_id << endl;
+    return nullptr;
+  }
+  // 设置参数默认值
+  c->time_base = {1, 25};
+  c->pix_fmt = AV_PIX_FMT_YUV420P;
+  c->thread_count = 16;
+  return c;
 }
 
 //////////////////////////////////////////

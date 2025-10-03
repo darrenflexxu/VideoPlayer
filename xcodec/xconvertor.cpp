@@ -1,4 +1,9 @@
 ﻿#include "xconvertor.h"
+extern "C" {
+#include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
+#include <libavutil/rational.h>
+}
 
 // 暂停或者播放
 void XConvertor::Pause(bool is_pause) {
@@ -6,6 +11,7 @@ void XConvertor::Pause(bool is_pause) {
   demux_.Pause(is_pause);
   audio_decode_.Pause(is_pause);
   video_decode_.Pause(is_pause);
+  mux_.Pause(is_pause);
 }
 
 void XConvertor::Stop() {
@@ -13,10 +19,12 @@ void XConvertor::Stop() {
   demux_.Exit();
   audio_decode_.Exit();
   video_decode_.Exit();
+  mux_.Exit();
   Wait();
   demux_.Wait();
   audio_decode_.Wait();
   video_decode_.Wait();
+  mux_.Wait();
 }
 bool XConvertor::Open(const char* url, void* winid) {
   // 解封装
@@ -25,6 +33,8 @@ bool XConvertor::Open(const char* url, void* winid) {
   // 视频解码
   auto vp = demux_.CopyVideoPara();
   if (vp) {
+    // 视频总时长
+    this->total_ms_ = vp->total_ms;
     // 视频总时长
     video_decode_.set_gpu_decode(gpu_decode_);
 
@@ -69,17 +79,35 @@ void XConvertor::Do(AVPacket* pkt) {
   if (video_decode_.is_open())
     video_decode_.Do(pkt);
 }
-void XConvertor::Start() {
+void XConvertor::Start(const char* url,
+                       AVCodecParameters* video_para,
+                       AVRational* video_time_base,
+                       AVCodecParameters* audio_para,
+                       AVRational* audio_time_base) {
+  if (video_para) {
+    video_encode_.set_c(
+        XCodec::Create(video_para->codec_id, true, gpu_encode_));
+  }
+
+  if (audio_para) {
+    audio_encode_.set_c(XCodec::Create(audio_para->codec_id, true, false));
+  }
+  mux_.Open(url, video_para, video_time_base, audio_para, audio_time_base);
   demux_.Start();
   if (video_decode_.is_open())
     video_decode_.Start();
   if (audio_decode_.is_open())
     audio_decode_.Start();
+  mux_.Start();
   XThread::Start();
 }
 
-bool XConvertor::IsFinish() {
+bool XConvertor::IsDecodeFinish() {
   return video_decode_.IsVideoFinish();
+}
+
+bool XConvertor::IsFinish() {
+  return IsDecodeFinish() && mux_.IsEmptyPacket();
 }
 
 // 渲染视频 播放音频
@@ -87,13 +115,35 @@ void XConvertor::Update() {
   // 渲染视频
   auto vf = video_decode_.GetFrame();
   if (vf) {
+    auto packet = video_encode_.Encode(vf);
+
+    if (packet) {
+      mux_.Do(packet);
+    }
     XFreeFrame(&vf);
+  } else if (IsDecodeFinish()) {
+    auto packets = video_encode_.End();
+
+    for (auto packet : packets) {
+      mux_.Do(packet);
+    }
   }
   // 音频播放
   auto af = audio_decode_.GetFrame();
-  if (!af)
-    return;
-  XFreeFrame(&af);
+  if (af) {
+    auto packet = audio_encode_.Encode(vf);
+
+    if (packet) {
+      mux_.Do(packet);
+    }
+    XFreeFrame(&af);
+  } else {
+    auto packets = audio_encode_.End();
+
+    for (auto packet : packets) {
+      mux_.Do(packet);
+    }
+  }
 }
 
 void XConvertor::Main() {
@@ -106,6 +156,8 @@ void XConvertor::Main() {
       MSleep(1);
       continue;
     }
+    this->pos_ms_ = video_decode_.cur_ms();
+
     if (ap) {
       syn = audio_decode_.cur_ms();
       audio_decode_.set_syn_pts(audio_decode_.cur_ms() + 10000);
