@@ -38,30 +38,5 @@ FIND_PACKAGE(Qt5LinguistTools REQUIRED)
 FIND_PACKAGE(Qt5Qml REQUIRED)
 FIND_PACKAGE(Qt5Quick REQUIRED)
 
-include_directories(
-    "${PROJECT_SOURCE_DIR}/xvideoview"
-)
-
 add_subdirectory(xcodec)
-add_definitions(-DUNICODE)
-
-FILE(GLOB XVIDEO_VIEW_SRC "${PROJECT_SOURCE_DIR}/xvideoview/*.cpp")
-FILE(GLOB XVIDEO_VIEW_HEADER "${PROJECT_SOURCE_DIR}/xvideoview/*.h")
-FILE(GLOB XVIDEO_VIEW_QRC "${PROJECT_SOURCE_DIR}/xvideoview/*.qrc")
-FILE(GLOB XVIDEO_VIEW_UI "${PROJECT_SOURCE_DIR}/xvideoview/*.ui")
-
-add_executable(XVideoView ${XVIDEO_VIEW_SRC} ${XVIDEO_VIEW_HEADER} ${XVIDEO_VIEW_UI} ${XVIDEO_VIEW_QRC})
-
-TARGET_LINK_LIBRARIES(XVideoView PRIVATE XCodec Qt5::Widgets Qt5::Core Qt5::Gui)
-TARGET_LINK_DIRECTORIES(XVideoView PRIVATE "${ThirdParty}/ffmpeg/lib" "${ThirdParty}/SDL2/lib" "${ThirdParty}/GLEW/lib")
-
-IF(WIN32)
-add_custom_command(
-        TARGET XVideoView POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-                ${ThirdParty}/bin/
-                \$\(OutDir\)
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-                ${ThirdParty}/opencv/bin/
-                \$\(OutDir\))
-ENDIF()
+add_subdirectory(XVideoView)

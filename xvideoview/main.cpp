@@ -1,7 +1,7 @@
 ﻿#include <QApplication>
 #include <QDebug>
 #include <QFileDialog>
-#include "xcodec/xplayer.h"
+#include "xplayer.h"
 #include "xplayvideo.h"
 
 

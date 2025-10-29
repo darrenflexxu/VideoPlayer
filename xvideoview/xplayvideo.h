@@ -2,7 +2,7 @@
 
 #include <QWidget>
 #include "ui_xplayvideo.h"
-#include "xcodec/xplayer.h"
+#include "xplayer.h"
 
 class XPlayVideo : public QWidget
 {
