@@ -9,6 +9,14 @@ void XConvertor::Pause(bool is_pause) {
   mux_.Pause(is_pause);
 }
 
+AVCodecContext* XConvertor::GetVideoCodec() {
+  return video_decode_.GetCodecContext();
+}
+
+AVCodecContext* XConvertor::GetAudioCodec() {
+  return audio_decode_.GetCodecContext();
+}
+
 void XConvertor::Stop() {
   Exit();
   demux_.Exit();
@@ -165,14 +173,12 @@ void XConvertor::Main() {
     if (IsFinish()) {
       break;
     }
-    // this->pos_ms_ = video_decode_.cur_ms();
-
-    // if (ap) {
-    //   syn = audio_decode_.cur_ms();
-    //   audio_decode_.set_syn_pts(audio_decode_.cur_ms() + 10000);
-    //   video_decode_.set_syn_pts(syn);
-    // }
-    Update();
+     this->pos_ms_ = video_decode_.cur_ms();
+     //if (ap) {
+     //  syn = audio_decode_.cur_ms();
+     //  audio_decode_.set_syn_pts(audio_decode_.cur_ms() + 10000);
+     //  video_decode_.set_syn_pts(syn);
+     //}
     MSleep(1);
   }
 }

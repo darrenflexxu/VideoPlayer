@@ -40,3 +40,4 @@ FIND_PACKAGE(Qt5Quick REQUIRED)
 
 add_subdirectory(xcodec)
 add_subdirectory(XVideoView)
+add_subdirectory(XVideoTranscode)
