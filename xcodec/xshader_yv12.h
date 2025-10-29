@@ -32,9 +32,10 @@ class XShaderYV12 {
   int width_ = 0;
   int height_ = 0;
 
-  int InitShader();
-public:
-  XShaderYV12(int w, int h);
+  int InitShader(double rotate);
+
+ public:
+  XShaderYV12(int w, int h, double rotate);
 
   bool Draw(
       const unsigned  char* y, int y_pitch,

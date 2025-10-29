@@ -80,7 +80,8 @@ bool XShader::DrawFrame(AVFrame* frame, AVCodecContext* ctx) {
   case AV_PIX_FMT_YUVJ420P:
   {
     if (!yv12_) {
-      yv12_ = std::make_shared<XShaderYV12>(pix_w_, pix_h_);
+      auto rotate = XTools::get_rotation_from_frame(frame);
+      yv12_ = std::make_shared<XShaderYV12>(pix_w_, pix_h_, rotate);
     }
     yv12_->Draw(frame->data[0], frame->linesize[0],//Y
       frame->data[1], frame->linesize[1],   //U

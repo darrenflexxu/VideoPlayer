@@ -146,3 +146,32 @@ void XAVPacketList::Push(AVPacket* pkt) {
         }
     }
 }
+
+
+double XTools::get_rotation_from_frame(const AVFrame* frame) {
+  double angle = 0.0;
+  // 查找 DISPLAYMATRIX 类型
+  const AVFrameSideData* sd =
+      av_frame_get_side_data(frame, AV_FRAME_DATA_DISPLAYMATRIX);
+  if (sd && sd->size >= sizeof(int32_t)) {
+    angle = av_display_rotation_get((int32_t*)sd->data);
+  }
+  return angle;
+}
+
+void XTools::copy_side_data(const AVFrame* src,
+                    AVFrame* dst,
+                    int type) {
+  const AVFrameSideData* src_sd =
+      av_frame_get_side_data(src, (AVFrameSideDataType)type);
+  if (src_sd) {
+    AVFrameSideData* dst_sd =
+        av_frame_new_side_data(dst, (AVFrameSideDataType)type, src_sd->size);
+    if (dst_sd) {
+      memcpy(dst_sd->data, src_sd->data, src_sd->size);
+      dst_sd->size = src_sd->size;
+      dst_sd->type = src_sd->type;
+      av_dict_copy(&dst_sd->metadata, src_sd->metadata, 0);
+    }
+  }
+}

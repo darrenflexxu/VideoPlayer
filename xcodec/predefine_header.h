@@ -18,6 +18,7 @@ extern "C" {
 #include <libavutil/rational.h>
 #include <libswscale/swscale.h>
 #include <libavutil/imgutils.h>
+#include <libavutil/display.h>
 }
 
 #ifdef WIN32

@@ -103,6 +103,7 @@ bool XDecode::RecvFrame(AVFrame* frame) {
       av_frame_free(&yuv420p_frame);
       frame->pts = f->pts;
       frame->pkt_dts = f->pkt_dts;
+      XTools::copy_side_data(f, frame, AV_FRAME_DATA_DISPLAYMATRIX);
       av_frame_free(&f);
       if (re != 0) {
         PrintErr(re);

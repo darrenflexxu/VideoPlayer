@@ -8,7 +8,7 @@ static const GLfloat vertexVertices[] = {
   1.0f, 0.5f,
 };
 #else  
-static const GLfloat vertexVertices[] = {
+static GLfloat vertexVertices[] = {
   -1.0f, -1.0f, 0.0f,
   1.0f, -1.0f, 0.0f,
   1.0f, 1.0f, 0.0f,
@@ -93,8 +93,24 @@ bool XShaderYV12::Draw(
   return true;
 }
 
+void rotateVertices(GLfloat* vertices, int numVertices, float angle) {
+  float rad = angle * M_PI / 180.0f;  // 角度转弧度
+  float cosA = cosf(rad);
+  float sinA = sinf(rad);
+
+  for (int i = 0; i < numVertices; ++i) {
+    float x = vertices[i * 3 + 0];
+    float y = vertices[i * 3 + 1];
+    float newX = x * cosA - y * sinA;
+    float newY = x * sinA + y * cosA;
+    vertices[i * 3 + 0] = newX;
+    vertices[i * 3 + 1] = newY;
+    // z不变
+  }
+}
+
 //Init Shader  
-int XShaderYV12::InitShader() {
+int XShaderYV12::InitShader(double rotate) {
   char pBuf[MAX_PATH] = {0};                                 //存放路径的变量     
   GetCurrentDirectory(MAX_PATH, pBuf);                   //获取程序的当前目录
   std::string app_path = pBuf;
@@ -111,6 +127,10 @@ int XShaderYV12::InitShader() {
 
   glGenBuffers(1, &vertexbuffer);
   glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
+
+  if (std::fabs(rotate) > FLT_EPSILON) {
+    rotateVertices(vertexVertices, 4, rotate);
+  }
   glBufferData(GL_ARRAY_BUFFER, sizeof(vertexVertices), vertexVertices, GL_STATIC_DRAW);
 
   GLint vertCompiled, fragCompiled, linked;
@@ -240,9 +260,9 @@ int XShaderYV12::InitShader() {
   return 0;
 }
 
-XShaderYV12::XShaderYV12(int w, int h) {
+XShaderYV12::XShaderYV12(int w, int h, double rotate) {
   pixel_w = w;
   pixel_h = h;
-  InitShader();
+  InitShader(rotate);
 }
 
