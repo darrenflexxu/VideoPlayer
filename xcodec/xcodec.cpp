@@ -1,15 +1,5 @@
-#include "xcodec.h"
-#include <iostream>
+﻿#include "predefine_header.h"
 using namespace std;
-extern "C"
-{
-#include <libavcodec/avcodec.h>
-#include <libavutil/opt.h>
-}
-//预处理指令导入库
-#pragma comment(lib,"avcodec.lib")
-#pragma comment(lib,"avutil.lib")
-
 
 //////////////////////////////////////////
 /// 创建编码上下文

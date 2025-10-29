@@ -1,12 +1,6 @@
-#include "xencode.h"
-#include <iostream>
-using namespace std;
-extern "C"
-{
-#include <libavcodec/avcodec.h>
-#include <libavutil/opt.h>
-}
+﻿#include "predefine_header.h"
 
+using namespace std;
 
 //////////////////////////////////////////////////////////////
 /// 编码数据 线程安全 每次新创建AVPacket

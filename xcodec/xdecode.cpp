@@ -1,11 +1,6 @@
-#include "xdecode.h"
-#include <iostream>
+﻿#include "predefine_header.h"
 using namespace std;
-extern "C" {
-#include <libavcodec/avcodec.h>
-#include <libavutil/opt.h>
-#include <libswscale/swscale.h>
-}
+
 bool XDecode::Send(const AVPacket* pkt)  // 发送解码
 {
   unique_lock<mutex> lock(mux_);

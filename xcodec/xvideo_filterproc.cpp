@@ -1,11 +1,4 @@
-﻿#include "xvideo_filterproc.h"
-#include <opencv2/opencv.hpp>
-#include <opencv2/video/tracking.hpp>
-extern "C" {
-#include <libavcodec/avcodec.h>
-#include <libavutil/imgutils.h>
-#include <libswscale/swscale.h>
-}
+﻿#include "predefine_header.h"
 
 namespace {
 cv::Mat AVFrameToCVMat(AVFrame* yuv420Frame) {

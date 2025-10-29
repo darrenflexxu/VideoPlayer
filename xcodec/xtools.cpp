@@ -1,12 +1,7 @@
-#include "xtools.h"
-#include <sstream>
+﻿#include "predefine_header.h"
+
 using namespace std;
-extern "C"
-{
-#include <libavformat/avformat.h>
-#include <libavcodec/avcodec.h>
-#include <libavutil/rational.h>
-}
+
 //根据时间基数计算
 XCODEC_API long long XRescale(long long pts,
                               AVRational* src_time_base,

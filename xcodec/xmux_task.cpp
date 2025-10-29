@@ -1,7 +1,5 @@
-#include "xmux_task.h"
-extern "C" {
-#include <libavformat/avformat.h>
-}
+﻿#include "predefine_header.h"
+
 using namespace std;
 
 void XMuxTask::Do(AVPacket* pkt) {

@@ -1,7 +1,6 @@
 ﻿#ifndef XVIDEO_VIEW_H
 #define XVIDEO_VIEW_H
-#include <mutex>
-#include <fstream>
+
 #include "xtools.h"
 
 struct IDirect3DSurface9;

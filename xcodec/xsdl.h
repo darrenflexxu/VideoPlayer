@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "xvideo_view.h"
 struct SDL_Window;

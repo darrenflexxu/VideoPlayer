@@ -1,12 +1,5 @@
-#include "xdecode_task.h"
-#include <iostream>
-#include "xtools.h"
-extern "C"
-{
-#include <libavcodec/avcodec.h>
-#include <libavformat/avformat.h>
+﻿#include "predefine_header.h"
 
-}
 using namespace std;
 void XDecodeTask::set_time_base(AVRational* time_base)
 {

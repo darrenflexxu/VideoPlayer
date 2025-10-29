@@ -1,6 +1,5 @@
-﻿#include "xplayer.h"
-#include "xaudio_play.h"
-#include "xvideo_filterproc.h"
+﻿#include "predefine_header.h"
+
 //暂停或者播放
 void XPlayer::Pause(bool is_pause)
 {

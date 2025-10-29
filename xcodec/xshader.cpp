@@ -1,10 +1,4 @@
-#include "xshader.h"
-#include <Windows.h>
-#include <string>
-extern "C"
-{
-#include <libavcodec/avcodec.h>
-}
+#include "predefine_header.h"
 
 XShader::XShader() {
 }

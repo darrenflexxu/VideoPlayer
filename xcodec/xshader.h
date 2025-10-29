@@ -1,4 +1,4 @@
-#ifndef __WINDOW_VIEW__
+﻿#ifndef __WINDOW_VIEW__
 #define __WINDOW_VIEW__
 
 #include <cstdlib>

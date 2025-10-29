@@ -1,5 +1,4 @@
 ﻿#pragma once
-#include "xtools.h"
 #include "xdemux.h"
 enum XSYN_TYPE
 {

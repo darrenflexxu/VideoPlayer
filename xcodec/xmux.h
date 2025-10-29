@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "xformat.h"
 //////////////////////////////////////
 /// 媒体封装

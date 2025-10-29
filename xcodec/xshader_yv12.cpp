@@ -1,5 +1,4 @@
-#include "xshader_yv12.h"
-#include <Windows.h>
+﻿#include "predefine_header.h"
 
 #if TEXTURE_ROTATE  
 static const GLfloat vertexVertices[] = {

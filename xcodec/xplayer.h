@@ -1,5 +1,4 @@
 ﻿#pragma once
-#include "xtools.h"
 #include "xdemux_task.h"
 #include "xdecode_task.h"
 #include "xvideo_view.h"

@@ -3,7 +3,6 @@
 /// <summary>
 /// 封装和解封装基类
 /// </summary>
-#include <mutex>
 struct AVFormatContext;
 struct AVCodecParameters;
 struct AVPacket;

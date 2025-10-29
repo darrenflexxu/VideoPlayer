@@ -1,11 +1,6 @@
-﻿#include "xconvertor.h"
-extern "C" {
-#include <libavcodec/avcodec.h>
-#include <libavformat/avformat.h>
-#include <libavutil/rational.h>
-}
+﻿#include "predefine_header.h"
 
-// 暂停或者播放
+// 暂停或者继续转码
 void XConvertor::Pause(bool is_pause) {
   XThread::Pause(is_pause);
   demux_.Pause(is_pause);
@@ -26,7 +21,8 @@ void XConvertor::Stop() {
   video_decode_.Wait();
   mux_.Wait();
 }
-bool XConvertor::Open(const char* url, void* winid) {
+
+bool XConvertor::Open(const char* url) {
   // 解封装
   if (!demux_.Open(url))
     return false;
@@ -67,7 +63,6 @@ bool XConvertor::Open(const char* url, void* winid) {
   } else {
     demux_.set_syn_type(XSYN_VIDEO);  // 根据视频同步
   }
-
   // 解封装数据传到当前类
   demux_.set_next(this);
   return true;
@@ -79,18 +74,29 @@ void XConvertor::Do(AVPacket* pkt) {
   if (video_decode_.is_open())
     video_decode_.Do(pkt);
 }
+
 void XConvertor::Start(const char* url,
                        AVCodecParameters* video_para,
                        AVRational* video_time_base,
                        AVCodecParameters* audio_para,
-                       AVRational* audio_time_base) {
+                       AVRational* audio_time_base,
+                       const std::map<std::string, std::string>& video_opts,
+                       const std::map<std::string, std::string>& audio_opts) {
   if (video_para) {
     video_encode_.set_c(
         XCodec::Create(video_para->codec_id, true, gpu_encode_));
+
+    for (const auto& opt : video_opts) {
+      video_encode_.SetOpt(opt.first.c_str(), opt.first.c_str());
+    }
   }
 
   if (audio_para) {
     audio_encode_.set_c(XCodec::Create(audio_para->codec_id, true, false));
+
+    for (const auto& opt : audio_opts) {
+      audio_encode_.SetOpt(opt.first.c_str(), opt.first.c_str());
+    }
   }
   mux_.Open(url, video_para, video_time_base, audio_para, audio_time_base);
   demux_.Start();
@@ -110,9 +116,8 @@ bool XConvertor::IsFinish() {
   return IsDecodeFinish() && mux_.IsEmptyPacket();
 }
 
-// 渲染视频 播放音频
 void XConvertor::Update() {
-  // 渲染视频
+  // 视频编码
   auto vf = video_decode_.GetFrame();
   if (vf) {
     auto packet = video_encode_.Encode(vf);
@@ -128,7 +133,7 @@ void XConvertor::Update() {
       mux_.Do(packet);
     }
   }
-  // 音频播放
+  // 音频编码
   auto af = audio_decode_.GetFrame();
   if (af) {
     auto packet = audio_encode_.Encode(vf);
@@ -156,13 +161,18 @@ void XConvertor::Main() {
       MSleep(1);
       continue;
     }
-    this->pos_ms_ = video_decode_.cur_ms();
-
-    if (ap) {
-      syn = audio_decode_.cur_ms();
-      audio_decode_.set_syn_pts(audio_decode_.cur_ms() + 10000);
-      video_decode_.set_syn_pts(syn);
+    // 判定转码是否结束
+    if (IsFinish()) {
+      break;
     }
+    // this->pos_ms_ = video_decode_.cur_ms();
+
+    // if (ap) {
+    //   syn = audio_decode_.cur_ms();
+    //   audio_decode_.set_syn_pts(audio_decode_.cur_ms() + 10000);
+    //   video_decode_.set_syn_pts(syn);
+    // }
+    Update();
     MSleep(1);
   }
 }

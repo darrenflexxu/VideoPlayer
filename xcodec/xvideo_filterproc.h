@@ -1,6 +1,5 @@
 ﻿#pragma once
 
-#include <vector>
 #include "xtools.h"
 
 class XCODEC_API XVideoFilterProc {

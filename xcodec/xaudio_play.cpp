@@ -1,10 +1,5 @@
-﻿#include "xaudio_play.h"
-#include <iostream>
-#include <SDL.h>
-extern "C"
-{
-#include <libavformat/avformat.h>
-}
+﻿#include "predefine_header.h"
+
 using namespace std;
 class CXAudioPlay :public XAudioPlay
 {

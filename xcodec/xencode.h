@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "xcodec.h"
 class XCODEC_API XEncode:public XCodec
 {

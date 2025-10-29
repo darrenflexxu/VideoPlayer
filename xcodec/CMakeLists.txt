@@ -17,4 +17,6 @@ add_definitions(-DXCODEC_EXPORTS)
 
 ADD_LIBRARY(XCodec SHARED ${VIDEO_PLAYER_SRC} ${VIDEO_PLAYER_HEADER})
 
+target_precompile_headers(XCodec PRIVATE predefine_header.h)
+
 TARGET_LINK_LIBRARIES(XCodec avcodec avdevice avfilter avformat avutil postproc swresample swscale SDL2 glew32 opengl32 "${OpenCV_LIBS}")

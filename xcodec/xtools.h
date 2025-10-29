@@ -15,6 +15,11 @@
 #include <iostream>
 #include <mutex>
 #include <list>
+#include <map>
+#include <string>
+#include <vector>
+#include <fstream>
+
 struct AVPacket;
 struct AVCodecParameters;
 struct AVRational;

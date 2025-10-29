@@ -11,8 +11,8 @@ class XCODEC_API XConvertor : public XThread {
   // 回调接收音视频包
   void Do(AVPacket* pkt) override;
 
-  // 打开音视频 初始化播放和渲染
-  bool Open(const char* url, void* winid);
+  // 打开需要转码的音视频url
+  bool Open(const char* url);
   void Stop();
 
   // 主线程 处理同步
@@ -20,14 +20,16 @@ class XCODEC_API XConvertor : public XThread {
 
   // 开启 解封装 音视频解码 和 处理同步的线程
   void Start(const char* url,
-             AVCodecParameters* video_para = nullptr,
-             AVRational* video_time_base = nullptr,
-             AVCodecParameters* audio_para = nullptr,
-             AVRational* audio_time_base = nullptr);
+             AVCodecParameters* video_para,
+             AVRational* video_time_base,
+             AVCodecParameters* audio_para,
+             AVRational* audio_time_base,
+             const std::map<std::string, std::string>& video_opts,
+             const std::map<std::string, std::string>& audio_opts);
 
   bool IsDecodeFinish();
   bool IsFinish();
-  // 渲染视频 播放音频
+  // 编码和封装
   void Update();
 
   void Pause(bool is_pause) override;

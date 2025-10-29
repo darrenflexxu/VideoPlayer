@@ -1,5 +1,4 @@
 ﻿#pragma once
-#include "xtools.h"
 #include "xdecode.h"
 class XCODEC_API XDecodeTask :public XThread
 {

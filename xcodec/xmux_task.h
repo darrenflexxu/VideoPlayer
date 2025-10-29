@@ -1,6 +1,6 @@
 #pragma once
 #include "xmux.h"
-#include "xtools.h"
+
 class XCODEC_API XMuxTask : public XThread {
  public:
   void Main() override;

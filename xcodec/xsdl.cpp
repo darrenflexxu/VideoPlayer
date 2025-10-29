@@ -1,6 +1,5 @@
-#include "xsdl.h"
-#include "SDL.h"
-#include <iostream>
+﻿#include "predefine_header.h"
+
 using namespace std;
 #pragma comment(lib,"SDL2.lib")
 static bool InitVideo()

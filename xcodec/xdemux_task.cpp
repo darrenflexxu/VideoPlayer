@@ -1,8 +1,5 @@
-#include "xdemux_task.h"
-extern "C"
-{
-#include <libavformat/avformat.h>
-}
+﻿#include "predefine_header.h"
+
 using namespace std;
 bool XDemuxTask::Seek(long long ms)
 {

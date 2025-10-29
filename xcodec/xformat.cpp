@@ -1,16 +1,5 @@
-#include "xformat.h"
-#include <iostream>
-#include <thread>
-#include "xtools.h"
-using namespace std;
-extern "C" { //指定函数是c语言函数，函数名不包含重载标注
-//引用ffmpeg头文件
-#include <libavformat/avformat.h>
-#include <libavcodec/avcodec.h>
-}
-//预处理指令导入库
-#pragma comment(lib,"avformat.lib")
-#pragma comment(lib,"avutil.lib")
+﻿#include "predefine_header.h"
+
 using namespace std;
 
 static int TimeoutCallback(void* para)

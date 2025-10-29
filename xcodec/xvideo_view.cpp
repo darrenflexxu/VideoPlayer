@@ -1,18 +1,6 @@
-#include "xsdl.h"
-#include "xtools.h"
-#include "xshader.h"
-#include <thread>
-#include <iostream>
-#ifdef WIN32
-#include <windows.h>
-#include <d3d9.h>
-#endif
+﻿#include "predefine_header.h"
+
 using namespace std;
-extern "C"
-{
-#include <libavcodec/avcodec.h>
-}
-#pragma comment(lib,"avutil.lib")
 
 struct DXVA2DevicePriv {
     HMODULE d3dlib;
