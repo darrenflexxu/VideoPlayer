@@ -31,6 +31,8 @@ public slots:
     void EnableGPUDirectRender(int enable);
 
 private:
+    void setPlayIcon(const QPixmap& pic);
+
     Ui::XPlayVideo ui;
     XPlayer player;
     bool moved_ = false;
