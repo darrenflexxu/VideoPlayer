@@ -9,12 +9,12 @@ void XConvertor::Pause(bool is_pause) {
   mux_.Pause(is_pause);
 }
 
-AVCodecContext* XConvertor::GetVideoCodec() {
-  return video_decode_.GetCodecContext();
+std::shared_ptr<XPara> XConvertor::GetVideoCodec() {
+  return demux_.CopyVideoPara();
 }
 
-AVCodecContext* XConvertor::GetAudioCodec() {
-  return audio_decode_.GetCodecContext();
+std::shared_ptr<XPara> XConvertor::GetAudioCodec() {
+  return demux_.CopyAudioPara();
 }
 
 void XConvertor::Stop() {

@@ -74,6 +74,44 @@
           <property name="title">
            <string>Video</string>
           </property>
+          <widget class="QWidget" name="gridLayoutWidget_4">
+           <property name="geometry">
+            <rect>
+             <x>9</x>
+             <y>19</y>
+             <width>421</width>
+             <height>151</height>
+            </rect>
+           </property>
+           <layout class="QGridLayout" name="gridLayoutOutputVideo">
+            <item row="0" column="1">
+             <widget class="QComboBox" name="outputVideoCodec">
+              <item>
+               <property name="text">
+                <string>h264</string>
+               </property>
+              </item>
+             </widget>
+            </item>
+            <item row="0" column="0">
+             <widget class="QLabel" name="outputVideoCodecLabel">
+              <property name="text">
+               <string>Codec</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="0">
+             <widget class="QLabel" name="outputVideoBitRateLabel">
+              <property name="text">
+               <string>Bit Rate</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="1">
+             <widget class="QLineEdit" name="outputVideoBitRate"/>
+            </item>
+           </layout>
+          </widget>
          </widget>
         </item>
         <item>
@@ -81,6 +119,34 @@
           <property name="title">
            <string>Audio</string>
           </property>
+          <widget class="QWidget" name="gridLayoutWidget_5">
+           <property name="geometry">
+            <rect>
+             <x>9</x>
+             <y>19</y>
+             <width>421</width>
+             <height>151</height>
+            </rect>
+           </property>
+           <layout class="QGridLayout" name="gridLayoutOutputAudio">
+            <item row="0" column="0">
+             <widget class="QLabel" name="outputAudioCodecLabel">
+              <property name="text">
+               <string>Codec</string>
+              </property>
+             </widget>
+            </item>
+            <item row="0" column="1">
+             <widget class="QComboBox" name="outputAudioCodec">
+              <item>
+               <property name="text">
+                <string>aac</string>
+               </property>
+              </item>
+             </widget>
+            </item>
+           </layout>
+          </widget>
          </widget>
         </item>
        </layout>
@@ -189,10 +255,18 @@
              </widget>
             </item>
             <item row="1" column="3">
-             <widget class="QLineEdit" name="inputVideoFrameRate"/>
+             <widget class="QLineEdit" name="inputVideoFrameRate">
+              <property name="readOnly">
+               <bool>true</bool>
+              </property>
+             </widget>
             </item>
             <item row="1" column="1">
-             <widget class="QLineEdit" name="inputVideoBitRate"/>
+             <widget class="QLineEdit" name="inputVideoBitRate">
+              <property name="readOnly">
+               <bool>true</bool>
+              </property>
+             </widget>
             </item>
             <item row="0" column="0">
              <widget class="QLabel" name="inputVideoWidthLabel">
@@ -202,10 +276,18 @@
              </widget>
             </item>
             <item row="0" column="1">
-             <widget class="QLineEdit" name="inputVideoWidth"/>
+             <widget class="QLineEdit" name="inputVideoWidth">
+              <property name="readOnly">
+               <bool>true</bool>
+              </property>
+             </widget>
             </item>
             <item row="0" column="3">
-             <widget class="QLineEdit" name="inputVideoHeight"/>
+             <widget class="QLineEdit" name="inputVideoHeight">
+              <property name="readOnly">
+               <bool>true</bool>
+              </property>
+             </widget>
             </item>
             <item row="1" column="0">
              <widget class="QLabel" name="inputVideoBitRateLabel">
@@ -222,7 +304,25 @@
              </widget>
             </item>
             <item row="2" column="1">
-             <widget class="QLineEdit" name="inputVideoCodec"/>
+             <widget class="QLineEdit" name="inputVideoCodec">
+              <property name="readOnly">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item row="2" column="2">
+             <widget class="QLabel" name="inputTimesLabel">
+              <property name="text">
+               <string>Totol times</string>
+              </property>
+             </widget>
+            </item>
+            <item row="2" column="3">
+             <widget class="QLineEdit" name="inputTimes">
+              <property name="readOnly">
+               <bool>true</bool>
+              </property>
+             </widget>
             </item>
            </layout>
           </widget>
@@ -242,11 +342,11 @@
              <height>151</height>
             </rect>
            </property>
-           <layout class="QGridLayout" name="gridLayout">
-            <item row="0" column="0">
-             <widget class="QLabel" name="inputAudioCodecLabel">
-              <property name="text">
-               <string>Codec</string>
+           <layout class="QGridLayout" name="gridLayoutInputAudio">
+            <item row="0" column="1">
+             <widget class="QLineEdit" name="inputAudioCodec">
+              <property name="readOnly">
+               <bool>true</bool>
               </property>
              </widget>
             </item>
@@ -257,11 +357,26 @@
               </property>
              </widget>
             </item>
-            <item row="1" column="1">
-             <widget class="QLineEdit" name="inputAudioSampleRate"/>
+            <item row="0" column="0">
+             <widget class="QLabel" name="inputAudioCodecLabel">
+              <property name="text">
+               <string>Codec</string>
+              </property>
+             </widget>
             </item>
-            <item row="0" column="1">
-             <widget class="QLineEdit" name="inputAudioCodec"/>
+            <item row="1" column="1">
+             <widget class="QLineEdit" name="inputAudioSampleRate">
+              <property name="readOnly">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item row="2" column="1">
+             <widget class="QLineEdit" name="inputAudioBitRate">
+              <property name="readOnly">
+               <bool>true</bool>
+              </property>
+             </widget>
             </item>
             <item row="2" column="0">
              <widget class="QLabel" name="inputAudioBitRateLabel">
@@ -270,8 +385,19 @@
               </property>
              </widget>
             </item>
-            <item row="2" column="1">
-             <widget class="QLineEdit" name="inputAudioBitRate"/>
+            <item row="3" column="0">
+             <widget class="QLabel" name="inputAudioChannelsLabel">
+              <property name="text">
+               <string>Channels</string>
+              </property>
+             </widget>
+            </item>
+            <item row="3" column="1">
+             <widget class="QLineEdit" name="inputAudioChannels">
+              <property name="readOnly">
+               <bool>true</bool>
+              </property>
+             </widget>
             </item>
            </layout>
           </widget>

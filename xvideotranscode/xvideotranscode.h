@@ -19,8 +19,15 @@ class XVideoTranscode : public QWidget {
   void Pause();  // ≤•∑≈∫Õ‘›Õ£
 
  private:
+  void SetInputVideoInfo(const std::shared_ptr<XPara>& video_para);
+  void SetOutputVideoInfo(const std::shared_ptr<XPara>& video_para);
+  void SetInputAudioInfo(const std::shared_ptr<XPara>& audio_para);
+  void SetOutputAudioInfo(const std::shared_ptr<XPara>& audio_para);
+
   Ui::XVideoTranscode ui;
   std::shared_ptr<XConvertor> player;
   QString inputURL;
+  std::shared_ptr<XPara> inputVideoPara;
+  std::shared_ptr<XPara> inputAudioPara;
   QString outputURL;
 };

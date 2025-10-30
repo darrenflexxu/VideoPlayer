@@ -43,8 +43,8 @@ class XCODEC_API XConvertor : public XThread {
   // 当前播放的位置 毫秒
   long long pos_ms() { return pos_ms_; }
 
-  AVCodecContext* GetVideoCodec();
-  AVCodecContext* GetAudioCodec();
+ std::shared_ptr<XPara> GetVideoCodec();
+  std::shared_ptr<XPara> GetAudioCodec();
 
  protected:
   XDemuxTask demux_;          // 解封装
