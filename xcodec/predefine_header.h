@@ -1,7 +1,7 @@
 #pragma once
 
 #include "xaudio_play.h"
-#include "xencode.h" 
+#include "xencode_task.h" 
 #include "xmux_task.h"
 #include "xvideo_filterproc.h"
 #include "xplayer.h"

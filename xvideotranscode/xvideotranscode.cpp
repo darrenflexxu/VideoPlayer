@@ -9,7 +9,6 @@ extern "C" {
 void XVideoTranscode::timerEvent(QTimerEvent* ev) {
   if (!player || player->is_pause())
     return;
-  player->Update();
   auto pos = player->pos_ms();
   auto total = player->total_ms();
   ui.trancodeProgressBar->setValue((pos * 100) / total);
@@ -62,7 +61,8 @@ void XVideoTranscode::SetOutputVideoInfo(
     const std::shared_ptr<XPara>& video_para) {
   if (video_para) {
     ui.outputVideoGroup->setEnabled(true);
-    auto codec_index = ui.outputVideoCodec->findText(avcodec_get_name(video_para->para->codec_id));
+    auto codec_index = ui.outputVideoCodec->findText(
+        avcodec_get_name(video_para->para->codec_id));
     ui.outputVideoCodec->setCurrentIndex(codec_index);
     ui.outputVideoBitRate->setText(
         QString("%1").arg(video_para->para->bit_rate));
@@ -121,6 +121,7 @@ XVideoTranscode::XVideoTranscode(QWidget* parent) : QWidget(parent) {
   connect(ui.inputURL, &QLineEdit::textChanged, [this](const QString& text) {
     player = std::make_shared<XConvertor>();
     player->set_gpu_decode(true);
+    player->set_gpu_encode(true);
 
     if (!player->Open(text.toStdString().c_str())) {
       return;
@@ -138,7 +139,10 @@ XVideoTranscode::XVideoTranscode(QWidget* parent) : QWidget(parent) {
   });
   connect(ui.outputURL, &QLineEdit::textChanged, [this](const QString& text) {
     inputVideoPara->para->codec_id = AV_CODEC_ID_H264;
-    inputAudioPara->para->codec_id = AV_CODEC_ID_AAC;
+
+    if (inputAudioPara) {
+      inputAudioPara->para->codec_id = AV_CODEC_ID_AAC;
+    }
     SetOutputVideoInfo(inputVideoPara);
     SetOutputAudioInfo(inputAudioPara);
   });
@@ -147,15 +151,17 @@ XVideoTranscode::XVideoTranscode(QWidget* parent) : QWidget(parent) {
       return;
     }
     std::map<std::string, std::string> video_opts, audio_opts;
-    video_opts["preset"] = "slow"; // 提升质量
+    video_opts["preset"] = "slow";  // 提升质量
     player->Start(outputURL.toStdString().c_str(), inputVideoPara->para,
-                  inputVideoPara->time_base, inputAudioPara->para,
-                  inputAudioPara->time_base, video_opts, audio_opts);
+                  inputVideoPara->time_base,
+                  inputAudioPara ? inputAudioPara->para : nullptr,
+                  inputAudioPara ? inputAudioPara->time_base : nullptr,
+                  video_opts, audio_opts);
   });
   connect(ui.outputVideoBitRate, &QLineEdit::textChanged,
           [this](const QString& text) {
-    inputVideoPara->para->bit_rate = text.toUInt();
-  });
+            inputVideoPara->para->bit_rate = text.toUInt();
+          });
   ui.outputVideoGroup->setEnabled(false);
   ui.outputAudioGroup->setEnabled(false);
 }

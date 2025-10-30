@@ -88,7 +88,7 @@ bool XDecodeTask::Open(AVCodecParameters* para)
 //责任链处理函数
 void XDecodeTask::Do(AVPacket* pkt)
 {
-    cout << "#" << flush;
+    cout << "D" << flush;
 
     if (!pkt || pkt->stream_index != stream_index_) //判断是否是视频
     {
@@ -167,10 +167,9 @@ void XDecodeTask::Main()
         }
 
         auto pkt = pkt_list_.Pop();
-        if (!pkt)
-        {
-            this_thread::sleep_for(std::chrono::milliseconds(1));
-            continue;
+        if (!pkt) {
+          MSleep(1);
+          continue;
         }
 
         if (pkt->size == 0) {
@@ -181,18 +180,24 @@ void XDecodeTask::Main()
             if (time_base_)
               cur_ms_ = av_rescale_q(list.back()->pts, *time_base_, {1, 1000});
           }
-          frames_.insert(frames_.end(), list.begin(), list.end());
           frame_cache_ = true;
+
+          if (has_next()) {
+            for (auto frame : list) {
+              Next(frame);
+            }
+            continue;
+          }
+          frames_.insert(frames_.end(), list.begin(), list.end());
           continue;
         }
         // 发送到解码线程
         auto re = decode_.Send(pkt);
         
         av_packet_free(&pkt);
-        if (!re)
-        {
-            this_thread::sleep_for(std::chrono::milliseconds(1));
-            continue;
+        if (!re) {
+          MSleep(1);
+          continue;
         }
         {
             unique_lock<mutex> lock(mux_);
@@ -211,13 +216,18 @@ void XDecodeTask::Main()
                 if(time_base_)
                     cur_ms_ = av_rescale_q(frame_->pts,*time_base_, 
                     { 1,1000 });;
+
+                if (has_next()) {
+                  Next(av_frame_clone(frame_));
+                  continue;
+                }
             }
             if (frame_cache_)
             {
                 frames_.push_back(av_frame_clone(frame_));
             }
         }
-        this_thread::sleep_for(std::chrono::milliseconds(1));
+        MSleep(1);
     }
     {
     unique_lock<mutex> lock(mux_);

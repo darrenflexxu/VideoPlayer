@@ -23,6 +23,7 @@ public:
     void ClearFinish();
 
     void set_stream_index(int i) { stream_index_ = i; }
+    int stream_index() { return stream_index_; }
 
     void set_frame_cache(bool is) { frame_cache_ = is; }
     bool is_open() { return is_open_; }

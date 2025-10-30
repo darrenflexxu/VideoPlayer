@@ -6,6 +6,8 @@ void XConvertor::Pause(bool is_pause) {
   demux_.Pause(is_pause);
   audio_decode_.Pause(is_pause);
   video_decode_.Pause(is_pause);
+  video_encode_.Pause(is_pause);
+  audio_encode_.Pause(is_pause);
   mux_.Pause(is_pause);
 }
 
@@ -22,11 +24,15 @@ void XConvertor::Stop() {
   demux_.Exit();
   audio_decode_.Exit();
   video_decode_.Exit();
+  video_encode_.Exit();
+  audio_encode_.Exit();
   mux_.Exit();
   Wait();
   demux_.Wait();
   audio_decode_.Wait();
   video_decode_.Wait();
+  video_encode_.Wait();
+  audio_encode_.Wait();
   mux_.Wait();
 }
 
@@ -47,8 +53,6 @@ bool XConvertor::Open(const char* url) {
     }
     // 用于过滤音频包
     video_decode_.set_stream_index(demux_.video_index());
-    // 缓冲
-    video_decode_.set_block_size(100);
   }
 
   auto ap = demux_.CopyAudioPara();
@@ -57,22 +61,14 @@ bool XConvertor::Open(const char* url) {
     if (!audio_decode_.Open(ap->para)) {
       return false;
     }
-    // 缓冲
-    audio_decode_.set_block_size(100);
-
     // 用于过滤视频数据
     audio_decode_.set_stream_index(demux_.audio_index());
-
-    // frame 缓冲
-    audio_decode_.set_frame_cache(true);
-
-    // 设置时间基数
-    double time_base = 0;
-  } else {
-    demux_.set_syn_type(XSYN_VIDEO);  // 根据视频同步
   }
-  // 解封装数据传到当前类
   demux_.set_next(this);
+  video_decode_.set_next(&video_encode_);
+  audio_decode_.set_next(&audio_encode_);
+  video_encode_.set_next(&mux_);
+  audio_encode_.set_next(&mux_);
   return true;
 }
 
@@ -81,6 +77,12 @@ void XConvertor::Do(AVPacket* pkt) {
     audio_decode_.Do(pkt);
   if (video_decode_.is_open())
     video_decode_.Do(pkt);
+
+  if (pkt && pkt->stream_index == video_decode_.stream_index() &&
+      pkt->buf == nullptr) {
+    demux_.Exit();
+    end_of_file_ = true;
+  }
 }
 
 void XConvertor::Start(const char* url,
@@ -91,94 +93,54 @@ void XConvertor::Start(const char* url,
                        const std::map<std::string, std::string>& video_opts,
                        const std::map<std::string, std::string>& audio_opts) {
   if (video_para) {
-    video_encode_.set_c(
-        XCodec::Create(video_para->codec_id, true, gpu_encode_));
-
-    for (const auto& opt : video_opts) {
-      video_encode_.SetOpt(opt.first.c_str(), opt.first.c_str());
-    }
+    video_encode_.set_gpu_encode(gpu_encode_);
+    video_encode_.Open(video_para, video_opts);
+    video_encode_.set_stream_index(0);
   }
 
   if (audio_para) {
-    audio_encode_.set_c(XCodec::Create(audio_para->codec_id, true, false));
-
-    for (const auto& opt : audio_opts) {
-      audio_encode_.SetOpt(opt.first.c_str(), opt.first.c_str());
-    }
+    audio_encode_.Open(audio_para, audio_opts);
+    audio_encode_.set_stream_index(1);
   }
   mux_.Open(url, video_para, video_time_base, audio_para, audio_time_base);
-  demux_.Start();
+  XThread::Start();
+  mux_.Start();
+  if (video_encode_.is_open()) {
+    video_encode_.Start();
+  }
+  if (audio_encode_.is_open()) {
+    audio_encode_.Start();
+  }
   if (video_decode_.is_open())
     video_decode_.Start();
   if (audio_decode_.is_open())
     audio_decode_.Start();
-  mux_.Start();
-  XThread::Start();
-}
-
-bool XConvertor::IsDecodeFinish() {
-  return video_decode_.IsVideoFinish();
-}
-
-bool XConvertor::IsFinish() {
-  return IsDecodeFinish() && mux_.IsEmptyPacket();
-}
-
-void XConvertor::Update() {
-  // 视频编码
-  auto vf = video_decode_.GetFrame();
-  if (vf) {
-    auto packet = video_encode_.Encode(vf);
-
-    if (packet) {
-      mux_.Do(packet);
-    }
-    XFreeFrame(&vf);
-  } else if (IsDecodeFinish()) {
-    auto packets = video_encode_.End();
-
-    for (auto packet : packets) {
-      mux_.Do(packet);
-    }
-  }
-  // 音频编码
-  auto af = audio_decode_.GetFrame();
-  if (af) {
-    auto packet = audio_encode_.Encode(vf);
-
-    if (packet) {
-      mux_.Do(packet);
-    }
-    XFreeFrame(&af);
-  } else {
-    auto packets = audio_encode_.End();
-
-    for (auto packet : packets) {
-      mux_.Do(packet);
-    }
-  }
+  demux_.Start();
 }
 
 void XConvertor::Main() {
-  long long syn = 0;
-  auto ap = demux_.CopyAudioPara();
-  auto vp = demux_.CopyVideoPara();
-  video_decode_.set_time_base(vp->time_base);
   while (!is_exit_) {
     if (is_pause()) {
       MSleep(1);
       continue;
     }
-    // 判定转码是否结束
-    if (IsFinish()) {
+
+    if (!end_of_decode_ && end_of_file_ && video_decode_.IsVideoFinish()) {
+      video_decode_.Exit();
+      audio_decode_.Exit();
+      end_of_decode_ = true;
+    }
+
+    if (!end_of_encode_ && end_of_decode_) {
+      video_encode_.Exit();
+      audio_encode_.Exit();
+      end_of_encode_ = true;
+    }
+
+    if (end_of_encode_ && mux_.IsEmptyPacket()) {
+      mux_.Exit();
       break;
     }
-     this->pos_ms_ = video_decode_.cur_ms();
-     //if (ap) {
-     //  syn = audio_decode_.cur_ms();
-     //  audio_decode_.set_syn_pts(audio_decode_.cur_ms() + 10000);
-     //  video_decode_.set_syn_pts(syn);
-     //}
     MSleep(1);
   }
 }

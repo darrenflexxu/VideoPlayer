@@ -30,5 +30,7 @@ private:
 
     long long begin_video_pts_ = -1;//原视频开始时间
     long long begin_audio_pts_ = -1;//原音频开始时间
+    int video_stream_index_ = 0;
+    int audio_stream_index_ = 0;
 };
 

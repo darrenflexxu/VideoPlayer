@@ -9,6 +9,8 @@ public:
     /// @para frame 空间由用户维护
     /// @return 失败范围nullptr 返回的AVPacket用户需要通过av_packet_free 清理
     AVPacket *Encode(const AVFrame* frame);
+    bool Send(AVFrame* frame);
+    bool Recv(AVPacket* pkt);
 
 
     //////////////////////////////////////////////////////////////

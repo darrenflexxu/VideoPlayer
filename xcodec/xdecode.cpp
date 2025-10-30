@@ -35,6 +35,7 @@ bool XDecode::InitHW() {
   return true;
 }
 
+namespace {
 class MyDecoder {
  public:
   SwsContext* get_or_create_sws(int srcW,
@@ -69,6 +70,7 @@ class MyDecoder {
   int srcW_ = 0, srcH_ = 0, dstW_ = 0, dstH_ = 0;
   AVPixelFormat srcFmt_ = AV_PIX_FMT_NONE, dstFmt_ = AV_PIX_FMT_NONE;
 };
+}
 
 bool XDecode::RecvFrame(AVFrame* frame) {
   if (!c_)

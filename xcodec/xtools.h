@@ -83,6 +83,14 @@ public:
 
     }
 
+    virtual void Do(AVFrame* frame) {}
+
+    virtual void Next(AVFrame* frame) {
+      std::unique_lock<std::mutex> lock(m_);
+      if (next_)
+        next_->Do(frame);
+    }
+
     //设置责任链下一个节点（线程安全）
     void set_next(XThread* xt) {
         std::unique_lock<std::mutex> lock(m_);
@@ -92,6 +100,8 @@ public:
     virtual void Pause(bool is_pause) { is_pause_ = is_pause; };
 
     bool is_pause() { return is_pause_; }
+
+    bool has_next() { return !!next_; }
 
 protected:
 

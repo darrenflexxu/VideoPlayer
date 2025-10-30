@@ -1,7 +1,7 @@
 ﻿#pragma once
 #include "xdecode_task.h"
 #include "xdemux_task.h"
-#include "xencode.h"
+#include "xencode_task.h"
 #include "xmux_task.h"
 #include "xtools.h"
 #include "xvideo_view.h"
@@ -27,11 +27,6 @@ class XCODEC_API XConvertor : public XThread {
              const std::map<std::string, std::string>& video_opts,
              const std::map<std::string, std::string>& audio_opts);
 
-  bool IsDecodeFinish();
-  bool IsFinish();
-  // 编码和封装
-  void Update();
-
   void Pause(bool is_pause) override;
 
   void set_gpu_decode(bool gpu) { gpu_decode_ = gpu; }
@@ -43,18 +38,21 @@ class XCODEC_API XConvertor : public XThread {
   // 当前播放的位置 毫秒
   long long pos_ms() { return pos_ms_; }
 
- std::shared_ptr<XPara> GetVideoCodec();
+  std::shared_ptr<XPara> GetVideoCodec();
   std::shared_ptr<XPara> GetAudioCodec();
 
  protected:
   XDemuxTask demux_;          // 解封装
   XDecodeTask audio_decode_;  // 音频解码
   XDecodeTask video_decode_;  // 视频解码
-  XEncode video_encode_;
-  XEncode audio_encode_;
+  XEncodeTask video_encode_;
+  XEncodeTask audio_encode_;
   XMuxTask mux_;
   bool gpu_decode_ = false;
   bool gpu_encode_ = false;
   long long total_ms_ = 0;
   long long pos_ms_ = 0;
+  bool end_of_file_ = false;
+  bool end_of_decode_ = false;
+  bool end_of_encode_ = false;
 };

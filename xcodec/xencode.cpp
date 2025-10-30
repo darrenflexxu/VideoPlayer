@@ -14,7 +14,9 @@ AVPacket* XEncode::Encode(const AVFrame* frame)
     av_frame_make_writable((AVFrame*)frame);
     //发送到编码线程
     auto re = avcodec_send_frame(c_, frame);
-    if (re != 0)return nullptr;
+    if (re != 0) {
+      return nullptr;
+    }
     auto pkt = av_packet_alloc();
     //接收编码线程数据
     re = avcodec_receive_packet(c_, pkt);
@@ -33,6 +35,37 @@ AVPacket* XEncode::Encode(const AVFrame* frame)
     }
     return nullptr;
 
+}
+
+bool XEncode::Send(AVFrame* frame) {
+  if (!frame)
+    return false;
+  unique_lock<mutex> lock(mux_);
+  if (!c_)
+    return false;
+  av_frame_make_writable((AVFrame*)frame);
+  // 发送到编码线程
+  auto re = avcodec_send_frame(c_, frame);
+  av_frame_free(&frame);
+
+  if (re != 0) {
+    return false;
+  }
+  return true;
+}
+
+bool XEncode::Recv(AVPacket* pkt) {
+  if (!pkt) {
+    return false;
+  }
+  unique_lock<mutex> lock(mux_);
+  if (!c_)
+    return false;
+  auto re = avcodec_receive_packet(c_, pkt);
+  if (re == 0) {
+    return true;
+  }
+  return false;
 }
 
 //////////////////////////////////////////////////////////////

@@ -7,7 +7,6 @@ void XMuxTask::Do(AVPacket* pkt) {
     unique_lock<mutex> lock(mux_);
     pkts_.Push(pkt);
   }
-  Next(pkt);
 }
 
 bool XMuxTask::IsEmptyPacket() {
