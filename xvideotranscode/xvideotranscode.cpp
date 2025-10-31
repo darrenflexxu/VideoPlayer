@@ -151,7 +151,6 @@ XVideoTranscode::XVideoTranscode(QWidget* parent) : QWidget(parent) {
       return;
     }
     std::map<std::string, std::string> video_opts, audio_opts;
-    video_opts["preset"] = "slow";  // ÌáÉýÖÊÁ¿
     player->Start(outputURL.toStdString().c_str(), inputVideoPara->para,
                   inputVideoPara->time_base,
                   inputAudioPara ? inputAudioPara->para : nullptr,

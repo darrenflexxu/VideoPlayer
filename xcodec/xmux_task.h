@@ -22,10 +22,15 @@ class XCODEC_API XMuxTask : public XThread {
   // 接收数据
   void Do(AVPacket* pkt);
 
-  bool IsEmptyPacket();
+  bool EndOfMux();
+
+  void set_block_size(int count) { block_size_ = count; }
+  void ignoreMaxPkts(bool ignore) { pkts_.IgnoreMaxPackets(ignore); }
 
  private:
   XMux xmux_;
   XAVPacketList pkts_;
   std::mutex mux_;
+  bool end_mux_ = false;
+  int block_size_ = 0;
 };

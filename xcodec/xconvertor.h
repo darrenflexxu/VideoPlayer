@@ -55,4 +55,5 @@ class XCODEC_API XConvertor : public XThread {
   bool end_of_file_ = false;
   bool end_of_decode_ = false;
   bool end_of_encode_ = false;
+  bool end_of_mux_ = false;
 };

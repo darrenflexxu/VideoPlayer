@@ -51,5 +51,6 @@ private:
     int timeout_ms_ = 0;//超时时间
     XSYN_TYPE syn_type_ = XSYN_NONE;
     bool is_eof_ = false;
+    int read_pkt_count_ = 0;
 };
 

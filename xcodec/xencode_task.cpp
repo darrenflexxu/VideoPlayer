@@ -16,6 +16,28 @@ AVCodecContext* XEncodeTask::GetCodecContext() const {
   return encode_.get_codec_context();
 }
 
+bool XEncodeTask::EndEncode() {
+  return end_encode_;
+}
+
+void XEncodeTask::NextPacket(AVPacket* pkt) {
+  if (!pkt) {
+    return;
+  }
+  unique_lock<mutex> lock(mux_);
+  pkts_cache_.push_back(pkt);
+  pkts_cache_.sort([](AVPacket* a, AVPacket* b) { return a->dts < b->dts; });
+
+  if (pkts_cache_.size() < 100) {
+    return;
+  }
+
+  while (!pkts_cache_.empty()) {
+    Next(pkts_cache_.front());
+    pkts_cache_.pop_front();
+  }
+}
+
 /// <summary>
 /// 清理缓存
 /// </summary>
@@ -53,10 +75,6 @@ bool XEncodeTask::Open(AVCodecParameters* para,
   // 复制视频参数
   avcodec_parameters_to_context(c, para);
   encode_.set_c(c);
-
-  for (const auto& opt : opts) {
-    encode_.SetOpt(opt.first.c_str(), opt.second.c_str());
-  }
 
   if (gpu_encode_) {
     encode_.get_codec_context()->pix_fmt = AV_PIX_FMT_NV12;
@@ -131,6 +149,7 @@ void XEncodeTask::Do(AVFrame* frame) {
     av_frame_free(&nv12_frame);
   }
   encode_.Send(frame);
+  frame_count_ += 1;
 }
 
 // 线程主函数
@@ -142,7 +161,6 @@ void XEncodeTask::Main() {
       continue;
     }    
     // 发送到解码线程
-    cout << "E" << flush;
     auto pkg = av_packet_alloc();
     auto ret = encode_.Recv(pkg);
 
@@ -151,14 +169,36 @@ void XEncodeTask::Main() {
       MSleep(1);
       continue;
     }
+    cout << "E" << flush;
     pkg->stream_index = stream_index_;
-    Next(pkg);
+    NextPacket(pkg);
     MSleep(1);
   }
+
+  do {
+    auto pkg = av_packet_alloc();
+    auto ret = encode_.Recv(pkg);
+
+    if (!ret) {
+      av_packet_free(&pkg);
+      break;
+    }
+    cout << "E" << flush;
+    pkg->stream_index = stream_index_;
+    NextPacket(pkg);
+  } while (!is_exit_);
   auto pkgs = encode_.End();
 
   for (auto pkg : pkgs) {
+    cout << "E" << flush;
     pkg->stream_index = stream_index_;
-    Next(pkg);
+    NextPacket(pkg);
   }
+
+  while (!pkts_cache_.empty()) {
+    Next(pkts_cache_.front());
+    pkts_cache_.pop_front();
+  }
+  end_encode_ = true;
+  cout << endl << "encode frame count(" << frame_count_ << ")" << endl << flush;
 }

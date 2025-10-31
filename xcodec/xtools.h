@@ -149,9 +149,14 @@ public:
     void Push(AVPacket* pkt);
     int Size();
     void Clear();
+    void SortByPts();
+    void IgnoreMaxPackets(bool ignore);
+    void ClearInvalidPackets();
+
 private:
     std::list<AVPacket*> pkts_;
 
     int max_packets_ = 1000;//最大列表数量，超出清理
     std::mutex mux_;
+    bool ignore_max_packets_ = false;
 };

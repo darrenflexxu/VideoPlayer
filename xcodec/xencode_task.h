@@ -36,6 +36,10 @@ class XCODEC_API XEncodeTask : public XThread {
 
   AVCodecContext* GetCodecContext() const;
 
+  bool EndEncode();
+
+  void NextPacket(AVPacket* pkt);
+
  private:
   long long cur_pts_ = -1;  // 当前解码到的pts（以解码数据为准）
   AVRational* time_base_ = nullptr;
@@ -46,4 +50,6 @@ class XCODEC_API XEncodeTask : public XThread {
   XEncode encode_;
   bool gpu_encode_ = false;
   bool end_encode_ = false;
+  int frame_count_ = 0;
+  std::list<AVPacket*> pkts_cache_;
 };

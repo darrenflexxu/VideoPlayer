@@ -53,6 +53,7 @@ bool XConvertor::Open(const char* url) {
     }
     // 用于过滤音频包
     video_decode_.set_stream_index(demux_.video_index());
+    video_decode_.ignoreMaxPkts(true);
   }
 
   auto ap = demux_.CopyAudioPara();
@@ -63,6 +64,7 @@ bool XConvertor::Open(const char* url) {
     }
     // 用于过滤视频数据
     audio_decode_.set_stream_index(demux_.audio_index());
+    audio_decode_.ignoreMaxPkts(true);
   }
   demux_.set_next(this);
   video_decode_.set_next(&video_encode_);
@@ -95,6 +97,29 @@ void XConvertor::Start(const char* url,
   if (video_para) {
     video_encode_.set_gpu_encode(gpu_encode_);
     video_encode_.Open(video_para, video_opts);
+    video_encode_.GetCodecContext()->refs = 4;
+    video_encode_.GetCodecContext()->gop_size = 2;
+    video_encode_.GetCodecContext()->max_b_frames = 0;
+    video_encode_.GetCodecContext()->profile = AV_PROFILE_H264_HIGH;
+    video_encode_.GetCodecContext()->flags = AV_CODEC_FLAG_QSCALE;
+    video_encode_.GetCodecContext()->global_quality = 0;
+    av_opt_set(video_encode_.GetCodecContext()->priv_data, "preset", "veryslow",
+               0);  // "best"或"veryslow"更高质量
+    av_opt_set(video_encode_.GetCodecContext()->priv_data, "profile", "high",
+               0);  // 尽量不用baseline
+    av_opt_set(video_encode_.GetCodecContext()->priv_data, "look_ahead", "1",
+               0);  // 启用lookahead提升质量
+    av_opt_set(video_encode_.GetCodecContext()->priv_data, "crf", "16", 0);
+    av_opt_set(video_encode_.GetCodecContext()->priv_data, "rc-lookahead", "60",
+               0);
+    av_opt_set(video_encode_.GetCodecContext()->priv_data, "tune", "zerolatency",
+               0);
+    av_opt_set(video_encode_.GetCodecContext()->priv_data, "async_depth", "1",
+               0);
+    av_opt_set(video_encode_.GetCodecContext()->priv_data, "x264-params",
+               "aq-mode=3:aq-strength=0.9:psy-rd=0.9,0.05:me=umh:subme=10:"
+               "trellis=2",
+               0);
     video_encode_.set_stream_index(0);
   }
 
@@ -102,6 +127,7 @@ void XConvertor::Start(const char* url,
     audio_encode_.Open(audio_para, audio_opts);
     audio_encode_.set_stream_index(1);
   }
+  mux_.ignoreMaxPkts(true);
   mux_.Open(url, video_para, video_time_base, audio_para, audio_time_base);
   XThread::Start();
   mux_.Start();
@@ -125,20 +151,26 @@ void XConvertor::Main() {
       continue;
     }
 
-    if (!end_of_decode_ && end_of_file_ && video_decode_.IsVideoFinish()) {
+    if (!end_of_decode_ && end_of_file_) {
       video_decode_.Exit();
       audio_decode_.Exit();
       end_of_decode_ = true;
     }
 
-    if (!end_of_encode_ && end_of_decode_) {
+    if (!end_of_encode_ && end_of_decode_ && video_decode_.EndOfDecode() &&
+        (!audio_decode_.is_open() || audio_decode_.EndOfDecode())) {
       video_encode_.Exit();
       audio_encode_.Exit();
       end_of_encode_ = true;
     }
 
-    if (end_of_encode_ && mux_.IsEmptyPacket()) {
+    if (!end_of_mux_ && end_of_encode_ && video_encode_.EndEncode() &&
+        (!audio_encode_.is_open() || audio_encode_.EndEncode())) {
       mux_.Exit();
+      end_of_mux_ = true;
+    }
+
+    if (end_of_mux_ && mux_.EndOfMux()) {
       break;
     }
     MSleep(1);

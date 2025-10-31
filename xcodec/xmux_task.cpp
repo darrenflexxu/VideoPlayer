@@ -3,21 +3,25 @@
 using namespace std;
 
 void XMuxTask::Do(AVPacket* pkt) {
-  {
-    unique_lock<mutex> lock(mux_);
     pkts_.Push(pkt);
-  }
+    if (block_size_ <= 0)
+      return;
+    while (!is_exit_) {
+      if (pkts_.Size() > block_size_) {
+        MSleep(1);
+        continue;
+      }
+      break;
+    }
 }
 
-bool XMuxTask::IsEmptyPacket() {
-  unique_lock<mutex> lock(mux_);
-  return pkts_.Size() == 0;
+bool XMuxTask::EndOfMux() {
+  return end_mux_;
 }
 
 void XMuxTask::Main() {
   xmux_.WriteHead();
 
-  // 找到关键帧
   while (!is_exit_) {
     unique_lock<mutex> lock(mux_);
     auto pkt = pkts_.Pop();
@@ -25,32 +29,19 @@ void XMuxTask::Main() {
       MSleep(1);
       continue;
     }
-    if (pkt->stream_index == xmux_.video_index() &&
-        pkt->flags & AV_PKT_FLAG_KEY)  // 关键帧
-    {
-      xmux_.Write(pkt);
-      av_packet_free(&pkt);
-      break;
-    }
-    // 丢掉非视频关键帧
+    xmux_.Write(pkt);
+    cout << "W" << flush;
     av_packet_free(&pkt);
   }
 
-  while (!is_exit_) {
-    unique_lock<mutex> lock(mux_);
-    auto pkt = pkts_.Pop();
-    if (!pkt) {
-      MSleep(1);
-      continue;
-    }
-
+  while (auto pkt = pkts_.Pop()) {
     xmux_.Write(pkt);
     cout << "W" << flush;
-
     av_packet_free(&pkt);
   }
   xmux_.WriteEnd();
   xmux_.set_c(nullptr);
+  end_mux_ = true;
 }
 
 bool XMuxTask::Open(const char* url,

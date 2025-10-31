@@ -48,6 +48,10 @@ public:
 
     AVCodecContext* GetCodecContext() const;
 
+    bool EndOfDecode();
+
+    bool ignoreMaxPkts(bool ignore);
+
 private:
     long long cur_pts_ = -1;//当前解码到的pts（以解码数据为准）
     AVRational* time_base_ = nullptr;
@@ -65,5 +69,8 @@ private:
     bool frame_cache_ = false;      //是否缓冲frame队列
     bool gpu_decode_ = false;
     bool gpu_direct_render_ = false;
+    int decode_frame_count_ = 0;
+    bool end_decode_ = false;
+    int recv_packet_count_ = 0;
 };
 

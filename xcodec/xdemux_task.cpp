@@ -71,8 +71,10 @@ void XDemuxTask::Main()
             //pkt.duration
             MSleep(dur);
         }
+        read_pkt_count_ += 1;
         Next(&pkt);
         av_packet_unref(&pkt);
         MSleep(1);
     }
+    cout << endl << "demux packet(" << read_pkt_count_ << ")" << endl << flush;
 }

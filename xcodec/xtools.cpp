@@ -119,12 +119,63 @@ void XAVPacketList::Clear() {
     }
 }
 
+void XAVPacketList::SortByPts() {
+  unique_lock<mutex> lock(mux_);
+  pkts_.sort([](AVPacket* a, AVPacket* b) { return a->pts < b->pts; });
+}
+
+void XAVPacketList::IgnoreMaxPackets(bool ignore) {
+  ignore_max_packets_ = ignore;
+}
+
+// 保留最长递增子序列
+std::list<AVPacket*> LIS(const std::list<AVPacket*>& input) {
+  std::vector<AVPacket*> nums(input.begin(), input.end());
+  int n = nums.size();
+  std::vector<int> dp(n, 1), prev(n, -1);
+  int max_len = 0, max_idx = 0;
+  for (int i = 0; i < n; ++i) {
+    for (int j = 0; j < i; ++j) {
+      if (nums[j]->pts < nums[i]->pts && dp[j] + 1 > dp[i]) {
+        dp[i] = dp[j] + 1;
+        prev[i] = j;
+      }
+    }
+    if (dp[i] > max_len) {
+      max_len = dp[i];
+      max_idx = i;
+    }
+  }
+  std::list<AVPacket*> lis;
+  // 回溯并倒序插入
+  std::vector<AVPacket*> tmp;
+  while (max_idx != -1) {
+    tmp.push_back(nums[max_idx]);
+    max_idx = prev[max_idx];
+  }
+  for (auto it = tmp.rbegin(); it != tmp.rend(); ++it)
+    lis.push_back(*it);
+  return lis;
+}
+
+void XAVPacketList::ClearInvalidPackets() {
+  unique_lock<mutex> lock(mux_);
+  pkts_ = LIS(pkts_);
+}
+
 void XAVPacketList::Push(AVPacket* pkt) {
+  if (!pkt) {
+    return;
+  }
     unique_lock<mutex> lock(mux_);
     //生成新的AVPacket 对象 引用计数+1;
     auto p = av_packet_alloc();
     av_packet_ref(p, pkt);//引用计数 减少数据复制，线程安全
     pkts_.push_back(p);
+
+    if (ignore_max_packets_) {
+      return;
+    }
 
     //超出最大空间，清理数据，到关键帧位置
     if (pkts_.size() > max_packets_) {
@@ -146,7 +197,6 @@ void XAVPacketList::Push(AVPacket* pkt) {
         }
     }
 }
-
 
 double XTools::get_rotation_from_frame(const AVFrame* frame) {
   double angle = 0.0;

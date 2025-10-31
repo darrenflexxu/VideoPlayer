@@ -16,6 +16,15 @@ AVCodecContext * XDecodeTask::GetCodecContext() const {
     return decode_.get_codec_context();
 }
 
+bool XDecodeTask::EndOfDecode() {
+  return end_decode_;
+}
+
+bool XDecodeTask::ignoreMaxPkts(bool ignore) {
+  pkt_list_.IgnoreMaxPackets(ignore);
+  return true;
+}
+
 /// <summary>
 /// 清理缓存
 /// </summary>
@@ -95,6 +104,7 @@ void XDecodeTask::Do(AVPacket* pkt)
         return;
     }
     pkt_list_.Push(pkt);
+    recv_packet_count_ += 1;
     if (block_size_ <= 0)return;
     while (!is_exit_)
     {
@@ -172,23 +182,17 @@ void XDecodeTask::Main()
           continue;
         }
 
-        if (pkt->size == 0) {
+        if (pkt->size == 0 && !has_next()) {
           auto list = decode_.End();
+          decode_frame_count_ += list.size();
 
           if (!list.empty()) {
             cur_pts_ = list.back()->pts;  // 转换成毫秒
             if (time_base_)
               cur_ms_ = av_rescale_q(list.back()->pts, *time_base_, {1, 1000});
           }
-          frame_cache_ = true;
-
-          if (has_next()) {
-            for (auto frame : list) {
-              Next(frame);
-            }
-            continue;
-          }
           frames_.insert(frames_.end(), list.begin(), list.end());
+          frame_cache_ = true;
           continue;
         }
         // 发送到解码线程
@@ -218,6 +222,7 @@ void XDecodeTask::Main()
                     { 1,1000 });;
 
                 if (has_next()) {
+                  decode_frame_count_ += 1;
                   Next(av_frame_clone(frame_));
                   continue;
                 }
@@ -229,9 +234,45 @@ void XDecodeTask::Main()
         }
         MSleep(1);
     }
+
+    if (has_next()) {
+      while (auto pkt = pkt_list_.Pop()) {
+        decode_.Send(pkt);
+        MSleep(1);
+        if (frame_) {
+          av_frame_unref(frame_);
+        }
+
+        if (!decode_.Recv(frame_)) {
+          continue;
+        }
+        decode_frame_count_ += 1;
+        cur_pts_ = frame_->pts;
+        // 转换成毫秒
+        if (time_base_)
+          cur_ms_ = av_rescale_q(frame_->pts, *time_base_, {1, 1000});
+        Next(av_frame_clone(frame_));
+        MSleep(1);
+      }
+      auto list = decode_.End();
+      decode_frame_count_ += list.size();
+      for (auto frame : list) {
+        cur_pts_ = frame->pts;
+        // 转换成毫秒
+        if (time_base_)
+          cur_ms_ = av_rescale_q(frame->pts, *time_base_, {1, 1000});
+        Next(frame);
+        MSleep(1);
+      }
+    }
     {
     unique_lock<mutex> lock(mux_);
     if(frame_)
         av_frame_free(&frame_);
     }
+    cout << endl
+         << "decode frame count(" << recv_packet_count_ << "->"
+         << decode_frame_count_ << ")" << endl
+         << flush;
+    end_decode_ = true;
 }
