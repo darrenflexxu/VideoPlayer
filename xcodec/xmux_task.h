@@ -27,10 +27,13 @@ class XCODEC_API XMuxTask : public XThread {
   void set_block_size(int count) { block_size_ = count; }
   void ignoreMaxPkts(bool ignore) { pkts_.IgnoreMaxPackets(ignore); }
 
+  int video_packet_count();
+
  private:
   XMux xmux_;
   XAVPacketList pkts_;
   std::mutex mux_;
   bool end_mux_ = false;
   int block_size_ = 0;
+  int video_packet_count_ = 0;
 };

@@ -9,9 +9,8 @@ extern "C" {
 void XVideoTranscode::timerEvent(QTimerEvent* ev) {
   if (!player || player->is_pause())
     return;
-  auto pos = player->pos_ms();
-  auto total = player->total_ms();
-  ui.trancodeProgressBar->setValue((pos * 100) / total);
+  ui.trancodeProgressBar->setValue(player->GetPos() * 100);
+  ui.trancodeProgressBar->repaint();
 }
 void XVideoTranscode::Close() {
   if (!player) {
@@ -119,6 +118,12 @@ XVideoTranscode::XVideoTranscode(QWidget* parent) : QWidget(parent) {
     ui.inputURL->setText(inputURL);
   });
   connect(ui.inputURL, &QLineEdit::textChanged, [this](const QString& text) {
+    if (text.isEmpty()) {
+      return;
+    }
+    if (player) {
+      player->Stop();
+    }
     player = std::make_shared<XConvertor>();
     player->set_gpu_decode(true);
     player->set_gpu_encode(true);
@@ -126,6 +131,7 @@ XVideoTranscode::XVideoTranscode(QWidget* parent) : QWidget(parent) {
     if (!player->Open(text.toStdString().c_str())) {
       return;
     }
+    ui.trancodeStartButton->setEnabled(!outputURL.isEmpty() && !inputURL.isEmpty());
     SetInputVideoInfo(inputVideoPara = player->GetVideoCodec());
     SetInputAudioInfo(inputAudioPara = player->GetAudioCodec());
   });
@@ -138,6 +144,11 @@ XVideoTranscode::XVideoTranscode(QWidget* parent) : QWidget(parent) {
     ui.outputURL->setText(outputURL);
   });
   connect(ui.outputURL, &QLineEdit::textChanged, [this](const QString& text) {
+    if (text.isEmpty()) {
+      return;
+    }
+    ui.trancodeStartButton->setEnabled(!outputURL.isEmpty() &&
+                                       !inputURL.isEmpty());
     inputVideoPara->para->codec_id = AV_CODEC_ID_H264;
 
     if (inputAudioPara) {
@@ -150,12 +161,12 @@ XVideoTranscode::XVideoTranscode(QWidget* parent) : QWidget(parent) {
     if (outputURL.isEmpty() || !player) {
       return;
     }
-    std::map<std::string, std::string> video_opts, audio_opts;
+    ui.trancodeStartButton->setEnabled(false);
     player->Start(outputURL.toStdString().c_str(), inputVideoPara->para,
                   inputVideoPara->time_base,
                   inputAudioPara ? inputAudioPara->para : nullptr,
-                  inputAudioPara ? inputAudioPara->time_base : nullptr,
-                  video_opts, audio_opts);
+                  inputAudioPara ? inputAudioPara->time_base : nullptr, {}, {});
+    startTimer(10);
   });
   connect(ui.outputVideoBitRate, &QLineEdit::textChanged,
           [this](const QString& text) {
@@ -163,6 +174,7 @@ XVideoTranscode::XVideoTranscode(QWidget* parent) : QWidget(parent) {
           });
   ui.outputVideoGroup->setEnabled(false);
   ui.outputAudioGroup->setEnabled(false);
+  ui.trancodeStartButton->setEnabled(false);
 }
 
 XVideoTranscode::~XVideoTranscode() {

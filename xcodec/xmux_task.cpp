@@ -19,6 +19,10 @@ bool XMuxTask::EndOfMux() {
   return end_mux_;
 }
 
+int XMuxTask::video_packet_count() {
+  return video_packet_count_;
+}
+
 void XMuxTask::Main() {
   xmux_.WriteHead();
 
@@ -30,14 +34,25 @@ void XMuxTask::Main() {
       continue;
     }
     xmux_.Write(pkt);
+
+    if (pkt->stream_index == xmux_.video_index()) {
+      video_packet_count_ += 1;
+    }
     cout << "W" << flush;
     av_packet_free(&pkt);
   }
+  
+  {
+    unique_lock<mutex> lock(mux_);
+    while (auto pkt = pkts_.Pop()) {
+      xmux_.Write(pkt);
 
-  while (auto pkt = pkts_.Pop()) {
-    xmux_.Write(pkt);
-    cout << "W" << flush;
-    av_packet_free(&pkt);
+      if (pkt->stream_index == xmux_.video_index()) {
+        video_packet_count_ += 1;
+      }
+      cout << "W" << flush;
+      av_packet_free(&pkt);
+    }
   }
   xmux_.WriteEnd();
   xmux_.set_c(nullptr);

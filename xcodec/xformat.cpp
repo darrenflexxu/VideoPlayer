@@ -83,7 +83,7 @@ std::shared_ptr<XPara> XFormat::CopyAudioPara()
     //转换成毫秒
     re->total_ms = av_rescale_q(c_->streams[index]->duration,
         c_->streams[index]->time_base, { 1,1000 });
-
+    re->frame_count = c_->streams[index]->nb_frames;
     return re;
 }
 
@@ -107,6 +107,7 @@ std::shared_ptr<XPara> XFormat::CopyVideoPara()
       re->total_ms = av_rescale_q(c_->streams[index]->duration,
                                   c_->streams[index]->time_base, {1, 1000});
     }
+    re->frame_count = c_->streams[index]->nb_frames;
     return re;
 }
 

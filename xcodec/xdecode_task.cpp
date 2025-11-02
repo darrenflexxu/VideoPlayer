@@ -25,6 +25,10 @@ bool XDecodeTask::ignoreMaxPkts(bool ignore) {
   return true;
 }
 
+int XDecodeTask::get_Current_decode_frame_count() {
+  return decode_frame_count_;
+}
+
 /// <summary>
 /// 清理缓存
 /// </summary>

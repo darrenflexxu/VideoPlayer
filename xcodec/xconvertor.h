@@ -32,14 +32,10 @@ class XCODEC_API XConvertor : public XThread {
   void set_gpu_decode(bool gpu) { gpu_decode_ = gpu; }
   void set_gpu_encode(bool gpu) { gpu_encode_ = gpu; }
 
-  // 总时长 毫秒
-  long long total_ms() { return total_ms_; }
-
-  // 当前播放的位置 毫秒
-  long long pos_ms() { return pos_ms_; }
-
   std::shared_ptr<XPara> GetVideoCodec();
   std::shared_ptr<XPara> GetAudioCodec();
+
+  float GetPos();
 
  protected:
   XDemuxTask demux_;          // 解封装
@@ -50,10 +46,9 @@ class XCODEC_API XConvertor : public XThread {
   XMuxTask mux_;
   bool gpu_decode_ = false;
   bool gpu_encode_ = false;
-  long long total_ms_ = 0;
-  long long pos_ms_ = 0;
   bool end_of_file_ = false;
   bool end_of_decode_ = false;
   bool end_of_encode_ = false;
   bool end_of_mux_ = false;
+  int total_frame_count_ = 0;
 };

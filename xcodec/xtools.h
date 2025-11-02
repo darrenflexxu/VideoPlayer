@@ -132,6 +132,7 @@ public:
     AVCodecParameters* para = nullptr;  //音视频参数
     AVRational* time_base = nullptr;    //时间基数
     long long total_ms = 0;             //总时长 毫秒
+    int frame_count = 0;
 
     //创建对象
     static XPara* Create();

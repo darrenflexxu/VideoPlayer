@@ -52,6 +52,8 @@ public:
 
     bool ignoreMaxPkts(bool ignore);
 
+    int get_Current_decode_frame_count();
+
 private:
     long long cur_pts_ = -1;//当前解码到的pts（以解码数据为准）
     AVRational* time_base_ = nullptr;

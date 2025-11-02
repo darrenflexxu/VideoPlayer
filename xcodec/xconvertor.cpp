@@ -19,6 +19,14 @@ std::shared_ptr<XPara> XConvertor::GetAudioCodec() {
   return demux_.CopyAudioPara();
 }
 
+float XConvertor::GetPos() {
+  if (total_frame_count_ == 0) {
+    total_frame_count_ = GetVideoCodec()->frame_count;
+  }
+  return float(video_decode_.get_Current_decode_frame_count() + mux_.video_packet_count()) /
+     float (2 * total_frame_count_);
+}
+
 void XConvertor::Stop() {
   Exit();
   demux_.Exit();
@@ -43,9 +51,6 @@ bool XConvertor::Open(const char* url) {
   // 视频解码
   auto vp = demux_.CopyVideoPara();
   if (vp) {
-    // 视频总时长
-    this->total_ms_ = vp->total_ms;
-    // 视频总时长
     video_decode_.set_gpu_decode(gpu_decode_);
 
     if (!video_decode_.Open(vp->para)) {
