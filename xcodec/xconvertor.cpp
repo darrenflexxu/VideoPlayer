@@ -94,6 +94,7 @@ void XConvertor::Start(const char* url,
                        AVRational* audio_time_base,
                        const std::map<std::string, std::string>& video_opts,
                        const std::map<std::string, std::string>& audio_opts) {
+  AVCodecParameters *tmp_video_para = nullptr;
   if (video_para) {
     video_encode_.set_gpu_encode(gpu_encode_);
     video_encode_.Open(video_para, video_opts);
@@ -121,6 +122,9 @@ void XConvertor::Start(const char* url,
                "trellis=2",
                0);
     video_encode_.set_stream_index(0);
+    tmp_video_para = avcodec_parameters_alloc();
+    avcodec_parameters_from_context(tmp_video_para,
+                                    video_encode_.GetCodecContext());
   }
 
   if (audio_para) {
@@ -128,7 +132,12 @@ void XConvertor::Start(const char* url,
     audio_encode_.set_stream_index(1);
   }
   mux_.ignoreMaxPkts(true);
-  mux_.Open(url, video_para, video_time_base, audio_para, audio_time_base);
+  mux_.Open(url, tmp_video_para, video_time_base, audio_para,
+            audio_time_base);
+
+  if (tmp_video_para) {
+    avcodec_parameters_free(&tmp_video_para);
+  }
   XThread::Start();
   mux_.Start();
   if (video_encode_.is_open()) {
