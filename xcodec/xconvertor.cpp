@@ -2,6 +2,30 @@
 
 #include <cstdio>
 
+// 渲染单行分段进度条: 总进度 + 各阶段▓░进度条 + 瓶颈标记
+// 整行定长(各段名称固定/条10格/数字3位/瓶颈6列补齐), 保证\r覆盖无残影
+// bottleneck: 瓶颈阶段索引(0-3), 4=无瓶颈(-)
+static void PrintStageLine(int percent, int demux_p, int dec_p, int enc_p,
+                           int mux_p, int bottleneck, bool newline) {
+  const char* names[4] = {"解封装", "解码", "编码", "写入"};
+  int pct[4] = {demux_p, dec_p, enc_p, mux_p};
+  printf("\r进度 %3d%% ", percent);
+  for (int i = 0; i < 4; ++i) {
+    int f = pct[i] / 10;
+    if (f > 10) f = 10;
+    if (f < 0) f = 0;
+    printf("|%s", names[i]);
+    for (int k = 0; k < f; ++k) printf("▓");
+    for (int k = f; k < 10; ++k) printf("░");
+    printf("%3d%%", pct[i]);
+  }
+  // 瓶颈标记固定宽度(中文按6列补齐), 无瓶颈时显示 -
+  const char* bn[5] = {"解封装", "解码  ", "编码  ", "写入  ", "—     "};
+  printf(" |瓶颈:%s", bn[(bottleneck >= 0 && bottleneck < 4) ? bottleneck : 4]);
+  if (newline) printf("\n");
+  fflush(stdout);
+}
+
 // 暂停或者继续转码
 void XConvertor::Pause(bool is_pause) {
   XThread::Pause(is_pause);
@@ -22,6 +46,18 @@ std::shared_ptr<XPara> XConvertor::GetAudioCodec() {
 }
 
 float XConvertor::GetPos() {
+  if (finished_) {
+    return 1.0f;
+  }
+  // 主路径: 输出时间戳/输入总时长(输入时长为容器精确值, 不受帧数估算误差影响)
+  if (total_ms_ > 0) {
+    auto done = mux_.output_ms();
+    if (done >= total_ms_) {
+      return 1.0f;
+    }
+    return float(done) / float(total_ms_);
+  }
+  // 无时长信息(直播等)退回包数估算
   if (total_frame_count_ <= 0) {
     return 0;
   }
@@ -178,27 +214,34 @@ void XConvertor::Start(const char* url,
 
   // 估算总帧数(有些文件nb_frames为0, 用时长*帧率/采样率推算)
   total_frame_count_ = 0;
+  video_total_frames_ = 0;
+  audio_total_frames_ = 0;
+  total_ms_ = 0;
   {
     auto vc = demux_.CopyVideoPara();
     auto ac = demux_.CopyAudioPara();
     if (vc) {
+      if (vc->total_ms > total_ms_) total_ms_ = vc->total_ms;
       if (vc->frame_count > 0) {
-        total_frame_count_ += vc->frame_count;
+        video_total_frames_ += vc->frame_count;
       } else if (vc->para->framerate.num > 0) {
-        total_frame_count_ +=
+        video_total_frames_ +=
             vc->total_ms * vc->para->framerate.num / vc->para->framerate.den /
             1000;
       }
+      total_frame_count_ += video_total_frames_;
     }
     if (ac) {
+      if (ac->total_ms > total_ms_) total_ms_ = ac->total_ms;
       int frame_size =
           ac->para->frame_size > 0 ? ac->para->frame_size : 1024;
       if (ac->frame_count > 0) {
-        total_frame_count_ += ac->frame_count;
+        audio_total_frames_ += ac->frame_count;
       } else if (ac->para->sample_rate > 0) {
-        total_frame_count_ += ac->total_ms * ac->para->sample_rate / 1000 /
-                              frame_size;
+        audio_total_frames_ += ac->total_ms * ac->para->sample_rate / 1000 /
+                               frame_size;
       }
+      total_frame_count_ += audio_total_frames_;
     }
     if (total_frame_count_ <= 0) {
       total_frame_count_ = 1;  // 防止除零
@@ -221,6 +264,58 @@ void XConvertor::Start(const char* url,
 }
 
 void XConvertor::Main() {
+  // 分阶段进度: 解封装/写入按时间轴(精确), 解码/编码按帧数估算
+  // 瓶颈用收敛前的原始值判定; 收敛保证流水线顺序 解封装>=解码>=编码>=写入
+  auto calc_stages = [&](int& demux_p, int& dec_p, int& enc_p, int& mux_p,
+                         int& bottleneck) {
+    int raw[4] = {0, 0, 0, 0};
+    if (total_ms_ > 0) {
+      raw[0] = (int)(demux_.read_ms() * 100 / total_ms_);
+      raw[3] = (int)(mux_.output_ms() * 100 / total_ms_);
+      if (raw[0] > 100) raw[0] = 100;
+      if (raw[3] > 100) raw[3] = 100;
+    }
+    if (total_frame_count_ > 0) {
+      // 只统计实际参与转码的流(例如 -v none 时不把视频帧计入分母)
+      int act_total = (video_encode_.is_open() ? video_total_frames_ : 0) +
+                      (audio_encode_.is_open() ? audio_total_frames_ : 0);
+      int act_dec =
+          (video_encode_.is_open()
+               ? video_decode_.get_Current_decode_frame_count()
+               : 0) +
+          (audio_encode_.is_open()
+               ? audio_decode_.get_Current_decode_frame_count()
+               : 0);
+      int act_enc = (video_encode_.is_open() ? video_encode_.frame_count()
+                                             : 0) +
+                    (audio_encode_.is_open() ? audio_encode_.frame_count()
+                                             : 0);
+      if (act_total > 0) {
+        raw[1] = (int)(act_dec * 100 / act_total);
+        raw[2] = (int)(act_enc * 100 / act_total);
+        if (raw[1] > 100) raw[1] = 100;
+        if (raw[2] > 100) raw[2] = 100;
+      }
+    }
+    // 时间轴进度受"末帧pts<容器时长"误差影响到不了100, 阶段真正完成后按完成标志置100
+    if (end_of_file_) raw[0] = 100;  // 解封装已读到EOF(所有包已读取)
+    if (end_of_mux_) raw[3] = 100;   // 写入已结束(编码器输出全部排空)
+    // 瓶颈: 收敛前原始值中的最小者, 全部相等时无瓶颈
+    bottleneck = 4;
+    {
+      int bi = 0;
+      for (int i = 1; i < 4; ++i)
+        if (raw[i] < raw[bi]) bi = i;
+      if (!(raw[0] == raw[1] && raw[1] == raw[2] && raw[2] == raw[3]))
+        bottleneck = bi;
+    }
+    // 链式收敛: 下游不可能快于上游
+    demux_p = raw[0];
+    dec_p = raw[1] < raw[0] ? raw[1] : raw[0];
+    enc_p = raw[2] < dec_p ? raw[2] : dec_p;
+    mux_p = raw[3] < enc_p ? raw[3] : enc_p;
+  };
+
   while (!is_exit_) {
     if (is_pause()) {
       MSleep(1);
@@ -254,11 +349,16 @@ void XConvertor::Main() {
       }
       finished_ = true;
       if (show_progress_) {
-        // 完成: 正常时置100%, 出错时保留当前值并换行收尾
-        printf("\r进度 %d%%\n",
-               mux_.has_error() ? (last_percent_ >= 0 ? last_percent_ : 0)
-                                : 100);
-        fflush(stdout);
+        // 完成: 正常时各阶段为100, 出错时按实际值渲染并换行收尾
+        int dp = 0, dc = 0, ec = 0, mp = 0, bn = 4;
+        calc_stages(dp, dc, ec, mp, bn);
+        if (!mux_.has_error()) {
+          dp = dc = ec = mp = 100;
+          bn = 4;
+        }
+        PrintStageLine(dp == 100 ? 100
+                                 : (last_percent_ >= 0 ? last_percent_ : 0),
+                       dp, dc, ec, mp, bn, true);
         progress_open_ = false;
       }
       break;
@@ -268,8 +368,9 @@ void XConvertor::Main() {
     if (show_progress_) {
       int percent = (int)(GetPos() * 100);
       if (percent != last_percent_) {
-        printf("\r进度 %d%%  ", percent);
-        fflush(stdout);
+        int dp = 0, dc = 0, ec = 0, mp = 0, bn = 4;
+        calc_stages(dp, dc, ec, mp, bn);
+        PrintStageLine(percent, dp, dc, ec, mp, bn, false);
         last_percent_ = percent;
         progress_open_ = true;
       }

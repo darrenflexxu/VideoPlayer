@@ -19,6 +19,9 @@ add_definitions(-DCV_IGNORE_DEBUG_BUILD_GUARD)
 
 ADD_LIBRARY(XCodec SHARED ${VIDEO_PLAYER_SRC} ${VIDEO_PLAYER_HEADER})
 
+# 源码为UTF-8, 强制/utf-8保证字面量为UTF-8, 与CLI(SetConsoleOutputCP(CP_UTF8))一致, 否则中文/进度条字符编译成GBK乱码
+target_compile_options(XCodec PRIVATE /utf-8)
+
 target_precompile_headers(XCodec PRIVATE predefine_header.h)
 
 TARGET_LINK_LIBRARIES(XCodec avcodec avdevice avfilter avformat avutil postproc swresample swscale SDL2 glew32 opengl32 "${OpenCV_LIBS}")

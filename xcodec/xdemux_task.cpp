@@ -45,7 +45,6 @@ void XDemuxTask::Main()
         if (!demux_.Read(&pkt, &errorCode))
         {
             //读取失败
-            cout << "-" << flush;
             if (!demux_.is_connected())
             {
                 Open(url_, timeout_ms_);
@@ -75,6 +74,10 @@ void XDemuxTask::Main()
             MSleep(dur);
         }
         read_pkt_count_ += 1;
+        if (pkt.pts != AV_NOPTS_VALUE) {
+          auto ms = demux_.RescaleToMs(pkt.pts, pkt.stream_index);
+          if (ms > read_ms_) read_ms_ = ms;
+        }
         Next(&pkt);
         av_packet_unref(&pkt);
         MSleep(1);

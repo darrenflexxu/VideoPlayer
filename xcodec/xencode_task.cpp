@@ -194,7 +194,7 @@ bool XEncodeTask::Open(AVCodecParameters* para,
         continue;
       }
       auto re = av_opt_set(c->priv_data, kv.first.c_str(), kv.second.c_str(), 0);
-      if (re != 0) {
+      if (re != 0 && re != AVERROR_OPTION_NOT_FOUND) {
         cerr << "set encoder opt[" << kv.first << "] failed!" << endl;
       }
     }

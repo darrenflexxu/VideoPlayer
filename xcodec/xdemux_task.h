@@ -46,6 +46,9 @@ public:
     ///读取到的数据包数量(调试输出用)
     int read_packet_count() { return read_pkt_count_; }
 
+    //已读包在源时间轴上的最大毫秒位置(用于计算解封装进度)
+    long long read_ms() { return read_ms_; }
+
     ///停止线程并清理资源，需要Wait等待线程结束
     void Stop();
 private:
@@ -55,5 +58,6 @@ private:
     XSYN_TYPE syn_type_ = XSYN_NONE;
     bool is_eof_ = false;
     int read_pkt_count_ = 0;
+    long long read_ms_ = 0;  //已读包的最大源时间位置(毫秒)
 };
 

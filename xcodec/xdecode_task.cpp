@@ -239,7 +239,6 @@ void XDecodeTask::Main()
 
             if(decode_.Recv(frame_))
             { 
-                cout << "@" << flush;
                 need_view_ = true;
                 cur_pts_ = frame_->pts;
                 //转换成毫秒

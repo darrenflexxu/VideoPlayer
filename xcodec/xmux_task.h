@@ -30,6 +30,9 @@ class XCODEC_API XMuxTask : public XThread {
   // 已写入封装的包总数(视频+音频)
   int packet_count();
 
+  // 已写入封装的包在源时间轴上的最大毫秒位置(用于计算转码进度)
+  long long output_ms() { return xmux_.output_ms(); }
+
   // 封装过程中是否发生了错误(打开/写头/写帧/写尾失败)
   bool has_error() { return has_error_; }
   std::string error() { return error_; }

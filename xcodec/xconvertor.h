@@ -66,6 +66,9 @@ class XCODEC_API XConvertor : public XThread {
   bool end_of_encode_ = false;
   bool end_of_mux_ = false;
   int total_frame_count_ = 0;
+  int video_total_frames_ = 0;  // 视频输出帧估算(分阶段进度用)
+  int audio_total_frames_ = 0;  // 音频输出帧估算(分阶段进度用)
+  long long total_ms_ = 0;  // 输入总时长(视频/音频取大), 用于按时间轴算进度
   bool finished_ = false;
   std::string error_;
   long long start_time_ms_ = 0;
