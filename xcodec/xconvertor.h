@@ -45,6 +45,10 @@ class XCODEC_API XConvertor : public XThread {
   // 输出一次转码过程统计, 用于调试
   std::string DumpInfo();
 
+  // 实际是否使用了硬件编码/解码(失败回退软件后为 false)
+  bool video_encode_gpu_used() { return video_encode_.gpu_used(); }
+  bool video_decode_gpu_used() { return video_decode_.gpu_used(); }
+
  protected:
   XDemuxTask demux_;          // 解封装
   XDecodeTask audio_decode_;  // 音频解码

@@ -182,6 +182,8 @@ bool XEncodeTask::Open(AVCodecParameters* para,
         cerr << "set encoder opt[" << kv.first << "] failed!" << endl;
       }
     }
+    // 不做额外探针: 实测向h264_qsv等send(NULL)冲刷后会破坏后续编码输出,
+    // 且本机QSV打开即可用(失败会走上面的软件回退), 运行时失败由Do()计数日志暴露
     return encode_.Open();
   };
 
@@ -226,7 +228,9 @@ void XEncodeTask::Do(AVFrame* frame) {
     }
   } else if (c->codec_type == AVMEDIA_TYPE_VIDEO) {
     // 视频: 缩放/格式转换到编码器期望的分辨率和像素格式
-    AVPixelFormat dst_fmt = gpu_encode_ ? AV_PIX_FMT_NV12 : c->pix_fmt;
+    // 用实际使用的gpu_used_(而非请求的gpu_encode_), 避免GPU失败回退软件后
+    // 仍给libx264/libx265喂NV12导致送帧全部失败
+    AVPixelFormat dst_fmt = gpu_used_ ? AV_PIX_FMT_NV12 : c->pix_fmt;
     if (dst_fmt == AV_PIX_FMT_NONE) dst_fmt = AV_PIX_FMT_YUV420P;
     int dw = c->width > 0 ? c->width : frame->width;
     int dh = c->height > 0 ? c->height : frame->height;
@@ -239,7 +243,15 @@ void XEncodeTask::Do(AVFrame* frame) {
     }
   }
 
-  encode_.Send(frame);
+  if (encode_.Send(frame)) {
+    encode_fail_count_ = 0;
+  } else {
+    // 送帧失败(硬件编码器可能运行中失效), 记录并继续, 避免静默丢帧
+    encode_fail_count_ += 1;
+    if (encode_fail_count_ == 1 || encode_fail_count_ % 60 == 0) {
+      cerr << "encode Send failed! count=" << encode_fail_count_ << endl;
+    }
+  }
   frame_count_ += 1;
 }
 

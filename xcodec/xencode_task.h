@@ -61,6 +61,7 @@ class XCODEC_API XEncodeTask : public XThread {
   bool gpu_used_ = false;
   bool end_encode_ = false;
   int frame_count_ = 0;
+  int encode_fail_count_ = 0;  // 连续/累计送帧失败次数(用于运行时诊断)
   std::list<AVPacket*> pkts_cache_;
   std::unique_ptr<XResample> resample_;  // 音频重采样(音频编码使用)
 };

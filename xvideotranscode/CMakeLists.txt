@@ -9,6 +9,8 @@ TARGET_LINK_LIBRARIES(XVideoTranscode PRIVATE XCodec Qt5::Widgets Qt5::Core Qt5:
 TARGET_LINK_DIRECTORIES(XVideoTranscode PRIVATE "${ThirdParty}/ffmpeg/lib"  "${ThirdParty}/SDL2/lib" "${ThirdParty}/GLEW/lib")
 target_include_directories(XVideoTranscode PRIVATE "." "../xcodec" "${ThirdParty}/ffmpeg/include")
 target_compile_definitions(XVideoTranscode PRIVATE -DUNICODE)
+# 源文件为UTF-8, 声明编码避免中文被按GBK误读
+target_compile_options(XVideoTranscode PRIVATE /utf-8)
 
 IF(WIN32)
 add_custom_command(

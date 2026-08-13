@@ -17,7 +17,7 @@ void XVideoTranscode::timerEvent(QTimerEvent* ev) {
   }
   ui.trancodeProgressBar->setValue(player->GetPos() * 100);
   ui.trancodeProgressBar->repaint();
-  // ×ªÂëÍê³É
+  // è½¬ç ç»“æŸ
   if (running_ && player->IsFinished()) {
     killTimer(timer_id_);
     running_ = false;
@@ -27,10 +27,10 @@ void XVideoTranscode::timerEvent(QTimerEvent* ev) {
     std::cout << player->DumpInfo() << std::flush;
     if (player->HasError()) {
       ui.statusLabel->setText(
-          QStringLiteral("×ªÂëÊ§°Ü: %1").arg(QString::fromStdString(
+          QStringLiteral("è½¬ç å¤±è´¥: %1").arg(QString::fromStdString(
               player->GetError())));
     } else {
-      ui.statusLabel->setText(QStringLiteral("×ªÂëÍê³É"));
+      ui.statusLabel->setText(QStringLiteral("è½¬ç å®Œæˆ"));
     }
   }
 }
@@ -70,7 +70,7 @@ void XVideoTranscode::SetInputVideoInfo(
         QTime::fromMSecsSinceStartOfDay(video_codec->total_ms)
             .toString("hh:mm:ss"));
 
-    // Ä¬ÈÏÊä³ö²ÎÊı = ÊäÈë²ÎÊı, ¹©ÓÃ»§ĞŞ¸Ä
+    // é»˜è®¤è¾“å‡ºå‚æ•° = è¾“å…¥å‚æ•°, ä¾›ç”¨æˆ·ä¿®æ”¹
     ui.outputVideoWidth->setText(QString("%1").arg(video_codec->para->width));
     ui.outputVideoHeight->setText(QString("%1").arg(video_codec->para->height));
     ui.outputVideoBitRate->setText(
@@ -96,7 +96,7 @@ void XVideoTranscode::SetOutputVideoInfo(
   if (has_video) {
     auto codec_index = ui.outputVideoCodec->findText(
         avcodec_get_name(video_para->para->codec_id));
-    if (codec_index < 0) codec_index = 0;  // Ä¬ÈÏh264
+    if (codec_index < 0) codec_index = 0;  // é»˜è®¤h264
     ui.outputVideoCodec->setCurrentIndex(codec_index);
   }
 }
@@ -136,18 +136,18 @@ void XVideoTranscode::SetOutputAudioInfo(
   if (has_audio) {
     auto codec_index = ui.outputAudioCodec->findText(
         avcodec_get_name(audio_para->para->codec_id));
-    if (codec_index < 0) codec_index = 0;  // Ä¬ÈÏaac
+    if (codec_index < 0) codec_index = 0;  // é»˜è®¤aac
     ui.outputAudioCodec->setCurrentIndex(codec_index);
   }
 }
 
 namespace {
-// Êä³öÊÓÆµ±àÂëÆ÷(ÏÂÀ­Ïî -> codec_id)
+// è¾“å‡ºè§†é¢‘ç¼–ç å™¨(ä¸‹æ‹‰é¡¹ -> codec_id)
 AVCodecID VideoCodecFromCombo(const QString& text) {
   if (text == "hevc") return AV_CODEC_ID_HEVC;
   return AV_CODEC_ID_H264;
 }
-// Êä³öÒôÆµ±àÂëÆ÷(ÏÂÀ­Ïî -> codec_id)
+// è¾“å‡ºéŸ³é¢‘ç¼–ç å™¨(ä¸‹æ‹‰é¡¹ -> codec_id)
 AVCodecID AudioCodecFromCombo(const QString& text) {
   if (text == "mp3") return AV_CODEC_ID_MP3;
   return AV_CODEC_ID_AAC;
@@ -160,41 +160,36 @@ XVideoTranscode::XVideoTranscode(QWidget* parent) : QWidget(parent) {
   ui.cancelButton->setEnabled(false);
 
   connect(ui.intputChoose, &QPushButton::pressed, [this]() {
-    inputURL = QFileDialog::getOpenFileName(
-        this, QStringLiteral("´ò¿ªÎÄ¼ş"), "",
-        QStringLiteral("ÊÓÆµÎÄ¼ş (*.flv *.rmvb *.avi *.MP4 *.mkv *.wmv);;") +
-            QStringLiteral("ÒôÆµÎÄ¼ş (*.mp3 *.wma *.wav);;") +
-            QStringLiteral("ËùÓĞÎÄ¼ş (*.*)"));
-    if (inputURL.isEmpty()) {
+    outputURL.clear();
+    auto file =
+        QFileDialog::getOpenFileName(this, QStringLiteral("æ‰“å¼€æ–‡ä»¶"), "",
+                                     QStringLiteral("è§†é¢‘æ–‡ä»¶ (*.flv *.rmvb "
+                                                    "*.avi *.MP4 *.mkv *.wmv)"
+                                                    ";;") +
+                                         QStringLiteral("éŸ³é¢‘æ–‡ä»¶ (*.mp3 "
+                                                        "*.aac);;") +
+                                         QStringLiteral("æ‰€æœ‰æ–‡ä»¶ (*.*)"));
+    if (file.isEmpty()) {
       return;
-    }
-    ui.inputURL->setText(inputURL);
-  });
-  connect(ui.inputURL, &QLineEdit::textChanged, [this](const QString& text) {
-    if (text.isEmpty()) {
-      return;
-    }
-    if (player) {
-      player->Stop();
     }
     player = std::make_shared<XConvertor>();
     player->set_gpu_decode(true);
     player->set_gpu_encode(true);
 
-    ui.statusLabel->setText(QStringLiteral("ÕıÔÚ´ò¿ªÊäÈëÎÄ¼ş..."));
-    if (!player->Open(text.toStdString().c_str())) {
-      ui.statusLabel->setText(QStringLiteral("´ò¿ªÊäÈëÎÄ¼şÊ§°Ü"));
+    ui.statusLabel->setText(QStringLiteral("æ­£åœ¨æ‰“å¼€è¾“å…¥æ–‡ä»¶..."));
+    if (!player->Open(file.toStdString().c_str())) {
+      ui.statusLabel->setText(QStringLiteral("æ‰“å¼€æ–‡ä»¶å¤±è´¥"));
       return;
     }
-    ui.statusLabel->setText(QStringLiteral("ÇëÑ¡ÔñÊä³öÎÄ¼ş"));
+    ui.statusLabel->setText(QStringLiteral("å·²é€‰æ‹©è¾“å…¥æ–‡ä»¶"));
     SetInputVideoInfo(inputVideoPara = player->GetVideoCodec());
     SetInputAudioInfo(inputAudioPara = player->GetAudioCodec());
   });
   connect(ui.outputChoose, &QPushButton::pressed, [this]() {
     outputURL =
-        QFileDialog::getSaveFileName(this, QStringLiteral("±£´æÎÄ¼ş"), "",
-                                     QStringLiteral("ÊÓÆµÎÄ¼ş (*.MP4);;") +
-                                         QStringLiteral("ÒôÆµÎÄ¼ş (*.mp3);;"));
+        QFileDialog::getSaveFileName(this, QStringLiteral("ä¿å­˜æ–‡ä»¶"), "",
+                                     QStringLiteral("è§†é¢‘æ–‡ä»¶ (*.MP4);;") +
+                                         QStringLiteral("éŸ³é¢‘æ–‡ä»¶ (*.mp3);;"));
     if (outputURL.isEmpty()) {
       return;
     }
@@ -204,15 +199,15 @@ XVideoTranscode::XVideoTranscode(QWidget* parent) : QWidget(parent) {
     if (text.isEmpty()) {
       return;
     }
-    // ¸ù¾İÊä³öÈİÆ÷Ô¤ÖÃ±àÂëÆ÷(comboBox±ä»¯»á»Øµ÷Ë¢ĞÂcodec_id)
+    // æ ¹æ®è¾“å‡ºå®¹å™¨é¢„ç½®ç¼–ç å™¨(comboBoxå˜åŒ–ä¼šå›è°ƒåˆ·æ–°codec_id)
     if (QFileInfo(text).suffix().toLower() == "mp3") {
       if (inputVideoPara) {
         ui.statusLabel->setText(
-            QStringLiteral("MP3¸ñÊ½²»Ö§³ÖÊÓÆµÁ÷, Çë¸ÄÓÃMP4"));
+            QStringLiteral("MP3æ ¼å¼ä¸æ”¯æŒè§†é¢‘æµ, è¯·æ”¹ç”¨MP4"));
         ui.outputURL->clear();
         return;
       }
-      // ÎŞÊÓÆµÊ±×Ô¶¯Ñ¡Ôñ mp3 ±àÂëÆ÷
+      // çº¯éŸ³é¢‘æ—¶è‡ªåŠ¨é€‰æ‹© mp3 ç¼–ç å™¨
       int mp3_index = ui.outputAudioCodec->findText("mp3");
       if (inputAudioPara && mp3_index >= 0) {
         ui.outputAudioCodec->setCurrentIndex(mp3_index);
@@ -226,7 +221,7 @@ XVideoTranscode::XVideoTranscode(QWidget* parent) : QWidget(parent) {
     if (outputURL.isEmpty() || !player || !inputVideoPara && !inputAudioPara) {
       return;
     }
-    // Ó¦ÓÃÊä³ö±àÂëÆ÷/²ÎÊı
+    // åº”ç”¨è¾“å‡ºç¼–ç å‚æ•°
     std::map<std::string, std::string> video_opts;
     std::map<std::string, std::string> audio_opts;
     if (inputVideoPara) {
@@ -234,16 +229,19 @@ XVideoTranscode::XVideoTranscode(QWidget* parent) : QWidget(parent) {
           VideoCodecFromCombo(ui.outputVideoCodec->currentText());
       bool ok = false;
       int w = ui.outputVideoWidth->text().toInt(&ok);
-      if (ok && w > 0) inputVideoPara->para->width = w & ~1;  // Å¼Êı¿í¶È
+      if (ok && w > 0) inputVideoPara->para->width = w & ~1;  // å–å¶æ•°
       int h = ui.outputVideoHeight->text().toInt(&ok);
       if (ok && h > 0) inputVideoPara->para->height = h & ~1;
       long long br = ui.outputVideoBitRate->text().toLongLong(&ok);
       if (ok && br > 0) {
         video_opts["bit_rate"] = std::to_string(br);
       } else {
-        // Î´Ö¸¶¨ÂëÂÊÊ¹ÓÃCRF¹Ì¶¨ÖÊÁ¿
+        // æœªæŒ‡å®šç ç‡æ—¶ä½¿ç”¨CRFå›ºå®šè´¨é‡
         video_opts["preset"] = "veryslow";
-        video_opts["profile"] = "high";
+        // x265æ²¡æœ‰highç­‰é«˜é…ç½®, profileåªå¯¹h264æœ‰æ•ˆ
+        if (inputVideoPara->para->codec_id != AV_CODEC_ID_HEVC) {
+          video_opts["profile"] = "high";
+        }
         video_opts["tune"] = "zerolatency";
         video_opts["crf"] = "18";
       }
@@ -254,7 +252,7 @@ XVideoTranscode::XVideoTranscode(QWidget* parent) : QWidget(parent) {
       bool ok = false;
       int rate = ui.outputAudioSampleRate->text().toInt(&ok);
       if (ok && rate > 0) inputAudioPara->para->sample_rate = rate;
-      // MP3±àÂëÆ÷Ö»Ö§³Ö 22050/32000/44100/48000
+      // MP3é‡‡æ ·ç‡åªæ”¯æŒ 22050/32000/44100/48000
       if (inputAudioPara->para->codec_id == AV_CODEC_ID_MP3) {
         int r = inputAudioPara->para->sample_rate;
         if (r != 22050 && r != 32000 && r != 44100 && r != 48000) {
@@ -266,7 +264,7 @@ XVideoTranscode::XVideoTranscode(QWidget* parent) : QWidget(parent) {
         inputAudioPara->para->bit_rate = abr;
       }
     }
-    ui.statusLabel->setText(QStringLiteral("ÕıÔÚ×ªÂë..."));
+    ui.statusLabel->setText(QStringLiteral("æ­£åœ¨è½¬ç ..."));
     ui.trancodeStartButton->setEnabled(false);
     ui.cancelButton->setEnabled(true);
     player->Start(outputURL.toStdString().c_str(),
@@ -277,7 +275,7 @@ XVideoTranscode::XVideoTranscode(QWidget* parent) : QWidget(parent) {
                   video_opts, audio_opts);
     if (player->HasError()) {
       ui.statusLabel->setText(
-          QStringLiteral("Æô¶¯Ê§°Ü: %1")
+          QStringLiteral("å¯åŠ¨å¤±è´¥: %1")
               .arg(QString::fromStdString(player->GetError())));
       ui.trancodeStartButton->setEnabled(true);
       ui.cancelButton->setEnabled(false);
@@ -290,7 +288,7 @@ XVideoTranscode::XVideoTranscode(QWidget* parent) : QWidget(parent) {
     if (!player) {
       return;
     }
-    ui.statusLabel->setText(QStringLiteral("ÕıÔÚÍ£Ö¹..."));
+    ui.statusLabel->setText(QStringLiteral("æ­£åœ¨åœæ­¢..."));
     player->Stop();
     if (running_) {
       killTimer(timer_id_);
@@ -299,7 +297,7 @@ XVideoTranscode::XVideoTranscode(QWidget* parent) : QWidget(parent) {
     ui.trancodeProgressBar->setValue(0);
     ui.cancelButton->setEnabled(false);
     ui.trancodeStartButton->setEnabled(true);
-    ui.statusLabel->setText(QStringLiteral("ÒÑÈ¡Ïû"));
+    ui.statusLabel->setText(QStringLiteral("å·²å–æ¶ˆ"));
   });
   connect(ui.outputVideoCodec, &QComboBox::currentTextChanged,
           [this](const QString& text) {

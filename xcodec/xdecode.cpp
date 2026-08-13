@@ -30,6 +30,7 @@ bool XDecode::InitHW() {
     return false;
   }
   c_->hw_device_ctx = av_buffer_ref(ctx);
+  av_buffer_unref(&ctx);  // 释放本地引用, 由 c_->hw_device_ctx 持有
   c_->pix_fmt = AV_PIX_FMT_QSV;
   cout << "硬件加速：" << endl;
   return true;
