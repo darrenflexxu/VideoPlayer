@@ -42,15 +42,15 @@ bool XEncode::Send(AVFrame* frame) {
     return false;
   unique_lock<mutex> lock(mux_);
   if (!c_)
-    return false;
-  av_frame_make_writable((AVFrame*)frame);
-  // 发送到编码线程
+    return false;  // 失败不释放frame, 由调用方决定重试或放弃
+  av_frame_make_writable(frame);
   auto re = avcodec_send_frame(c_, frame);
-  av_frame_free(&frame);
-
   if (re != 0) {
+    // 失败(常见为EAGAIN输入缓冲满)不释放frame, 由调用方重试保持帧序,
+    // 避免在qsv等异步硬件编码器上静默丢帧
     return false;
   }
+  av_frame_free(&frame);
   return true;
 }
 

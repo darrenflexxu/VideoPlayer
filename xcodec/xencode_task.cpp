@@ -112,12 +112,20 @@ void XEncodeTask::NextPacket(AVPacket* pkt) {
 void XEncodeTask::Clear() {
   unique_lock<mutex> lock(mux_);
   cur_pts_ = -1;
+  while (!frame_queue_.empty()) {
+    av_frame_free(&frame_queue_.front());
+    frame_queue_.pop_front();
+  }
   encode_.Clear();
 }
 void XEncodeTask::Stop() {
   XThread::Stop();
 
   unique_lock<mutex> lock(mux_);
+  while (!frame_queue_.empty()) {
+    av_frame_free(&frame_queue_.front());
+    frame_queue_.pop_front();
+  }
   encode_.set_c(nullptr);
   is_open_ = false;
   if (time_base_)
@@ -163,6 +171,9 @@ bool XEncodeTask::Open(AVCodecParameters* para,
       } else {
         c->pix_fmt = AV_PIX_FMT_YUV420P;
       }
+      // 必须在avcodec_open2之前设置, 否则h264_qsv等会按默认B帧做重排,
+      // 输入缓冲持续占满导致送帧EAGAIN丢帧(XConvertor::Start里是open后设, 不生效)
+      c->max_b_frames = 0;
     } else if (c->codec_type == AVMEDIA_TYPE_AUDIO) {
       if (c->codec && c->codec->sample_fmts &&
           c->codec->sample_fmts[0] != AV_SAMPLE_FMT_NONE) {
@@ -243,39 +254,96 @@ void XEncodeTask::Do(AVFrame* frame) {
     }
   }
 
-  if (encode_.Send(frame)) {
-    encode_fail_count_ = 0;
-  } else {
-    // 送帧失败(硬件编码器可能运行中失效), 记录并继续, 避免静默丢帧
-    encode_fail_count_ += 1;
-    if (encode_fail_count_ == 1 || encode_fail_count_ % 60 == 0) {
-      cerr << "encode Send failed! count=" << encode_fail_count_ << endl;
-    }
+  // 入队交给编码线程送帧(队列满则等待, 背压自然传导到解码/解封装),
+  // 送帧统一由Main线程串行send/recv, 消除跨线程EAGAIN竞争导致的丢帧
+  while (!is_exit_ && (int)frame_queue_.size() >= 200) {
+    lock.unlock();
+    MSleep(1);
+    lock.lock();
   }
-  frame_count_ += 1;
+  if (is_exit_) {
+    av_frame_free(&frame);
+    return;
+  }
+  frame_queue_.push_back(frame);
 }
 
 // 线程主函数
 void XEncodeTask::Main() {
+  // 入队帧与编码包在同一线程串行send/recv(消除跨线程EAGAIN竞争丢帧)
+  auto pop_frame = [&]() -> AVFrame* {
+    unique_lock<mutex> lock(mux_);
+    if (frame_queue_.empty()) return nullptr;
+    auto f = frame_queue_.front();
+    frame_queue_.pop_front();
+    return f;
+  };
+  // 送帧; 失败(EAGAIN输入缓冲满)时先收包腾出缓冲再重试, 保持帧序
+  auto send_one = [&](AVFrame* frame) -> bool {
+    int tries = 0;
+    while (tries < 5000) {
+      if (encode_.Send(frame)) return true;
+      auto p = av_packet_alloc();
+      if (encode_.Recv(p)) {
+        cout << "E" << flush;
+        p->stream_index = stream_index_;
+        NextPacket(p);
+      } else {
+        av_packet_free(&p);
+      }
+      if (!encode_.get_codec_context()) return false;  // 编码器已被关闭
+      MSleep(1);
+      ++tries;
+    }
+    return false;
+  };
+
   while (!is_exit_) {
     if (is_pause())  // 暂停
     {
       MSleep(1);
       continue;
-    }    
-    // 发送到解码线程
+    }
+    auto frame = pop_frame();
+    if (frame) {
+      if (send_one(frame)) {
+        frame_count_ += 1;
+        encode_fail_count_ = 0;
+      } else {
+        cerr << "encode Send give up: pts=" << frame->pts
+             << " w=" << frame->width << " h=" << frame->height
+             << " fmt=" << frame->format << endl;
+        av_frame_free(&frame);
+        encode_fail_count_ += 1;
+        if (encode_fail_count_ == 1 || encode_fail_count_ % 60 == 0) {
+          cerr << "encode Send failed! count=" << encode_fail_count_ << endl;
+        }
+      }
+    }
+    // 收包(送帧期间send_one内部已顺带收包, 这里兜底排空)
     auto pkg = av_packet_alloc();
     auto ret = encode_.Recv(pkg);
 
-    if (!ret) {
-      av_packet_free(&pkg);
-      MSleep(1);
+    if (ret) {
+      cout << "E" << flush;
+      pkg->stream_index = stream_index_;
+      NextPacket(pkg);
       continue;
     }
-    cout << "E" << flush;
-    pkg->stream_index = stream_index_;
-    NextPacket(pkg);
-    MSleep(1);
+    av_packet_free(&pkg);
+    if (!frame) MSleep(1);  // 队列空且无包可收, 稍候
+  }
+
+  // 收尾: 送完队列剩余帧(此时is_exit_已置位, 但帧仍需送进编码器)
+  for (;;) {
+    auto frame = pop_frame();
+    if (!frame) break;
+    if (send_one(frame)) {
+      frame_count_ += 1;
+    } else {
+      cerr << "encode Send give up(EOF): pts=" << frame->pts << endl;
+      av_frame_free(&frame);
+    }
   }
 
   do {
