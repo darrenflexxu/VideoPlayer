@@ -3,16 +3,16 @@
 using namespace std;
 
 void XMuxTask::Do(AVPacket* pkt) {
-    pkts_.Push(pkt);
-    if (block_size_ <= 0)
-      return;
-    while (!is_exit_) {
-      if (pkts_.Size() > block_size_) {
-        MSleep(1);
-        continue;
-      }
-      break;
+  pkts_.Push(pkt);
+  if (block_size_ <= 0)
+    return;
+  while (!is_exit_) {
+    if (pkts_.Size() > block_size_) {
+      MSleep(1);
+      continue;
     }
+    break;
+  }
 }
 
 bool XMuxTask::EndOfMux() {
@@ -34,22 +34,16 @@ void XMuxTask::Main() {
       continue;
     }
     xmux_.Write(pkt);
-
-    if (pkt->stream_index == xmux_.video_index()) {
-      video_packet_count_ += 1;
-    }
+    video_packet_count_ += 1;
     cout << "W" << flush;
     av_packet_free(&pkt);
   }
-  
+
   {
     unique_lock<mutex> lock(mux_);
     while (auto pkt = pkts_.Pop()) {
       xmux_.Write(pkt);
-
-      if (pkt->stream_index == xmux_.video_index()) {
-        video_packet_count_ += 1;
-      }
+      video_packet_count_ += 1;
       cout << "W" << flush;
       av_packet_free(&pkt);
     }

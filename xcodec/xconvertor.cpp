@@ -21,10 +21,11 @@ std::shared_ptr<XPara> XConvertor::GetAudioCodec() {
 
 float XConvertor::GetPos() {
   if (total_frame_count_ == 0) {
-    total_frame_count_ = GetVideoCodec()->frame_count;
+    total_frame_count_ = GetVideoCodec()->frame_count +
+                         (GetAudioCodec()  ? GetAudioCodec()->frame_count : 0);
   }
-  return float(video_decode_.get_Current_decode_frame_count() + mux_.video_packet_count()) /
-     float (2 * total_frame_count_);
+  return float(mux_.video_packet_count()) /
+     float (total_frame_count_);
 }
 
 void XConvertor::Stop() {

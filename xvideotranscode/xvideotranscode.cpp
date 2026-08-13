@@ -131,7 +131,7 @@ XVideoTranscode::XVideoTranscode(QWidget* parent) : QWidget(parent) {
     if (!player->Open(text.toStdString().c_str())) {
       return;
     }
-    ui.trancodeStartButton->setEnabled(!outputURL.isEmpty() && !inputURL.isEmpty());
+    ui.trancodeStartButton->setEnabled(true);
     SetInputVideoInfo(inputVideoPara = player->GetVideoCodec());
     SetInputAudioInfo(inputAudioPara = player->GetAudioCodec());
   });
@@ -147,8 +147,6 @@ XVideoTranscode::XVideoTranscode(QWidget* parent) : QWidget(parent) {
     if (text.isEmpty()) {
       return;
     }
-    ui.trancodeStartButton->setEnabled(!outputURL.isEmpty() &&
-                                       !inputURL.isEmpty());
     inputVideoPara->para->codec_id = AV_CODEC_ID_H264;
 
     if (inputAudioPara) {
