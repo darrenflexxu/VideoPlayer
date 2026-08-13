@@ -36,6 +36,13 @@
       </property>
      </widget>
     </item>
+    <item row="6" column="0">
+     <widget class="QLineEdit" name="statusLabel">
+      <property name="readOnly">
+       <bool>true</bool>
+      </property>
+     </widget>
+    </item>
     <item row="3" column="0">
      <widget class="QGroupBox" name="outputGroup">
       <property name="sizePolicy">
@@ -91,6 +98,11 @@
                 <string>h264</string>
                </property>
               </item>
+              <item>
+               <property name="text">
+                <string>hevc</string>
+               </property>
+              </item>
              </widget>
             </item>
             <item row="0" column="0">
@@ -109,6 +121,26 @@
             </item>
             <item row="1" column="1">
              <widget class="QLineEdit" name="outputVideoBitRate"/>
+            </item>
+            <item row="2" column="0">
+             <widget class="QLabel" name="outputVideoWidthLabel">
+              <property name="text">
+               <string>Width</string>
+              </property>
+             </widget>
+            </item>
+            <item row="2" column="1">
+             <widget class="QLineEdit" name="outputVideoWidth"/>
+            </item>
+            <item row="2" column="2">
+             <widget class="QLabel" name="outputVideoHeightLabel">
+              <property name="text">
+               <string>Height</string>
+              </property>
+             </widget>
+            </item>
+            <item row="2" column="3">
+             <widget class="QLineEdit" name="outputVideoHeight"/>
             </item>
            </layout>
           </widget>
@@ -143,7 +175,32 @@
                 <string>aac</string>
                </property>
               </item>
+              <item>
+               <property name="text">
+                <string>mp3</string>
+               </property>
+              </item>
              </widget>
+            </item>
+            <item row="1" column="0">
+             <widget class="QLabel" name="outputAudioBitRateLabel">
+              <property name="text">
+               <string>Bit Rate</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="1">
+             <widget class="QLineEdit" name="outputAudioBitRate"/>
+            </item>
+            <item row="2" column="0">
+             <widget class="QLabel" name="outputAudioSampleRateLabel">
+              <property name="text">
+               <string>Sample Rate</string>
+              </property>
+             </widget>
+            </item>
+            <item row="2" column="1">
+             <widget class="QLineEdit" name="outputAudioSampleRate"/>
             </item>
            </layout>
           </widget>
@@ -186,11 +243,22 @@
      </layout>
     </item>
     <item row="4" column="0">
-     <widget class="QPushButton" name="trancodeStartButton">
-      <property name="text">
-       <string>Transcode</string>
-      </property>
-     </widget>
+     <layout class="QHBoxLayout" name="transcodeButtonLayout">
+      <item>
+       <widget class="QPushButton" name="trancodeStartButton">
+        <property name="text">
+         <string>Transcode</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="cancelButton">
+        <property name="text">
+         <string>Cancel</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
     </item>
     <item row="1" column="0">
      <widget class="QGroupBox" name="inputGroup">

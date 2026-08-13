@@ -53,8 +53,12 @@ void XDemuxTask::Main()
 
             if (errorCode == AVERROR_EOF && !is_eof_) {
               is_eof_ = true;
-              pkt.stream_index = demux_.video_index();
-              Next(&pkt);
+              // 生成一个空包作为EOF标记(带视频流时走视频流, 纯音频走音频流)
+              AVPacket eof = {};
+              eof.stream_index = demux_.video_index() >= 0
+                                     ? demux_.video_index()
+                                     : demux_.audio_index();
+              Next(&eof);
             }
             MSleep(1);
             continue;

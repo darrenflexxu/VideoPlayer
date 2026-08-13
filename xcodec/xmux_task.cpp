@@ -24,7 +24,13 @@ int XMuxTask::video_packet_count() {
 }
 
 void XMuxTask::Main() {
-  xmux_.WriteHead();
+  if (!xmux_.WriteHead()) {
+    has_error_ = true;
+    error_ = "写输出文件头失败";
+    end_mux_ = true;
+    xmux_.set_c(nullptr);
+    return;
+  }
 
   while (!is_exit_) {
     unique_lock<mutex> lock(mux_);
@@ -33,22 +39,37 @@ void XMuxTask::Main() {
       MSleep(1);
       continue;
     }
-    xmux_.Write(pkt);
+    if (!xmux_.Write(pkt)) {
+      has_error_ = true;
+      error_ = "写输出文件失败";
+      av_packet_free(&pkt);
+      break;
+    }
     video_packet_count_ += 1;
     cout << "W" << flush;
     av_packet_free(&pkt);
   }
 
-  {
-    unique_lock<mutex> lock(mux_);
-    while (auto pkt = pkts_.Pop()) {
-      xmux_.Write(pkt);
-      video_packet_count_ += 1;
-      cout << "W" << flush;
-      av_packet_free(&pkt);
+  if (!has_error_) {
+    {
+      unique_lock<mutex> lock(mux_);
+      while (auto pkt = pkts_.Pop()) {
+        if (!xmux_.Write(pkt)) {
+          has_error_ = true;
+          error_ = "写输出文件失败";
+          av_packet_free(&pkt);
+          break;
+        }
+        video_packet_count_ += 1;
+        cout << "W" << flush;
+        av_packet_free(&pkt);
+      }
+    }
+    if (!xmux_.WriteEnd()) {
+      has_error_ = true;
+      error_ = "写输出文件尾失败";
     }
   }
-  xmux_.WriteEnd();
   xmux_.set_c(nullptr);
   end_mux_ = true;
 }

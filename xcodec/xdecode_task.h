@@ -54,6 +54,13 @@ public:
 
     int get_Current_decode_frame_count();
 
+    // 实际使用的硬件加速解码状态(失败回退软件后为 false)
+    bool gpu_used() { return gpu_used_; }
+    // 解码器收到的数据包数量
+    int recv_packet_count() { return recv_packet_count_; }
+    // 解码器名称(如 h264/libx264), 未打开返回空
+    const char* decoder_name();
+
 private:
     long long cur_pts_ = -1;//当前解码到的pts（以解码数据为准）
     AVRational* time_base_ = nullptr;
@@ -71,6 +78,7 @@ private:
     bool frame_cache_ = false;      //是否缓冲frame队列
     bool gpu_decode_ = false;
     bool gpu_direct_render_ = false;
+    bool gpu_used_ = false;
     int decode_frame_count_ = 0;
     bool end_decode_ = false;
     int recv_packet_count_ = 0;

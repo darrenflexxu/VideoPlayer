@@ -37,6 +37,14 @@ class XCODEC_API XConvertor : public XThread {
 
   float GetPos();
 
+  // 转码完成(正常结束或被Stop终止)
+  bool IsFinished() { return finished_; }
+  bool HasError() { return !error_.empty(); }
+  std::string GetError() { return error_; }
+
+  // 输出一次转码过程统计, 用于调试
+  std::string DumpInfo();
+
  protected:
   XDemuxTask demux_;          // 解封装
   XDecodeTask audio_decode_;  // 音频解码
@@ -51,4 +59,7 @@ class XCODEC_API XConvertor : public XThread {
   bool end_of_encode_ = false;
   bool end_of_mux_ = false;
   int total_frame_count_ = 0;
+  bool finished_ = false;
+  std::string error_;
+  long long start_time_ms_ = 0;
 };

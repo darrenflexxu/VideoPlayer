@@ -14,6 +14,8 @@ link_directories("${ThirdParty}/ffmpeg/lib"
 )
 
 add_definitions(-DXCODEC_EXPORTS)
+# 只用发布版OpenCV库, Debug构建时关闭其debug_build_guard命名空间, 否则链接不到发布版符号
+add_definitions(-DCV_IGNORE_DEBUG_BUILD_GUARD)
 
 ADD_LIBRARY(XCodec SHARED ${VIDEO_PLAYER_SRC} ${VIDEO_PLAYER_HEADER})
 

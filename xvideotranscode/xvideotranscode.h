@@ -16,7 +16,7 @@ class XVideoTranscode : public QWidget {
   void closeEvent(QCloseEvent* ev) override;
 
  public slots:
-  void Pause();  // ²¥·ÅºÍÔÝÍ£
+  void Pause();  // ï¿½ï¿½ï¿½Åºï¿½ï¿½ï¿½Í£
 
  private:
   void SetInputVideoInfo(const std::shared_ptr<XPara>& video_para);
@@ -30,4 +30,6 @@ class XVideoTranscode : public QWidget {
   std::shared_ptr<XPara> inputVideoPara;
   std::shared_ptr<XPara> inputAudioPara;
   QString outputURL;
+  bool running_ = false;
+  int timer_id_ = 0;
 };

@@ -29,11 +29,17 @@ class XCODEC_API XMuxTask : public XThread {
 
   int video_packet_count();
 
+  // 封装过程中是否发生了错误(打开/写头/写帧/写尾失败)
+  bool has_error() { return has_error_; }
+  std::string error() { return error_; }
+
  private:
   XMux xmux_;
   XAVPacketList pkts_;
   std::mutex mux_;
   bool end_mux_ = false;
+  bool has_error_ = false;
+  std::string error_;
   int block_size_ = 0;
   int video_packet_count_ = 0;
 };

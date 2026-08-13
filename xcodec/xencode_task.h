@@ -1,6 +1,8 @@
 ﻿#pragma once
 #include <deque>
+#include <memory>
 #include "xencode.h"
+#include "xresample.h"
 
 class XCODEC_API XEncodeTask : public XThread {
  public:
@@ -40,6 +42,13 @@ class XCODEC_API XEncodeTask : public XThread {
 
   void NextPacket(AVPacket* pkt);
 
+  // 已经送入编码器的帧数量
+  int frame_count() { return frame_count_; }
+  // 实际使用的硬件加速编码状态(失败回退软件后为 false)
+  bool gpu_used() { return gpu_used_; }
+  // 编码器名称(如 libx264/h264_qsv), 未打开返回空
+  const char* encoder_name();
+
  private:
   long long cur_pts_ = -1;  // 当前解码到的pts（以解码数据为准）
   AVRational* time_base_ = nullptr;
@@ -49,7 +58,9 @@ class XCODEC_API XEncodeTask : public XThread {
   std::mutex mux_;
   XEncode encode_;
   bool gpu_encode_ = false;
+  bool gpu_used_ = false;
   bool end_encode_ = false;
   int frame_count_ = 0;
   std::list<AVPacket*> pkts_cache_;
+  std::unique_ptr<XResample> resample_;  // 音频重采样(音频编码使用)
 };

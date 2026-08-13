@@ -43,6 +43,9 @@ public:
     ///设置同步类型，只支持视频
     void set_syn_type(XSYN_TYPE t) { syn_type_ = t; }
 
+    ///读取到的数据包数量(调试输出用)
+    int read_packet_count() { return read_pkt_count_; }
+
     ///停止线程并清理资源，需要Wait等待线程结束
     void Stop();
 private:

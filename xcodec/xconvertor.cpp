@@ -1,5 +1,7 @@
 ﻿#include "predefine_header.h"
 
+#include <cstdio>
+
 // 暂停或者继续转码
 void XConvertor::Pause(bool is_pause) {
   XThread::Pause(is_pause);
@@ -20,12 +22,14 @@ std::shared_ptr<XPara> XConvertor::GetAudioCodec() {
 }
 
 float XConvertor::GetPos() {
-  if (total_frame_count_ == 0) {
-    total_frame_count_ = GetVideoCodec()->frame_count +
-                         (GetAudioCodec()  ? GetAudioCodec()->frame_count : 0);
+  if (total_frame_count_ <= 0) {
+    return 0;
   }
-  return float(mux_.video_packet_count()) /
-     float (total_frame_count_);
+  auto done = mux_.video_packet_count();
+  if (done >= total_frame_count_) {
+    return 1.0f;
+  }
+  return float(done) / float(total_frame_count_);
 }
 
 void XConvertor::Stop() {
@@ -43,6 +47,7 @@ void XConvertor::Stop() {
   video_encode_.Wait();
   audio_encode_.Wait();
   mux_.Wait();
+  finished_ = true;
 }
 
 bool XConvertor::Open(const char* url) {
@@ -81,16 +86,17 @@ bool XConvertor::Open(const char* url) {
 }
 
 void XConvertor::Do(AVPacket* pkt) {
+  if (!pkt) return;
+  // EOF标记包(buf为空), 结束解封装
+  if (pkt->buf == nullptr) {
+    demux_.Exit();
+    end_of_file_ = true;
+    return;
+  }
   if (audio_decode_.is_open())
     audio_decode_.Do(pkt);
   if (video_decode_.is_open())
     video_decode_.Do(pkt);
-
-  if (pkt && pkt->stream_index == video_decode_.stream_index() &&
-      pkt->buf == nullptr) {
-    demux_.Exit();
-    end_of_file_ = true;
-  }
 }
 
 void XConvertor::Start(const char* url,
@@ -100,50 +106,97 @@ void XConvertor::Start(const char* url,
                        AVRational* audio_time_base,
                        const std::map<std::string, std::string>& video_opts,
                        const std::map<std::string, std::string>& audio_opts) {
+  finished_ = false;
+  error_.clear();
+  end_of_file_ = end_of_decode_ = end_of_encode_ = end_of_mux_ = false;
+  start_time_ms_ = NowMs();
+
   AVCodecParameters *tmp_video_para = nullptr;
+  AVCodecParameters *tmp_audio_para = nullptr;
+  AVRational enc_video_time_base = {1, 1000};
+  AVRational enc_audio_time_base = {1, 1000};
+
   if (video_para) {
+    // 编码器按源时间基数接收帧pts, 保证编码后包的时间基数与源一致
     video_encode_.set_gpu_encode(gpu_encode_);
+    video_encode_.set_time_base(video_time_base);
     video_encode_.Open(video_para, video_opts);
-    video_encode_.GetCodecContext()->refs = 4;
-    video_encode_.GetCodecContext()->gop_size = 2;
-    video_encode_.GetCodecContext()->max_b_frames = 0;
-    video_encode_.GetCodecContext()->profile = AV_PROFILE_H264_HIGH;
-    video_encode_.GetCodecContext()->flags = AV_CODEC_FLAG_QSCALE;
-    video_encode_.GetCodecContext()->global_quality = 0;
-    av_opt_set(video_encode_.GetCodecContext()->priv_data, "preset", "veryslow",
-               0);  // "best"或"veryslow"更高质量
-    av_opt_set(video_encode_.GetCodecContext()->priv_data, "profile", "high",
-               0);  // 尽量不用baseline
-    av_opt_set(video_encode_.GetCodecContext()->priv_data, "look_ahead", "1",
-               0);  // 启用lookahead提升质量
-    av_opt_set(video_encode_.GetCodecContext()->priv_data, "crf", "16", 0);
-    av_opt_set(video_encode_.GetCodecContext()->priv_data, "rc-lookahead", "60",
-               0);
-    av_opt_set(video_encode_.GetCodecContext()->priv_data, "tune", "zerolatency",
-               0);
-    av_opt_set(video_encode_.GetCodecContext()->priv_data, "async_depth", "1",
-               0);
-    av_opt_set(video_encode_.GetCodecContext()->priv_data, "x264-params",
-               "aq-mode=3:aq-strength=0.9:psy-rd=0.9,0.05:me=umh:subme=10:"
-               "trellis=2",
-               0);
+    if (!video_encode_.is_open()) {
+      error_ = "打开视频编码器失败(编解码器不支持?)";
+      return;
+    }
+    auto c = video_encode_.GetCodecContext();
+    c->refs = 4;
+    c->gop_size = 2;
+    c->max_b_frames = 0;
+    enc_video_time_base = c->time_base;  // 以avcodec_open2后的实际为准
     video_encode_.set_stream_index(0);
     tmp_video_para = avcodec_parameters_alloc();
-    avcodec_parameters_from_context(tmp_video_para,
-                                    video_encode_.GetCodecContext());
+    avcodec_parameters_from_context(tmp_video_para, c);
   }
 
   if (audio_para) {
+    audio_encode_.set_gpu_encode(false);  // 音频不做硬件编码
+    audio_encode_.set_time_base(audio_time_base);
     audio_encode_.Open(audio_para, audio_opts);
-    audio_encode_.set_stream_index(1);
+    if (!audio_encode_.is_open()) {
+      error_ = "打开音频编码器失败(编解码器不支持?)";
+      if (tmp_video_para) avcodec_parameters_free(&tmp_video_para);
+      return;
+    }
+    enc_audio_time_base = audio_encode_.GetCodecContext()->time_base;
+    // 纯音频时音频流索引为0, 有视频时为1
+    audio_encode_.set_stream_index(video_encode_.is_open() ? 1 : 0);
+    tmp_audio_para = avcodec_parameters_alloc();
+    avcodec_parameters_from_context(
+        tmp_audio_para, audio_encode_.GetCodecContext());
   }
+
   mux_.ignoreMaxPkts(true);
-  mux_.Open(url, tmp_video_para, video_time_base, audio_para,
-            audio_time_base);
+  if (!mux_.Open(url, tmp_video_para, &enc_video_time_base, tmp_audio_para,
+                 &enc_audio_time_base)) {
+    error_ = "创建输出文件失败: ";
+    if (tmp_video_para) avcodec_parameters_free(&tmp_video_para);
+    if (tmp_audio_para) avcodec_parameters_free(&tmp_audio_para);
+    return;
+  }
 
   if (tmp_video_para) {
     avcodec_parameters_free(&tmp_video_para);
   }
+  if (tmp_audio_para) {
+    avcodec_parameters_free(&tmp_audio_para);
+  }
+
+  // 估算总帧数(有些文件nb_frames为0, 用时长*帧率/采样率推算)
+  total_frame_count_ = 0;
+  {
+    auto vc = demux_.CopyVideoPara();
+    auto ac = demux_.CopyAudioPara();
+    if (vc) {
+      if (vc->frame_count > 0) {
+        total_frame_count_ += vc->frame_count;
+      } else if (vc->para->framerate.num > 0) {
+        total_frame_count_ +=
+            vc->total_ms * vc->para->framerate.num / vc->para->framerate.den /
+            1000;
+      }
+    }
+    if (ac) {
+      int frame_size =
+          ac->para->frame_size > 0 ? ac->para->frame_size : 1024;
+      if (ac->frame_count > 0) {
+        total_frame_count_ += ac->frame_count;
+      } else if (ac->para->sample_rate > 0) {
+        total_frame_count_ += ac->total_ms * ac->para->sample_rate / 1000 /
+                              frame_size;
+      }
+    }
+    if (total_frame_count_ <= 0) {
+      total_frame_count_ = 1;  // 防止除零
+    }
+  }
+
   XThread::Start();
   mux_.Start();
   if (video_encode_.is_open()) {
@@ -172,22 +225,89 @@ void XConvertor::Main() {
       end_of_decode_ = true;
     }
 
-    if (!end_of_encode_ && end_of_decode_ && video_decode_.EndOfDecode() &&
+    if (!end_of_encode_ && end_of_decode_ &&
+        (!video_decode_.is_open() || video_decode_.EndOfDecode()) &&
         (!audio_decode_.is_open() || audio_decode_.EndOfDecode())) {
       video_encode_.Exit();
       audio_encode_.Exit();
       end_of_encode_ = true;
     }
 
-    if (!end_of_mux_ && end_of_encode_ && video_encode_.EndEncode() &&
+    if (!end_of_mux_ && end_of_encode_ &&
+        (!video_encode_.is_open() || video_encode_.EndEncode()) &&
         (!audio_encode_.is_open() || audio_encode_.EndEncode())) {
       mux_.Exit();
       end_of_mux_ = true;
     }
 
     if (end_of_mux_ && mux_.EndOfMux()) {
+      if (mux_.has_error()) {
+        error_ = mux_.error();
+      }
+      finished_ = true;
       break;
     }
     MSleep(1);
   }
+}
+
+std::string XConvertor::DumpInfo() {
+  std::string s;
+  char buf[256];
+  auto vc = demux_.CopyVideoPara();
+  auto ac = demux_.CopyAudioPara();
+  s += "==== 转码信息 ====\n";
+  if (vc) {
+    snprintf(buf, sizeof(buf), "输入视频: %s %dx%d %.2ffps 时长%lldms\n",
+             avcodec_get_name(vc->para->codec_id), vc->para->width,
+             vc->para->height,
+             vc->para->framerate.den
+                 ? (double)vc->para->framerate.num / vc->para->framerate.den
+                 : 0,
+             (long long)vc->total_ms);
+    s += buf;
+  }
+  if (ac) {
+    snprintf(buf, sizeof(buf), "输入音频: %s %dHz %d声道 时长%lldms\n",
+             avcodec_get_name(ac->para->codec_id), ac->para->sample_rate,
+             ac->para->ch_layout.nb_channels, (long long)ac->total_ms);
+    s += buf;
+  }
+  if (video_decode_.is_open()) {
+    snprintf(buf, sizeof(buf), "视频解码: %s 收包%d 出帧%d 硬件=%s\n",
+             video_decode_.decoder_name(), video_decode_.recv_packet_count(),
+             video_decode_.get_Current_decode_frame_count(),
+             video_decode_.gpu_used() ? "是" : "否");
+    s += buf;
+  }
+  if (audio_decode_.is_open()) {
+    snprintf(buf, sizeof(buf), "音频解码: %s 收包%d 出帧%d 硬件=%s\n",
+             audio_decode_.decoder_name(), audio_decode_.recv_packet_count(),
+             audio_decode_.get_Current_decode_frame_count(),
+             audio_decode_.gpu_used() ? "是" : "否");
+    s += buf;
+  }
+  if (video_encode_.is_open()) {
+    snprintf(buf, sizeof(buf), "视频编码: %s 入帧%d 硬件=%s\n",
+             video_encode_.encoder_name(), video_encode_.frame_count(),
+             video_encode_.gpu_used() ? "是" : "否");
+    s += buf;
+  }
+  if (audio_encode_.is_open()) {
+    snprintf(buf, sizeof(buf), "音频编码: %s 入帧%d\n",
+             audio_encode_.encoder_name(), audio_encode_.frame_count());
+    s += buf;
+  }
+  snprintf(buf, sizeof(buf), "解封装读取: %d 包, 封装写入: %d 包\n",
+           demux_.read_packet_count(), mux_.video_packet_count());
+  s += buf;
+  if (start_time_ms_ > 0) {
+    snprintf(buf, sizeof(buf), "耗时: %lld ms\n",
+             (long long)(NowMs() - start_time_ms_));
+    s += buf;
+  }
+  if (!error_.empty()) {
+    s += "错误: " + error_ + "\n";
+  }
+  return s;
 }

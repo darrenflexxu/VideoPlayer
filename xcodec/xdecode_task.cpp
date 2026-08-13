@@ -29,6 +29,11 @@ int XDecodeTask::get_Current_decode_frame_count() {
   return decode_frame_count_;
 }
 
+const char* XDecodeTask::decoder_name() {
+  auto c = decode_.get_codec_context();
+  return (c && c->codec) ? c->codec->name : "";
+}
+
 /// <summary>
 /// 清理缓存
 /// </summary>
@@ -73,6 +78,7 @@ bool XDecodeTask::Open(AVCodecParameters* para)
     }
     unique_lock<mutex> lock(mux_);
     is_open_ = false;
+    gpu_used_ = false;
     auto c = decode_.Create(para->codec_id, false, gpu_decode_);
     if (!c)
     {
@@ -90,10 +96,28 @@ bool XDecodeTask::Open(AVCodecParameters* para)
 
     if (!decode_.Open())
     {
-        LOGERROR("decode_.Open() failed!");
-        return false;
+        if (gpu_decode_) {
+            // GPU 解码失败(如无QSV设备), 回退软件解码
+            LOGERROR("gpu decode open failed! fallback to software");
+            decode_.set_c(nullptr);
+            c = decode_.Create(para->codec_id, false, false);
+            if (!c) {
+                LOGERROR("decode_.Create failed!");
+                return false;
+            }
+            avcodec_parameters_to_context(c, para);
+            decode_.set_c(c);
+            if (!decode_.Open()) {
+                LOGERROR("decode_.Open() failed!");
+                return false;
+            }
+        } else {
+            LOGERROR("decode_.Open() failed!");
+            return false;
+        }
     }
     LOGINFO("Open decode success!");
+    gpu_used_ = gpu_decode_;
     is_open_ = true;
     return true;
 }
