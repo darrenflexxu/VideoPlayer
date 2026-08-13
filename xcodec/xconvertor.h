@@ -32,6 +32,9 @@ class XCODEC_API XConvertor : public XThread {
   void set_gpu_decode(bool gpu) { gpu_decode_ = gpu; }
   void set_gpu_encode(bool gpu) { gpu_encode_ = gpu; }
 
+  // 是否向控制台打印转码进度(\r进度 xx%), 默认开; --quiet等场景可关闭
+  void set_show_progress(bool show) { show_progress_ = show; }
+
   std::shared_ptr<XPara> GetVideoCodec();
   std::shared_ptr<XPara> GetAudioCodec();
 
@@ -66,4 +69,7 @@ class XCODEC_API XConvertor : public XThread {
   bool finished_ = false;
   std::string error_;
   long long start_time_ms_ = 0;
+  bool show_progress_ = true;
+  int last_percent_ = -1;
+  bool progress_open_ = false;
 };

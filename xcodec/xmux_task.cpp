@@ -19,8 +19,8 @@ bool XMuxTask::EndOfMux() {
   return end_mux_;
 }
 
-int XMuxTask::video_packet_count() {
-  return video_packet_count_;
+int XMuxTask::packet_count() {
+  return packet_count_;
 }
 
 void XMuxTask::Main() {
@@ -45,8 +45,7 @@ void XMuxTask::Main() {
       av_packet_free(&pkt);
       break;
     }
-    video_packet_count_ += 1;
-    cout << "W" << flush;
+    packet_count_ += 1;
     av_packet_free(&pkt);
   }
 
@@ -60,8 +59,7 @@ void XMuxTask::Main() {
           av_packet_free(&pkt);
           break;
         }
-        video_packet_count_ += 1;
-        cout << "W" << flush;
+        packet_count_ += 1;
         av_packet_free(&pkt);
       }
     }

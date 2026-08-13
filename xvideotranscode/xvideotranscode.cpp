@@ -237,12 +237,11 @@ XVideoTranscode::XVideoTranscode(QWidget* parent) : QWidget(parent) {
         video_opts["bit_rate"] = std::to_string(br);
       } else {
         // 未指定码率时使用CRF固定质量
-        video_opts["preset"] = "veryslow";
+        video_opts["preset"] = "medium";
         // x265没有high等高配置, profile只对h264有效
         if (inputVideoPara->para->codec_id != AV_CODEC_ID_HEVC) {
           video_opts["profile"] = "high";
         }
-        video_opts["tune"] = "zerolatency";
         video_opts["crf"] = "18";
       }
     }

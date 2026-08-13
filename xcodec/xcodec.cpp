@@ -1,4 +1,6 @@
 ﻿#include "predefine_header.h"
+#include <thread>
+
 using namespace std;
 
 //////////////////////////////////////////
@@ -48,7 +50,11 @@ AVCodecContext* XCodec::Create(int codec_id, bool isencode, bool gpu) {
   // 设置参数默认值
   c->time_base = {1, 25};
   c->pix_fmt = AV_PIX_FMT_YUV420P;
-  c->thread_count = 16;
+  // 线程数按CPU逻辑核自适应, 避免硬编码16在4线程机器上过度订阅
+  int hc = (int)std::thread::hardware_concurrency();
+  c->thread_count = hc > 0 ? hc : 4;
+  // 注: QSV(h264_qsv/hevc_qsv)的帧缓冲与thread_count耦合, 改小会引发尾帧丢失,
+  // 故QSV路径在Open()里单独恢复为16(见XEncodeTask::Open)
   return c;
 }
 

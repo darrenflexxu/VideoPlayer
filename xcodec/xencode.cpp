@@ -1,5 +1,9 @@
 ﻿#include "predefine_header.h"
 
+extern "C" {
+#include <libavutil/time.h>
+}
+
 using namespace std;
 
 //////////////////////////////////////////////////////////////
@@ -75,18 +79,55 @@ std::vector<AVPacket*> XEncode::End()
     std::vector<AVPacket*> res;
     unique_lock<mutex>lock(mux_);
     if (!c_)return res;
-    auto re = avcodec_send_frame(c_, NULL); //发送NULL 获取缓冲
-    if (re != 0)return res;
-    while (re >= 0)
-    {
-        auto pkt = av_packet_alloc();
-        re = avcodec_receive_packet(c_, pkt);
-        if (re != 0)
-        {
+
+    // 收下当前已就绪的包(到EAGAIN为止)
+    auto drain_ready = [&]() {
+        for (;;) {
+            auto pkt = av_packet_alloc();
+            auto re = avcodec_receive_packet(c_, pkt);
+            if (re == 0) {
+                res.push_back(pkt);
+                continue;
+            }
             av_packet_free(&pkt);
-            break;
+            return;
         }
-        res.push_back(pkt);
+    };
+    drain_ready();
+
+    // 冲刷编码器。send(NULL)在QSV等异步编码器上可能返回EAGAIN
+    // (硬件仍有在途帧), 若就此放弃会静默丢尾帧(实测90帧只剩63),
+    // 需交替收包腾出缓冲后重试send(NULL)。
+    int retry = 0;
+    while (retry < 100) {
+        auto re = avcodec_send_frame(c_, NULL);
+        if (re == 0) break;
+        if (re == AVERROR(EAGAIN)) {
+            drain_ready();
+            ++retry;
+            continue;
+        }
+        break;  // 其他错误放弃
+    }
+
+    // 冲刷后持续收包: 异步编码器返回EAGAIN可能是暂态(硬件在途),
+    // 短暂等待直到EOF/出错/超时, 确保所有帧都取回
+    int idle = 0;
+    for (;;) {
+        auto pkt = av_packet_alloc();
+        auto re = avcodec_receive_packet(c_, pkt);
+        if (re == 0) {
+            res.push_back(pkt);
+            idle = 0;
+            continue;
+        }
+        av_packet_free(&pkt);
+        if (re == AVERROR(EAGAIN)) {
+            if (++idle > 2000) break;  // ~2s仍无新包, 视为冲刷完成
+            av_usleep(1000);
+            continue;
+        }
+        break;  // EOF或其他错误
     }
     return res;
 }

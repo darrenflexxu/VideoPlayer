@@ -125,8 +125,6 @@ bool XDecodeTask::Open(AVCodecParameters* para)
 //责任链处理函数
 void XDecodeTask::Do(AVPacket* pkt)
 {
-    cout << "D" << flush;
-
     if (!pkt || pkt->stream_index != stream_index_) //判断是否是视频
     {
         return;

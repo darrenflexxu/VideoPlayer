@@ -25,9 +25,9 @@ struct Options {
   long long vbr = 0;  // 视频码率 bps, 0=CRF固定质量
   long long abr = 0;  // 音频码率 bps, 0=编码器默认
   int asr = 0;        // 音频采样率
-  string preset = "veryslow";
+  string preset = "medium";
   string profile = "high";
-  string tune = "zerolatency";
+  string tune = "";
   string crf = "18";
   bool gpu = false;
   bool quiet = false;
@@ -48,10 +48,10 @@ void PrintUsage() {
       "视频选项:\n"
       "  -w <宽度>  -H <高度>  输出尺寸(自动取偶数)\n"
       "  --vbr <bps>          视频码率, 指定后按码率编码\n"
-      "  --preset <名>         默认 veryslow\n"
+      "  --preset <名>         默认 medium (ultrafast..veryslow)\n"
       "  --crf <数值>          默认 18 (仅未指定码率时生效)\n"
       "  --profile <名>        默认 high\n"
-      "  --tune <名>           默认 zerolatency\n"
+      "  --tune <名>           默认不设(如film/animation/zerolatency)\n"
       "\n"
       "音频选项:\n"
       "  --abr <bps>          音频码率\n"
@@ -209,7 +209,10 @@ int RunTranscode(const Options& opt) {
       if (video_para->codec_id != AV_CODEC_ID_HEVC) {
         video_opts["profile"] = opt.profile;
       }
-      video_opts["tune"] = opt.tune;
+      // tune为空时不设置(文件转码用默认即可, zerolatency只适合直播)
+      if (!opt.tune.empty()) {
+        video_opts["tune"] = opt.tune;
+      }
       video_opts["crf"] = opt.crf;
     }
   }
@@ -229,6 +232,7 @@ int RunTranscode(const Options& opt) {
           video_para, vp ? vp->time_base : nullptr,
           audio_para, ap ? ap->time_base : nullptr,
           video_opts, audio_opts);
+  c.set_show_progress(!opt.quiet);
   if (c.HasError()) {
     fprintf(stderr, "启动转码失败: %s\n", c.GetError().c_str());
     return 1;
@@ -238,19 +242,10 @@ int RunTranscode(const Options& opt) {
     fprintf(stderr, "提示: QSV硬件编码不可用, 已回退软件编码\n");
   }
 
-  // 进度显示
-  int last_percent = -1;
+  // 等待转码结束(进度由XConvertor统一打印)
   while (!c.IsFinished()) {
-    float pos = c.GetPos();
-    int percent = (int)(pos * 100);
-    if (!opt.quiet && percent != last_percent) {
-      printf("\r进度 %d%%  ", percent);
-      fflush(stdout);
-      last_percent = percent;
-    }
     MSleep(50);
   }
-  printf("\n");
 
   printf("%s\n", c.DumpInfo().c_str());
   c.Stop();

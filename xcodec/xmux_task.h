@@ -27,7 +27,8 @@ class XCODEC_API XMuxTask : public XThread {
   void set_block_size(int count) { block_size_ = count; }
   void ignoreMaxPkts(bool ignore) { pkts_.IgnoreMaxPackets(ignore); }
 
-  int video_packet_count();
+  // 已写入封装的包总数(视频+音频)
+  int packet_count();
 
   // 封装过程中是否发生了错误(打开/写头/写帧/写尾失败)
   bool has_error() { return has_error_; }
@@ -41,5 +42,5 @@ class XCODEC_API XMuxTask : public XThread {
   bool has_error_ = false;
   std::string error_;
   int block_size_ = 0;
-  int video_packet_count_ = 0;
+  int packet_count_ = 0;
 };

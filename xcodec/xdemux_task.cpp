@@ -65,7 +65,6 @@ void XDemuxTask::Main()
         }
 
         //播放速度控制
-        cout << "R" << flush;
         if (syn_type_ == XSYN_VIDEO &&
             pkt.stream_index == demux_.video_index())
         {

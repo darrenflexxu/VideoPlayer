@@ -25,7 +25,7 @@ float XConvertor::GetPos() {
   if (total_frame_count_ <= 0) {
     return 0;
   }
-  auto done = mux_.video_packet_count();
+  auto done = mux_.packet_count();
   if (done >= total_frame_count_) {
     return 1.0f;
   }
@@ -48,6 +48,12 @@ void XConvertor::Stop() {
   audio_encode_.Wait();
   mux_.Wait();
   finished_ = true;
+  // 取消/异常退出时进度行可能还挂着\r, 补换行避免后续输出接在同一行
+  if (show_progress_ && progress_open_) {
+    printf("\n");
+    fflush(stdout);
+    progress_open_ = false;
+  }
 }
 
 bool XConvertor::Open(const char* url) {
@@ -110,6 +116,8 @@ void XConvertor::Start(const char* url,
   error_.clear();
   end_of_file_ = end_of_decode_ = end_of_encode_ = end_of_mux_ = false;
   start_time_ms_ = NowMs();
+  last_percent_ = -1;
+  progress_open_ = false;
 
   AVCodecParameters *tmp_video_para = nullptr;
   AVCodecParameters *tmp_audio_para = nullptr;
@@ -245,7 +253,26 @@ void XConvertor::Main() {
         error_ = mux_.error();
       }
       finished_ = true;
+      if (show_progress_) {
+        // 完成: 正常时置100%, 出错时保留当前值并换行收尾
+        printf("\r进度 %d%%\n",
+               mux_.has_error() ? (last_percent_ >= 0 ? last_percent_ : 0)
+                                : 100);
+        fflush(stdout);
+        progress_open_ = false;
+      }
       break;
+    }
+
+    // 控制台进度(节流: 百分比变化才打印, 避免每包flush拖慢性能)
+    if (show_progress_) {
+      int percent = (int)(GetPos() * 100);
+      if (percent != last_percent_) {
+        printf("\r进度 %d%%  ", percent);
+        fflush(stdout);
+        last_percent_ = percent;
+        progress_open_ = true;
+      }
     }
     MSleep(1);
   }
@@ -299,7 +326,7 @@ std::string XConvertor::DumpInfo() {
     s += buf;
   }
   snprintf(buf, sizeof(buf), "解封装读取: %d 包, 封装写入: %d 包\n",
-           demux_.read_packet_count(), mux_.video_packet_count());
+           demux_.read_packet_count(), mux_.packet_count());
   s += buf;
   if (start_time_ms_ > 0) {
     snprintf(buf, sizeof(buf), "耗时: %lld ms\n",

@@ -20,7 +20,7 @@ class VideoSws {
     }
     if (ctx_) sws_freeContext(ctx_);
     ctx_ = sws_getContext(sw, sh, (enum AVPixelFormat)sf, dw, dh,
-                          (enum AVPixelFormat)df, SWS_BICUBIC, nullptr,
+                          (enum AVPixelFormat)df, SWS_FAST_BILINEAR, nullptr,
                           nullptr, nullptr);
     sw_ = sw;
     sh_ = sh;
@@ -153,6 +153,11 @@ bool XEncodeTask::Open(AVCodecParameters* para,
       return false;
     }
     avcodec_parameters_to_context(c, para);
+    if (gpu) {
+      // QSV编码器的内部帧缓冲与thread_count耦合, 改成4会出现尾帧丢失,
+      // 故GPU(QSV)路径保持16; 软件编码仍用硬件并发数(见XCodec::Create)
+      c->thread_count = 16;
+    }
     if (time_base_ && (time_base_->num > 0 && time_base_->den > 0)) {
       // 编码器按源时间基数接收帧pts, 保证编码后包的时间基数与源一致
       c->time_base = *time_base_;
@@ -285,7 +290,6 @@ void XEncodeTask::Main() {
       if (encode_.Send(frame)) return true;
       auto p = av_packet_alloc();
       if (encode_.Recv(p)) {
-        cout << "E" << flush;
         p->stream_index = stream_index_;
         NextPacket(p);
       } else {
@@ -325,7 +329,6 @@ void XEncodeTask::Main() {
     auto ret = encode_.Recv(pkg);
 
     if (ret) {
-      cout << "E" << flush;
       pkg->stream_index = stream_index_;
       NextPacket(pkg);
       continue;
@@ -346,7 +349,8 @@ void XEncodeTask::Main() {
     }
   }
 
-  do {
+  // 排空当前已就绪的包(异步在途的由End()冲刷回收)
+  for (;;) {
     auto pkg = av_packet_alloc();
     auto ret = encode_.Recv(pkg);
 
@@ -354,14 +358,12 @@ void XEncodeTask::Main() {
       av_packet_free(&pkg);
       break;
     }
-    cout << "E" << flush;
     pkg->stream_index = stream_index_;
     NextPacket(pkg);
-  } while (!is_exit_);
+  }
   auto pkgs = encode_.End();
 
   for (auto pkg : pkgs) {
-    cout << "E" << flush;
     pkg->stream_index = stream_index_;
     NextPacket(pkg);
   }
