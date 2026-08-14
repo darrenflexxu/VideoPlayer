@@ -375,38 +375,52 @@ bool XConvertor::OpenSegment(int i) {
   }
   auto vp = demux_.CopyVideoPara();
   auto ap = demux_.CopyAudioPara();
-  // 流布局必须与第0段一致(拼接输出只有一套音视频流)
-  if (i > 0 && i < (int)seg_has_video_.size()) {
-    bool hv = vp != nullptr, ha = ap != nullptr;
-    if (hv != seg_has_video_[0] || ha != seg_has_audio_[0]) {
-      char b[256];
-      snprintf(b, sizeof(b), "片段%d的流布局与第0段不一致(视频/音频有无不同)", i + 1);
-      error_ = b;
-      return false;
-    }
-  }
+  // 输出流布局以第0段为准: 本段缺的流该段留空(视频无画面/音频静音),
+  // 本段多余的流直接丢弃(解码器未打开, 包在Do()里被跳过)
+  bool want_video = !seg_has_video_.empty() && seg_has_video_[0];
+  bool want_audio = !seg_has_audio_.empty() && seg_has_audio_[0];
   video_decode_.set_gpu_decode(gpu_decode_);
-  if (vp) {
-    video_decode_.set_stream_index(demux_.video_index());
-    video_decode_.ignoreMaxPkts(true);
-    if (!video_decode_.Open(vp->para)) {
-      char b[128];
-      snprintf(b, sizeof(b), "打开片段%d视频解码器失败", i + 1);
-      error_ = b;
-      return false;
+  if (want_video) {
+    if (vp) {
+      video_decode_.set_stream_index(demux_.video_index());
+      video_decode_.ignoreMaxPkts(true);
+      if (!video_decode_.Open(vp->para)) {
+        char b[128];
+        snprintf(b, sizeof(b), "打开片段%d视频解码器失败", i + 1);
+        error_ = b;
+        return false;
+      }
+      video_decode_.set_time_base(vp->time_base);
+    } else {
+      // 本段无视频: 关闭解码器, 该段视频留空
+      video_decode_.Stop();
+      if (i > 0)
+        std::cout << "片段" << (i + 1) << "无视频流, 该段输出视频将留空" << std::endl;
     }
-    video_decode_.set_time_base(vp->time_base);
+  } else if (vp && i > 0) {
+    // 输出无视频但本段有视频: 直接丢弃
+    std::cout << "片段" << (i + 1) << "的视频流将被丢弃(输出无视频)" << std::endl;
   }
-  if (ap) {
-    audio_decode_.set_stream_index(demux_.audio_index());
-    audio_decode_.ignoreMaxPkts(true);
-    if (!audio_decode_.Open(ap->para)) {
-      char b[128];
-      snprintf(b, sizeof(b), "打开片段%d音频解码器失败", i + 1);
-      error_ = b;
-      return false;
+  if (want_audio) {
+    if (ap) {
+      audio_decode_.set_stream_index(demux_.audio_index());
+      audio_decode_.ignoreMaxPkts(true);
+      if (!audio_decode_.Open(ap->para)) {
+        char b[128];
+        snprintf(b, sizeof(b), "打开片段%d音频解码器失败", i + 1);
+        error_ = b;
+        return false;
+      }
+      audio_decode_.set_time_base(ap->time_base);
+    } else {
+      // 本段无音频: 关闭解码器, 该段音频静音
+      audio_decode_.Stop();
+      if (i > 0)
+        std::cout << "片段" << (i + 1) << "无音频流, 该段输出音频将静音" << std::endl;
     }
-    audio_decode_.set_time_base(ap->time_base);
+  } else if (ap && i > 0) {
+    // 输出无音频但本段有音频: 直接丢弃
+    std::cout << "片段" << (i + 1) << "的音频流将被丢弃(输出无音频)" << std::endl;
   }
   return true;
 }
