@@ -79,13 +79,15 @@ bool XMux::Write(AVPacket* pkt)
     {
         if (begin_video_pts_ < 0)
             begin_video_pts_ = pkt->pts;
-        if (src_video_time_base_ && pkt->pts >= begin_video_pts_) {
-          auto ms = av_rescale_q(pkt->pts - begin_video_pts_,
+        // 毫秒模式: 包时间戳已是绝对毫秒, 不再以首包为0重定基
+        long long off = ms_mode_ ? 0 : begin_video_pts_;
+        if (src_video_time_base_ && pkt->pts >= off) {
+          auto ms = av_rescale_q(pkt->pts - off,
                                  *src_video_time_base_, {1, 1000});
           if (ms > output_ms_) output_ms_ = ms;
         }
         lock.unlock();
-        RescaleTime(pkt, begin_video_pts_, src_video_time_base_);
+        RescaleTime(pkt, off, src_video_time_base_);
         lock.lock();
 
     }
@@ -93,13 +95,14 @@ bool XMux::Write(AVPacket* pkt)
     {
         if (begin_audio_pts_ < 0)
             begin_audio_pts_ = pkt->pts;
-        if (src_audio_time_base_ && pkt->pts >= begin_audio_pts_) {
-          auto ms = av_rescale_q(pkt->pts - begin_audio_pts_,
+        long long off = ms_mode_ ? 0 : begin_audio_pts_;
+        if (src_audio_time_base_ && pkt->pts >= off) {
+          auto ms = av_rescale_q(pkt->pts - off,
                                  *src_audio_time_base_, {1, 1000});
           if (ms > output_ms_) output_ms_ = ms;
         }
         lock.unlock();
-        RescaleTime(pkt, begin_audio_pts_, src_audio_time_base_);
+        RescaleTime(pkt, off, src_audio_time_base_);
         lock.lock();
     }
 

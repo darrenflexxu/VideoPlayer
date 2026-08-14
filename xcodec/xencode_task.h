@@ -44,6 +44,9 @@ class XCODEC_API XEncodeTask : public XThread {
 
   void set_time_base(AVRational* time_base);
 
+  // 当前编码器使用的输入时间基数(毫秒模式Do()换算用), 未设置返回{1,1000}
+  AVRational cur_time_base() const;
+
   AVCodecContext* GetCodecContext() const;
 
   bool EndEncode();

@@ -178,6 +178,8 @@ void XConvertor::Start(const char* url,
     enc_audio_time_base = audio_encode_.GetCodecContext()->time_base;
 
   mux_.ignoreMaxPkts(true);
+  // 截取模式: 编码器输出绝对毫秒时间戳, 封装时不再以首包为0重定基
+  mux_.set_ms_mode(start_ms_ > 0);
   if (!mux_.Open(url, tmp_video_para, &enc_video_time_base, tmp_audio_para,
                  &enc_audio_time_base)) {
     error_ = "创建输出文件失败: ";
@@ -375,10 +377,12 @@ bool XConvertor::OpenSegment(int i) {
   }
   auto vp = demux_.CopyVideoPara();
   auto ap = demux_.CopyAudioPara();
-  // 输出流布局以第0段为准: 本段缺的流该段留空(视频无画面/音频静音),
-  // 本段多余的流直接丢弃(解码器未打开, 包在Do()里被跳过)
-  bool want_video = !seg_has_video_.empty() && seg_has_video_[0];
-  bool want_audio = !seg_has_audio_.empty() && seg_has_audio_[0];
+  // 输出流布局为所有片段的并集: 本段缺的流该段留空(视频无画面/音频静音)
+  bool want_video = want_video_;
+  bool want_audio = want_audio_;
+  // 本段无音频流: 输出需补静音帧, 使音频轨从0开始连续(首段无音频时不能留空,
+  // 否则mux会以首个真实音频包为0重定基, 破坏后续时间戳)
+  silent_audio_seg_ = want_audio && !ap;
   video_decode_.set_gpu_decode(gpu_decode_);
   if (want_video) {
     if (vp) {
@@ -400,9 +404,6 @@ bool XConvertor::OpenSegment(int i) {
       if (i > 0)
         std::cout << "片段" << (i + 1) << "无视频流, 该段输出视频将留空" << std::endl;
     }
-  } else if (vp && i > 0) {
-    // 输出无视频但本段有视频: 直接丢弃
-    std::cout << "片段" << (i + 1) << "的视频流将被丢弃(输出无视频)" << std::endl;
   }
   if (want_audio) {
     if (ap) {
@@ -422,11 +423,44 @@ bool XConvertor::OpenSegment(int i) {
       if (i > 0)
         std::cout << "片段" << (i + 1) << "无音频流, 该段输出音频将静音" << std::endl;
     }
-  } else if (ap && i > 0) {
-    // 输出无音频但本段有音频: 直接丢弃
-    std::cout << "片段" << (i + 1) << "的音频流将被丢弃(输出无音频)" << std::endl;
   }
   return true;
+}
+
+// 当前段无音频流时, 按该段有效时长向音频编码器补静音帧, 使输出音频轨连续
+// (帧pts换算成编码器输入时间基数, Do()里转回毫秒并叠加段偏移; 背压自限速)
+void XConvertor::FeedSilentAudio() {
+  if (!audio_encode_.is_open() || !silent_audio_seg_) return;
+  int i = cur_seg_;
+  long long ss = i < (int)seg_trims_.size() ? seg_trims_[i].first : 0;
+  long long eff = i < (int)seg_dur_ms_.size() ? seg_dur_ms_[i] : 0;
+  if (eff <= 0) return;
+  auto c = audio_encode_.GetCodecContext();
+  if (!c || c->sample_rate <= 0) return;
+  int fs = c->frame_size > 0 ? c->frame_size : 1024;
+  long long frame_ms = 1000LL * fs / c->sample_rate;
+  if (frame_ms <= 0) frame_ms = 21;
+  AVRational tb = audio_encode_.cur_time_base();
+  AVRational ms_tb = {1, 1000};
+  int n = (int)((eff + frame_ms - 1) / frame_ms);
+  fprintf(stderr, "[DBG-FS] seg%d silent feed n=%d eff=%lld off=%lld\n", i, n,
+          eff, pts_offset_ms_);
+  for (int j = 0; j < n; ++j) {
+    AVFrame* f = av_frame_alloc();
+    if (!f) break;
+    f->format = c->sample_fmt;
+    f->sample_rate = c->sample_rate;
+    av_channel_layout_copy(&f->ch_layout, &c->ch_layout);
+    f->nb_samples = fs;
+    if (av_frame_get_buffer(f, 0) < 0) {
+      av_frame_free(&f);
+      break;
+    }
+    f->pts = av_rescale_q(ss + j * frame_ms, ms_tb, tb);
+    av_samples_set_silence(f->data, 0, f->nb_samples, f->ch_layout.nb_channels,
+                           (AVSampleFormat)f->format);
+    audio_encode_.Do(f);
+  }
 }
 
 // 多片段拼接: 复用已Open的第0段, 编码器/mux全程复用, 段间只换解封装+解码器
@@ -473,7 +507,13 @@ void XConvertor::StartConcat(
   video_encode_.set_trim_start_ms(ss0);
   audio_encode_.set_trim_start_ms(ss0);
 
-  // 探测各片段时长/帧时长, 计算有效时长与进度分母
+  // 探测各片段时长/帧时长, 计算有效时长与进度分母;
+  // 同时抓取并集流参数: 当第0段缺某流但后面片段有, 用第一个含该流的片段参数打开编码器
+  AVCodecParameters* union_video_para = nullptr;
+  AVCodecParameters* union_audio_para = nullptr;
+  AVRational union_video_tb = {0, 0};
+  AVRational union_audio_tb = {0, 0};
+  bool got_uv = false, got_ua = false;
   for (int i = 0; i < seg_count_; ++i) {
     long long full = 0;
     long long vfd = 40, afd = 40;  // 视频/音频帧时长(毫秒)估算, 兜底40ms
@@ -492,11 +532,23 @@ void XConvertor::StartConcat(
           auto t = st->codecpar->codec_type;
           if (t == AVMEDIA_TYPE_VIDEO) {
             hv = true;
+            if (!got_uv) {
+              union_video_para = avcodec_parameters_alloc();
+              avcodec_parameters_copy(union_video_para, st->codecpar);
+              union_video_tb = st->time_base;
+              got_uv = true;
+            }
             if (st->codecpar->framerate.num > 0 && st->codecpar->framerate.den > 0)
               vfd = 1000LL * st->codecpar->framerate.den /
                     st->codecpar->framerate.num;
           } else if (t == AVMEDIA_TYPE_AUDIO) {
             ha = true;
+            if (!got_ua) {
+              union_audio_para = avcodec_parameters_alloc();
+              avcodec_parameters_copy(union_audio_para, st->codecpar);
+              union_audio_tb = st->time_base;
+              got_ua = true;
+            }
             if (st->codecpar->sample_rate > 0) {
               int fs = st->codecpar->frame_size > 0 ? st->codecpar->frame_size
                                                     : 1024;
@@ -525,20 +577,46 @@ void XConvertor::StartConcat(
   }
   if (total_ms_ <= 0) total_ms_ = 1;  // 防止除零
 
+  // 输出流布局为所有片段的并集(第0段缺的流, 若后面片段有则保留)
+  want_video_ = false;
+  want_audio_ = false;
+  for (bool b : seg_has_video_) want_video_ |= b;
+  for (bool b : seg_has_audio_) want_audio_ |= b;
+
   // 打开输出编码器+封装(一次, 后续段不复用编码器重开)
   AVCodecParameters* tmp_video_para = nullptr;
   AVCodecParameters* tmp_audio_para = nullptr;
-  if (!OpenEncoders(video_para, video_time_base, audio_para, audio_time_base,
+  AVCodecParameters* eff_video_para = video_para;
+  AVCodecParameters* eff_audio_para = audio_para;
+  AVRational* eff_video_tb = video_time_base;
+  AVRational* eff_audio_tb = audio_time_base;
+  if (want_video_ && !eff_video_para && got_uv) {
+    eff_video_para = union_video_para;
+    eff_video_tb = &union_video_tb;
+  }
+  if (want_audio_ && !eff_audio_para && got_ua) {
+    eff_audio_para = union_audio_para;
+    eff_audio_tb = &union_audio_tb;
+  }
+  if (!OpenEncoders(eff_video_para, eff_video_tb, eff_audio_para, eff_audio_tb,
                     video_opts, audio_opts, &tmp_video_para, &tmp_audio_para)) {
+    avcodec_parameters_free(&union_video_para);
+    avcodec_parameters_free(&union_audio_para);
     return;
   }
+  if (union_video_para) avcodec_parameters_free(&union_video_para);
+  if (union_audio_para) avcodec_parameters_free(&union_audio_para);
   AVRational enc_video_time_base = {1, 1000};
   AVRational enc_audio_time_base = {1, 1000};
   if (video_encode_.is_open())
     enc_video_time_base = video_encode_.GetCodecContext()->time_base;
   if (audio_encode_.is_open())
     enc_audio_time_base = audio_encode_.GetCodecContext()->time_base;
+
   mux_.ignoreMaxPkts(true);
+  // 拼接模式: 编码器输出绝对毫秒时间戳, 封装时不再以首包为0重定基,
+  // 否则第0段无音频时首包非0会把后续音频时间轴整体平移
+  mux_.set_ms_mode(true);
   if (!mux_.Open(out_url, tmp_video_para, &enc_video_time_base, tmp_audio_para,
                  &enc_audio_time_base)) {
     error_ = "创建输出文件失败: ";
@@ -549,6 +627,21 @@ void XConvertor::StartConcat(
   if (tmp_video_para) avcodec_parameters_free(&tmp_video_para);
   if (tmp_audio_para) avcodec_parameters_free(&tmp_audio_para);
 
+  // 静音段的音频帧计入进度分母, 避免补静音后音频编码/写入进度提前到100
+  if (audio_encode_.is_open()) {
+    auto ac = audio_encode_.GetCodecContext();
+    long long fm = 21;
+    if (ac && ac->sample_rate > 0) {
+      int fs = ac->frame_size > 0 ? ac->frame_size : 1024;
+      fm = 1000LL * fs / ac->sample_rate;
+    }
+    if (fm <= 0) fm = 21;
+    for (int i = 0; i < seg_count_; ++i) {
+      if (!seg_has_audio_[i] && seg_dur_ms_[i] > 0)
+        audio_total_frames_ += (int)(seg_dur_ms_[i] / fm);
+    }
+  }
+
   total_frame_count_ = (video_encode_.is_open() ? video_total_frames_ : 0) +
                        (audio_encode_.is_open() ? audio_total_frames_ : 0);
   if (total_frame_count_ <= 0) total_frame_count_ = 1;  // 防止除零
@@ -557,6 +650,8 @@ void XConvertor::StartConcat(
   if (!OpenSegment(0)) return;
   XThread::Start();
   StartPipeline();
+  // 第0段无音频时先补静音帧, 保证音频轨从0开始连续
+  FeedSilentAudio();
 }
 
 void XConvertor::MainConcat() {
@@ -615,6 +710,8 @@ void XConvertor::MainConcat() {
         demux_.Start();
         if (video_decode_.is_open()) video_decode_.Start();
         if (audio_decode_.is_open()) audio_decode_.Start();
+        // 本段无音频时补静音帧, 覆盖该段有效时长, 使音频轨连续
+        FeedSilentAudio();
         continue;
       }
       // 最后一段: 编码器排空收尾

@@ -75,6 +75,12 @@ void XEncodeTask::set_time_base(AVRational* time_base) {
   time_base_->num = time_base->num;
 }
 
+AVRational XEncodeTask::cur_time_base() const {
+  if (time_base_) return *time_base_;
+  AVRational tb = {1, 1000};
+  return tb;
+}
+
 AVCodecContext* XEncodeTask::GetCodecContext() const {
   return encode_.get_codec_context();
 }
@@ -239,6 +245,17 @@ void XEncodeTask::Do(AVFrame* frame) {
 
   if (c->codec_type == AVMEDIA_TYPE_AUDIO) {
     // 音频: 重采样到编码器期望的采样格式/采样率/声道布局
+    static double dbg_rms_in = -1;
+    if (getenv("XD_DEBUG") && pts_offset_ms_ > 23000 && dbg_rms_in < 2) {
+      double acc = 0;
+      int n = frame->nb_samples * frame->ch_layout.nb_channels;
+      for (int k = 0; k < n && k < 4096; ++k) {
+        acc += (double)frame->data[0][k] * frame->data[0][k];
+      }
+      dbg_rms_in = n > 0 ? sqrt(acc / (n < 4096 ? n : 4096)) : 0;
+      fprintf(stderr, "[DBG-RIN] pts=%lld rms=%.2f fmt=%d ns=%d\n", frame->pts,
+              dbg_rms_in, frame->format, frame->nb_samples);
+    }
     if (!resample_) resample_.reset(new XResample());
     if (resample_->Need(frame, c)) resample_->Create(frame, c);
     if (resample_->is_active()) {
@@ -246,6 +263,16 @@ void XEncodeTask::Do(AVFrame* frame) {
       av_frame_free(&frame);
       if (!out) return;
       frame = out;
+      if (getenv("XD_DEBUG") && frame->pts > 23100 && frame->pts < 23300) {
+        double acc = 0;
+        int n = frame->nb_samples * frame->ch_layout.nb_channels;
+        for (int k = 0; k < n && k < 4096; ++k) {
+          acc += (double)frame->data[0][k] * frame->data[0][k];
+        }
+        fprintf(stderr, "[DBG-ROUT] pts=%lld rms=%.2f (in=%.2f) fmt=%d ns=%d\n",
+                frame->pts, n > 0 ? sqrt(acc / (n < 4096 ? n : 4096)) : 0,
+                dbg_rms_in, frame->format, frame->nb_samples);
+      }
     }
   } else if (c->codec_type == AVMEDIA_TYPE_VIDEO) {
     // 视频: 缩放/格式转换到编码器期望的分辨率和像素格式
@@ -275,6 +302,24 @@ void XEncodeTask::Do(AVFrame* frame) {
       return;
     }
     frame->pts = pts_offset_ms_ + rel_ms;
+  }
+  if (c->codec_type == AVMEDIA_TYPE_AUDIO && getenv("XD_DEBUG")) {
+    static long long dbg_last = -1;
+    static int dbg_cnt = 0;
+    long long p = frame->pts;
+    if (dbg_last < 0 || (p - dbg_last) > 200 || (dbg_last - p) > 200 ||
+        p > 23000) {
+      fprintf(stderr,
+              "[DBG-A] audio frame pts=%lld (off=%lld trim=%lld tb=%d/%d fmt=%d "
+              "sr=%d ns=%d ch=%d rs=%d)\n",
+              p, pts_offset_ms_, trim_start_ms_, time_base_->num,
+              time_base_->den, frame->format, frame->sample_rate,
+              frame->nb_samples,
+              frame->ch_layout.nb_channels, resample_ && resample_->is_active());
+      dbg_cnt++;
+      if (dbg_cnt > 12) { /* keep bounded */ }
+    }
+    dbg_last = p;
   }
 
   // 入队交给编码线程送帧(队列满则等待, 背压自然传导到解码/解封装),
@@ -306,6 +351,14 @@ void XEncodeTask::Main() {
   auto push_packet = [&](AVPacket* p) {
     if (!p) return;
     if (p->dts == AV_NOPTS_VALUE || p->dts > p->pts) p->dts = p->pts;
+    if (getenv("XD_DEBUG")) {
+      auto cc = encode_.get_codec_context();
+      if (cc && cc->codec_type == AVMEDIA_TYPE_AUDIO) {
+        long long ms = p->pts;  // ms模式包pts已是毫秒
+        if (p->size > 6)
+          fprintf(stderr, "[DBG-P] audio pkt pts=%lld size=%d\n", ms, p->size);
+      }
+    }
     p->stream_index = stream_index_;
     NextPacket(p);
   };

@@ -27,6 +27,9 @@ class XCODEC_API XMuxTask : public XThread {
   void set_block_size(int count) { block_size_ = count; }
   void ignoreMaxPkts(bool ignore) { pkts_.IgnoreMaxPackets(ignore); }
 
+  // 毫秒PTS模式: 包时间戳已是输出时间轴上的绝对毫秒, 不再以首包为0重定基
+  void set_ms_mode(bool on) { xmux_.set_ms_mode(on); }
+
   // 已写入封装的包总数(视频+音频)
   int packet_count();
 

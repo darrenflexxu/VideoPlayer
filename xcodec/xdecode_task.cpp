@@ -250,6 +250,20 @@ void XDecodeTask::Main()
 
                 if (has_next()) {
                   decode_frame_count_ += 1;
+                  if (getenv("XD_DEBUG") && frame_->nb_samples > 0 &&
+                      frame_->pts > 23000) {
+                    double acc = 0;
+                    int n = frame_->nb_samples * frame_->ch_layout.nb_channels;
+                    for (int k = 0; k < n && k < 4096; ++k)
+                      acc += (double)frame_->data[0][k] * frame_->data[0][k];
+                    fprintf(stderr,
+                            "[DBG-DEC] pts=%lld rms=%.2f ns=%d tb=%d/%d\n",
+                            frame_->pts,
+                            n > 0 ? sqrt(acc / (n < 4096 ? n : 4096)) : 0,
+                            frame_->nb_samples,
+                            time_base_ ? time_base_->num : -1,
+                            time_base_ ? time_base_->den : -1);
+                  }
                   Next(av_frame_clone(frame_));
                   continue;
                 }

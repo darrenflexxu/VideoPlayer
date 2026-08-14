@@ -84,6 +84,8 @@ class XCODEC_API XConvertor : public XThread {
   // 打开某一片段的解封装+解码器(含截取seek与流布局校验), 并启动其线程
   bool OpenSegment(int i);
   void StartPipeline();  // 启动 mux/编码/解码/demux 线程
+  // 当前段无音频流时, 按该段有效时长向音频编码器补静音帧(与视频对齐, 背压自限速)
+  void FeedSilentAudio();
   void MainConcat();     // 拼接主循环(段切换/结束)
   // 分阶段进度: 解封装/写入按时间轴, 解码/编码按帧数, 链式收敛保证顺序
   void CalcStages(int& demux_p, int& dec_p, int& enc_p, int& mux_p,
@@ -125,6 +127,9 @@ class XCODEC_API XConvertor : public XThread {
   std::vector<long long> seg_frame_dur_ms_;  // 各片段帧时长(毫秒, 段间留隙用)
   std::vector<bool> seg_has_video_;       // 各片段是否有视频流(布局校验)
   std::vector<bool> seg_has_audio_;
+  bool want_video_ = false;               // 输出布局取所有片段的并集
+  bool want_audio_ = false;
+  bool silent_audio_seg_ = false;         // 当前段无音频流, 需要补静音帧
   int cur_seg_ = 0;
   int seg_count_ = 0;
   long long seg_start_ms_ = 0;  // 当前段之前各段有效时长之和(进度用)

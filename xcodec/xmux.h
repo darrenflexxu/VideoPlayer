@@ -27,10 +27,15 @@ public:
     void set_src_video_time_base(AVRational* tb);
     void set_src_audio_time_base(AVRational* tb);
 
+    // 毫秒PTS模式(拼接/截取): 包时间戳已是输出时间轴上的绝对毫秒,
+    // 不再以首包为0重定基, 否则首包非0(如第0段无音频时)会把后续时间轴整体平移
+    void set_ms_mode(bool on) { ms_mode_ = on; }
+
     ~XMux();
 private:
     AVRational* src_video_time_base_ = nullptr;
     AVRational* src_audio_time_base_ = nullptr;
+    bool ms_mode_ = false;
 
     long long begin_video_pts_ = -1;//原视频开始时间
     long long begin_audio_pts_ = -1;//原音频开始时间
