@@ -24,6 +24,14 @@ class XCODEC_API XEncodeTask : public XThread {
 
   void set_gpu_encode(bool gpu) { gpu_encode_ = gpu; }
 
+  // 毫秒PTS模式: 拼接多段时编码器以{1,1000}为时间基数, Do()里把源pts
+  // 换算成毫秒并叠加段偏移, 保证多段输出时间轴连续
+  void set_ms_pts_mode(bool on) { ms_pts_mode_ = on; }
+  // 当前段的PTS偏移(毫秒), 段内帧pts都加上该偏移
+  void set_pts_offset_ms(long long ms) { pts_offset_ms_ = ms; }
+  // 截取起点(毫秒, 源时间轴): 小于该值的帧丢弃不编码, 0=不截
+  void set_trim_start_ms(long long ms) { trim_start_ms_ = ms; }
+
   /// <summary>
   /// 清理缓存
   /// </summary>
@@ -65,4 +73,7 @@ class XCODEC_API XEncodeTask : public XThread {
   std::list<AVPacket*> pkts_cache_;
   std::deque<AVFrame*> frame_queue_;  // 待编码帧队列(Do入队, Main出队送帧)
   std::unique_ptr<XResample> resample_;  // 音频重采样(音频编码使用)
+  bool ms_pts_mode_ = false;       // 拼接模式: 输出时间轴为毫秒
+  long long pts_offset_ms_ = 0;    // 当前段的PTS偏移(毫秒)
+  long long trim_start_ms_ = 0;    // 截取起点(毫秒, 源时间轴), 0=不截
 };

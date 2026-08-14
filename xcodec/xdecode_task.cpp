@@ -119,6 +119,8 @@ bool XDecodeTask::Open(AVCodecParameters* para)
     LOGINFO("Open decode success!");
     gpu_used_ = gpu_decode_;
     is_open_ = true;
+    // 重开解码器用于下一段拼接: 结束标志清掉, 帧计数跨段累计(进度单调)
+    end_decode_ = false;
     return true;
 }
 

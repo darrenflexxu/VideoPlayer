@@ -15,8 +15,13 @@ using std::string;
 namespace {
 
 // 命令行参数
+struct Input {
+  string file;
+  double ss = 0;  // 截取起点(秒), 0=不截
+  double to = 0;  // 截取终点(秒), 0=不截
+};
 struct Options {
-  string input;
+  std::vector<Input> inputs;
   string output;
   string vcodec = "keep";  // h264 / hevc / none / keep
   string acodec = "keep";  // aac / mp3 / none / keep
@@ -38,8 +43,12 @@ void PrintUsage() {
       "用法: XVideoTranscodeCLI -i <输入文件> -o <输出文件> [选项]\n"
       "\n"
       "必选:\n"
-      "  -i <文件>          输入音视频文件\n"
+      "  -i <文件>          输入音视频文件(可多次指定, 多个即按顺序拼接)\n"
       "  -o <文件>          输出文件(容器按扩展名识别: .mp4/.mkv/.mp3 等)\n"
+      "\n"
+      "截取(作用于最近一次 -i, 秒数可带小数, 均可选):\n"
+      "  -ss <秒>           截取起点\n"
+      "  -to <秒>           截取终点(超文件结尾则到文件尾)\n"
       "\n"
       "编码器(-v none 时只转音频; -a none 时只转视频):\n"
       "  -v h264|hevc|none  视频编码器, 默认保持源\n"
@@ -65,7 +74,9 @@ void PrintUsage() {
       "示例:\n"
       "  XVideoTranscodeCLI -i in.mp4 -o out.mp4\n"
       "  XVideoTranscodeCLI -i in.mp4 -o out.mp4 -v hevc -w 1280 -h 720\n"
-      "  XVideoTranscodeCLI -i in.mp4 -o out.mp3 -v none -a mp3 --abr 128000\n");
+      "  XVideoTranscodeCLI -i in.mp4 -o out.mp3 -v none -a mp3 --abr 128000\n"
+      "  XVideoTranscodeCLI -i in.mp4 -ss 2 -to 6 -o cut.mp4\n"
+      "  XVideoTranscodeCLI -i a.mp4 -ss 1 -to 3 -i b.mp4 -o out.mp4\n");
 }
 
 // 解析参数, 出错返回false
@@ -83,8 +94,24 @@ bool ParseArgs(int argc, char** argv, Options* opt) {
     if (a == "-i") {
       auto v = next("-i");
       if (!v) return false;
-      opt->input = v;
+      opt->inputs.push_back({string(v), 0, 0});
       has_in = true;
+    } else if (a == "-ss") {
+      const char* v = next("-ss");
+      if (!v) return false;
+      if (opt->inputs.empty()) {
+        fprintf(stderr, "错误: -ss 需跟在 -i 之后!\n");
+        return false;
+      }
+      opt->inputs.back().ss = atof(v);
+    } else if (a == "-to") {
+      const char* v = next("-to");
+      if (!v) return false;
+      if (opt->inputs.empty()) {
+        fprintf(stderr, "错误: -to 需跟在 -i 之后!\n");
+        return false;
+      }
+      opt->inputs.back().to = atof(v);
     } else if (a == "-o") {
       auto v = next("-o");
       if (!v) return false;
@@ -137,6 +164,16 @@ bool ParseArgs(int argc, char** argv, Options* opt) {
     fprintf(stderr, "错误: 必须指定 -i 和 -o!\n");
     return false;
   }
+  for (auto& in : opt->inputs) {
+    if (in.ss < 0) {
+      fprintf(stderr, "错误: -ss 不能为负数!\n");
+      return false;
+    }
+    if (in.to > 0 && in.to <= in.ss) {
+      fprintf(stderr, "错误: -to 必须大于 -ss!\n");
+      return false;
+    }
+  }
   return true;
 }
 
@@ -151,8 +188,14 @@ int RunTranscode(const Options& opt) {
   c.set_gpu_decode(opt.gpu);
   c.set_gpu_encode(opt.gpu);
 
-  if (!c.Open(opt.input.c_str())) {
-    fprintf(stderr, "打开输入文件失败: %s\n", opt.input.c_str());
+  const Input& in0 = opt.inputs[0];
+  if (opt.inputs.size() == 1) {
+    // 单文件截取区间(毫秒)
+    c.set_trim_ms((long long)(in0.ss * 1000), (long long)(in0.to * 1000));
+  }
+
+  if (!c.Open(in0.file.c_str())) {
+    fprintf(stderr, "打开输入文件失败: %s\n", in0.file.c_str());
     return 1;
   }
   auto vp = c.GetVideoCodec();
@@ -228,10 +271,25 @@ int RunTranscode(const Options& opt) {
     if (opt.abr > 0) audio_para->bit_rate = opt.abr;
   }
 
-  c.Start(opt.output.c_str(),
-          video_para, vp ? vp->time_base : nullptr,
-          audio_para, ap ? ap->time_base : nullptr,
-          video_opts, audio_opts);
+  if (opt.inputs.size() == 1) {
+    c.Start(opt.output.c_str(),
+            video_para, vp ? vp->time_base : nullptr,
+            audio_para, ap ? ap->time_base : nullptr,
+            video_opts, audio_opts);
+  } else {
+    // 多片段拼接: 各片段截取区间转毫秒
+    std::vector<std::string> urls;
+    std::vector<std::pair<long long, long long>> seg_trims;
+    for (auto& in : opt.inputs) {
+      urls.push_back(in.file);
+      seg_trims.push_back({(long long)(in.ss * 1000),
+                           (long long)(in.to * 1000)});
+    }
+    c.StartConcat(urls, opt.output.c_str(),
+                  video_para, vp ? vp->time_base : nullptr,
+                  audio_para, ap ? ap->time_base : nullptr,
+                  video_opts, audio_opts, seg_trims);
+  }
   c.set_show_progress(!opt.quiet);
   if (c.HasError()) {
     fprintf(stderr, "启动转码失败: %s\n", c.GetError().c_str());

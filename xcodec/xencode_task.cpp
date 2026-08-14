@@ -158,7 +158,10 @@ bool XEncodeTask::Open(AVCodecParameters* para,
       // 故GPU(QSV)路径保持16; 软件编码仍用硬件并发数(见XCodec::Create)
       c->thread_count = 16;
     }
-    if (time_base_ && (time_base_->num > 0 && time_base_->den > 0)) {
+    if (ms_pts_mode_) {
+      // 拼接模式: 输出时间轴统一为毫秒, 多段pts直接累加偏移即可连续
+      c->time_base = AVRational{1, 1000};
+    } else if (time_base_ && (time_base_->num > 0 && time_base_->den > 0)) {
       // 编码器按源时间基数接收帧pts, 保证编码后包的时间基数与源一致
       c->time_base = *time_base_;
     }
@@ -219,6 +222,8 @@ bool XEncodeTask::Open(AVCodecParameters* para,
 
   LOGINFO("Open encode success!");
   is_open_ = true;
+  // 重开编码器用于下一段拼接: 结束标志清掉, 帧计数跨段累计(进度单调)
+  end_encode_ = false;
   return true;
 }
 
@@ -257,6 +262,19 @@ void XEncodeTask::Do(AVFrame* frame) {
       if (!out) return;
       frame = out;
     }
+  }
+
+  // 拼接/截取模式: 把源时间轴的pts换算成毫秒, 减去截取起点再叠加段偏移,
+  // 得到输出时间轴上连续的时间戳(缩放/重采样已保留源pts)
+  if (ms_pts_mode_ && time_base_ && frame->pts != AV_NOPTS_VALUE) {
+    long long rel_ms = av_rescale_q(frame->pts, *time_base_, {1, 1000}) -
+                       trim_start_ms_;
+    if (rel_ms < 0) {
+      // 截取起点之前的帧丢弃(不送编码器), 帧级精确
+      av_frame_free(&frame);
+      return;
+    }
+    frame->pts = pts_offset_ms_ + rel_ms;
   }
 
   // 入队交给编码线程送帧(队列满则等待, 背压自然传导到解码/解封装),

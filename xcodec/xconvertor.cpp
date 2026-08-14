@@ -93,6 +93,8 @@ void XConvertor::Stop() {
 }
 
 bool XConvertor::Open(const char* url) {
+  // 单文件截取区间(起点seek/终点停读由解封装处理)
+  demux_.set_trim(start_ms_, end_ms_);
   // 解封装
   if (!demux_.Open(url))
     return false;
@@ -150,51 +152,30 @@ void XConvertor::Start(const char* url,
                        const std::map<std::string, std::string>& audio_opts) {
   finished_ = false;
   error_.clear();
+  concat_mode_ = false;
   end_of_file_ = end_of_decode_ = end_of_encode_ = end_of_mux_ = false;
   start_time_ms_ = NowMs();
   last_percent_ = -1;
   progress_open_ = false;
 
-  AVCodecParameters *tmp_video_para = nullptr;
-  AVCodecParameters *tmp_audio_para = nullptr;
+  // 单文件截取: 起点之前的帧由编码器丢弃(毫秒PTS模式, 输出时间轴统一毫秒)
+  video_encode_.set_ms_pts_mode(start_ms_ > 0);
+  audio_encode_.set_ms_pts_mode(start_ms_ > 0);
+  video_encode_.set_trim_start_ms(start_ms_);
+  audio_encode_.set_trim_start_ms(start_ms_);
+
+  AVCodecParameters* tmp_video_para = nullptr;
+  AVCodecParameters* tmp_audio_para = nullptr;
+  if (!OpenEncoders(video_para, video_time_base, audio_para, audio_time_base,
+                    video_opts, audio_opts, &tmp_video_para, &tmp_audio_para)) {
+    return;
+  }
   AVRational enc_video_time_base = {1, 1000};
   AVRational enc_audio_time_base = {1, 1000};
-
-  if (video_para) {
-    // 编码器按源时间基数接收帧pts, 保证编码后包的时间基数与源一致
-    video_encode_.set_gpu_encode(gpu_encode_);
-    video_encode_.set_time_base(video_time_base);
-    video_encode_.Open(video_para, video_opts);
-    if (!video_encode_.is_open()) {
-      error_ = "打开视频编码器失败(编解码器不支持?)";
-      return;
-    }
-    auto c = video_encode_.GetCodecContext();
-    c->refs = 4;
-    c->gop_size = 2;
-    c->max_b_frames = 0;
-    enc_video_time_base = c->time_base;  // 以avcodec_open2后的实际为准
-    video_encode_.set_stream_index(0);
-    tmp_video_para = avcodec_parameters_alloc();
-    avcodec_parameters_from_context(tmp_video_para, c);
-  }
-
-  if (audio_para) {
-    audio_encode_.set_gpu_encode(false);  // 音频不做硬件编码
-    audio_encode_.set_time_base(audio_time_base);
-    audio_encode_.Open(audio_para, audio_opts);
-    if (!audio_encode_.is_open()) {
-      error_ = "打开音频编码器失败(编解码器不支持?)";
-      if (tmp_video_para) avcodec_parameters_free(&tmp_video_para);
-      return;
-    }
+  if (video_encode_.is_open())
+    enc_video_time_base = video_encode_.GetCodecContext()->time_base;
+  if (audio_encode_.is_open())
     enc_audio_time_base = audio_encode_.GetCodecContext()->time_base;
-    // 纯音频时音频流索引为0, 有视频时为1
-    audio_encode_.set_stream_index(video_encode_.is_open() ? 1 : 0);
-    tmp_audio_para = avcodec_parameters_alloc();
-    avcodec_parameters_from_context(
-        tmp_audio_para, audio_encode_.GetCodecContext());
-  }
 
   mux_.ignoreMaxPkts(true);
   if (!mux_.Open(url, tmp_video_para, &enc_video_time_base, tmp_audio_para,
@@ -204,7 +185,6 @@ void XConvertor::Start(const char* url,
     if (tmp_audio_para) avcodec_parameters_free(&tmp_audio_para);
     return;
   }
-
   if (tmp_video_para) {
     avcodec_parameters_free(&tmp_video_para);
   }
@@ -248,7 +228,126 @@ void XConvertor::Start(const char* url,
     }
   }
 
+  // 单文件截取: 总时长与帧数分母按有效区间缩放(进度/GetPos用)
+  if ((start_ms_ > 0 || end_ms_ > 0) && total_ms_ > 0) {
+    long long eff =
+        (end_ms_ > 0 && end_ms_ < total_ms_ ? end_ms_ : total_ms_) - start_ms_;
+    if (eff < 0) eff = 0;
+    if (eff < total_ms_) {
+      double ratio = (double)eff / (double)total_ms_;
+      video_total_frames_ = (int)(video_total_frames_ * ratio);
+      audio_total_frames_ = (int)(audio_total_frames_ * ratio);
+      total_ms_ = eff;
+      total_frame_count_ = (video_encode_.is_open() ? video_total_frames_ : 0) +
+                           (audio_encode_.is_open() ? audio_total_frames_ : 0);
+      if (total_frame_count_ <= 0) {
+        total_frame_count_ = 1;  // 防止除零
+      }
+    }
+  }
+
   XThread::Start();
+  StartPipeline();
+}
+
+// 分阶段进度: 解封装/写入按时间轴(精确), 解码/编码按帧数估算
+// 瓶颈用收敛前的原始值判定; 收敛保证流水线顺序 解封装>=解码>=编码>=写入
+void XConvertor::CalcStages(int& demux_p, int& dec_p, int& enc_p, int& mux_p,
+                            int& bottleneck) {
+  int raw[4] = {0, 0, 0, 0};
+  if (total_ms_ > 0) {
+    raw[0] = (int)(demux_pos_ms() * 100 / total_ms_);
+    raw[3] = (int)(mux_.output_ms() * 100 / total_ms_);
+    if (raw[0] > 100) raw[0] = 100;
+    if (raw[3] > 100) raw[3] = 100;
+  }
+  if (total_frame_count_ > 0) {
+    // 只统计实际参与转码的流(例如 -v none 时不把视频帧计入分母)
+    int act_total = (video_encode_.is_open() ? video_total_frames_ : 0) +
+                    (audio_encode_.is_open() ? audio_total_frames_ : 0);
+    int act_dec =
+        (video_encode_.is_open() ? video_decode_.get_Current_decode_frame_count()
+                                 : 0) +
+        (audio_encode_.is_open() ? audio_decode_.get_Current_decode_frame_count()
+                                 : 0);
+    int act_enc = (video_encode_.is_open() ? video_encode_.frame_count() : 0) +
+                  (audio_encode_.is_open() ? audio_encode_.frame_count() : 0);
+    if (act_total > 0) {
+      raw[1] = (int)(act_dec * 100 / act_total);
+      raw[2] = (int)(act_enc * 100 / act_total);
+      if (raw[1] > 100) raw[1] = 100;
+      if (raw[2] > 100) raw[2] = 100;
+    }
+  }
+  // 时间轴进度受"末帧pts<容器时长"误差影响到不了100, 阶段真正完成后按完成标志置100
+  if (end_of_file_) raw[0] = 100;  // 解封装已读到EOF(所有包已读取)
+  if (end_of_mux_) raw[3] = 100;   // 写入已结束(编码器输出全部排空)
+  // 瓶颈: 收敛前原始值中的最小者, 全部相等时无瓶颈
+  bottleneck = 4;
+  {
+    int bi = 0;
+    for (int i = 1; i < 4; ++i)
+      if (raw[i] < raw[bi]) bi = i;
+    if (!(raw[0] == raw[1] && raw[1] == raw[2] && raw[2] == raw[3]))
+      bottleneck = bi;
+  }
+  // 链式收敛: 下游不可能快于上游
+  demux_p = raw[0];
+  dec_p = raw[1] < raw[0] ? raw[1] : raw[0];
+  enc_p = raw[2] < dec_p ? raw[2] : dec_p;
+  mux_p = raw[3] < enc_p ? raw[3] : enc_p;
+}
+
+bool XConvertor::OpenEncoders(
+    AVCodecParameters* video_para,
+    AVRational* video_time_base,
+    AVCodecParameters* audio_para,
+    AVRational* audio_time_base,
+    const std::map<std::string, std::string>& video_opts,
+    const std::map<std::string, std::string>& audio_opts,
+    AVCodecParameters** out_video_para,
+    AVCodecParameters** out_audio_para) {
+  *out_video_para = nullptr;
+  *out_audio_para = nullptr;
+  if (video_para) {
+    // 编码器按源时间基数接收帧pts, 保证编码后包的时间基数与源一致
+    // (拼接毫秒模式时Open内部改为{1,1000})
+    video_encode_.set_gpu_encode(gpu_encode_);
+    video_encode_.set_time_base(video_time_base);
+    video_encode_.Open(video_para, video_opts);
+    if (!video_encode_.is_open()) {
+      error_ = "打开视频编码器失败(编解码器不支持?)";
+      return false;
+    }
+    auto c = video_encode_.GetCodecContext();
+    c->refs = 4;
+    c->gop_size = 2;
+    c->max_b_frames = 0;
+    video_encode_.set_stream_index(0);
+    *out_video_para = avcodec_parameters_alloc();
+    avcodec_parameters_from_context(*out_video_para, c);
+  }
+
+  if (audio_para) {
+    audio_encode_.set_gpu_encode(false);  // 音频不做硬件编码
+    audio_encode_.set_time_base(audio_time_base);
+    audio_encode_.Open(audio_para, audio_opts);
+    if (!audio_encode_.is_open()) {
+      error_ = "打开音频编码器失败(编解码器不支持?)";
+      if (*out_video_para) avcodec_parameters_free(out_video_para);
+      return false;
+    }
+    // 纯音频时音频流索引为0, 有视频时为1
+    audio_encode_.set_stream_index(video_encode_.is_open() ? 1 : 0);
+    *out_audio_para = avcodec_parameters_alloc();
+    avcodec_parameters_from_context(*out_audio_para,
+                                    audio_encode_.GetCodecContext());
+  }
+  return true;
+}
+
+// 启动 mux/编码/解码/demux 流水线线程
+void XConvertor::StartPipeline() {
   mux_.Start();
   if (video_encode_.is_open()) {
     video_encode_.Start();
@@ -263,59 +362,295 @@ void XConvertor::Start(const char* url,
   demux_.Start();
 }
 
-void XConvertor::Main() {
-  // 分阶段进度: 解封装/写入按时间轴(精确), 解码/编码按帧数估算
-  // 瓶颈用收敛前的原始值判定; 收敛保证流水线顺序 解封装>=解码>=编码>=写入
-  auto calc_stages = [&](int& demux_p, int& dec_p, int& enc_p, int& mux_p,
-                         int& bottleneck) {
-    int raw[4] = {0, 0, 0, 0};
-    if (total_ms_ > 0) {
-      raw[0] = (int)(demux_.read_ms() * 100 / total_ms_);
-      raw[3] = (int)(mux_.output_ms() * 100 / total_ms_);
-      if (raw[0] > 100) raw[0] = 100;
-      if (raw[3] > 100) raw[3] = 100;
+// 打开某一片段的解封装+解码器(含截取seek与流布局校验)
+bool XConvertor::OpenSegment(int i) {
+  long long ss = i < (int)seg_trims_.size() ? seg_trims_[i].first : 0;
+  long long to = i < (int)seg_trims_.size() ? seg_trims_[i].second : 0;
+  demux_.set_trim(ss, to);
+  if (!demux_.Open(seg_urls_[i].c_str())) {
+    char b[128];
+    snprintf(b, sizeof(b), "打开片段%d失败", i + 1);
+    error_ = b;
+    return false;
+  }
+  auto vp = demux_.CopyVideoPara();
+  auto ap = demux_.CopyAudioPara();
+  // 流布局必须与第0段一致(拼接输出只有一套音视频流)
+  if (i > 0 && i < (int)seg_has_video_.size()) {
+    bool hv = vp != nullptr, ha = ap != nullptr;
+    if (hv != seg_has_video_[0] || ha != seg_has_audio_[0]) {
+      char b[256];
+      snprintf(b, sizeof(b), "片段%d的流布局与第0段不一致(视频/音频有无不同)", i + 1);
+      error_ = b;
+      return false;
     }
-    if (total_frame_count_ > 0) {
-      // 只统计实际参与转码的流(例如 -v none 时不把视频帧计入分母)
-      int act_total = (video_encode_.is_open() ? video_total_frames_ : 0) +
-                      (audio_encode_.is_open() ? audio_total_frames_ : 0);
-      int act_dec =
-          (video_encode_.is_open()
-               ? video_decode_.get_Current_decode_frame_count()
-               : 0) +
-          (audio_encode_.is_open()
-               ? audio_decode_.get_Current_decode_frame_count()
-               : 0);
-      int act_enc = (video_encode_.is_open() ? video_encode_.frame_count()
-                                             : 0) +
-                    (audio_encode_.is_open() ? audio_encode_.frame_count()
-                                             : 0);
-      if (act_total > 0) {
-        raw[1] = (int)(act_dec * 100 / act_total);
-        raw[2] = (int)(act_enc * 100 / act_total);
-        if (raw[1] > 100) raw[1] = 100;
-        if (raw[2] > 100) raw[2] = 100;
+  }
+  video_decode_.set_gpu_decode(gpu_decode_);
+  if (vp) {
+    video_decode_.set_stream_index(demux_.video_index());
+    video_decode_.ignoreMaxPkts(true);
+    if (!video_decode_.Open(vp->para)) {
+      char b[128];
+      snprintf(b, sizeof(b), "打开片段%d视频解码器失败", i + 1);
+      error_ = b;
+      return false;
+    }
+    video_decode_.set_time_base(vp->time_base);
+  }
+  if (ap) {
+    audio_decode_.set_stream_index(demux_.audio_index());
+    audio_decode_.ignoreMaxPkts(true);
+    if (!audio_decode_.Open(ap->para)) {
+      char b[128];
+      snprintf(b, sizeof(b), "打开片段%d音频解码器失败", i + 1);
+      error_ = b;
+      return false;
+    }
+    audio_decode_.set_time_base(ap->time_base);
+  }
+  return true;
+}
+
+// 多片段拼接: 复用已Open的第0段, 编码器/mux全程复用, 段间只换解封装+解码器
+void XConvertor::StartConcat(
+    const std::vector<std::string>& urls,
+    const char* out_url,
+    AVCodecParameters* video_para,
+    AVRational* video_time_base,
+    AVCodecParameters* audio_para,
+    AVRational* audio_time_base,
+    const std::map<std::string, std::string>& video_opts,
+    const std::map<std::string, std::string>& audio_opts,
+    const std::vector<std::pair<long long, long long>>& seg_trims) {
+  finished_ = false;
+  error_.clear();
+  concat_mode_ = true;
+  end_of_file_ = end_of_decode_ = end_of_encode_ = end_of_mux_ = false;
+  start_time_ms_ = NowMs();
+  last_percent_ = -1;
+  progress_open_ = false;
+
+  seg_urls_ = urls;
+  seg_trims_ = seg_trims;
+  seg_count_ = (int)urls.size();
+  cur_seg_ = 0;
+  last_seg_ = (seg_count_ == 1);
+  seg_start_ms_ = 0;
+  pts_offset_ms_ = 0;
+  seg_dur_ms_.clear();
+  seg_frame_dur_ms_.clear();
+  seg_has_video_.clear();
+  seg_has_audio_.clear();
+  total_ms_ = 0;
+  video_total_frames_ = 0;
+  audio_total_frames_ = 0;
+  total_frame_count_ = 0;
+
+  // 编码器毫秒PTS模式(整个拼接复用同一编码器, 段间只更新偏移/截取)
+  video_encode_.set_ms_pts_mode(true);
+  audio_encode_.set_ms_pts_mode(true);
+  video_encode_.set_pts_offset_ms(0);
+  audio_encode_.set_pts_offset_ms(0);
+  long long ss0 = seg_trims_.empty() ? 0 : seg_trims_[0].first;
+  video_encode_.set_trim_start_ms(ss0);
+  audio_encode_.set_trim_start_ms(ss0);
+
+  // 探测各片段时长/帧时长, 计算有效时长与进度分母
+  for (int i = 0; i < seg_count_; ++i) {
+    long long full = 0;
+    long long vfd = 40, afd = 40;  // 视频/音频帧时长(毫秒)估算, 兜底40ms
+    bool hv = false, ha = false;
+    AVFormatContext* fc = nullptr;
+    if (avformat_open_input(&fc, seg_urls_[i].c_str(), nullptr, nullptr) == 0) {
+      if (avformat_find_stream_info(fc, nullptr) >= 0) {
+        for (unsigned s = 0; s < fc->nb_streams; ++s) {
+          auto st = fc->streams[s];
+          long long dur = 0;
+          if (st->duration > 0)
+            dur = av_rescale_q(st->duration, st->time_base, {1, 1000});
+          else
+            dur = av_rescale_q(fc->duration, AV_TIME_BASE_Q, {1, 1000});
+          if (dur > full) full = dur;
+          auto t = st->codecpar->codec_type;
+          if (t == AVMEDIA_TYPE_VIDEO) {
+            hv = true;
+            if (st->codecpar->framerate.num > 0 && st->codecpar->framerate.den > 0)
+              vfd = 1000LL * st->codecpar->framerate.den /
+                    st->codecpar->framerate.num;
+          } else if (t == AVMEDIA_TYPE_AUDIO) {
+            ha = true;
+            if (st->codecpar->sample_rate > 0) {
+              int fs = st->codecpar->frame_size > 0 ? st->codecpar->frame_size
+                                                    : 1024;
+              afd = 1000LL * fs / st->codecpar->sample_rate;
+            }
+          }
+        }
+      }
+      avformat_close_input(&fc);
+    }
+    seg_has_video_.push_back(hv);
+    seg_has_audio_.push_back(ha);
+    long long ss = i < (int)seg_trims_.size() ? seg_trims_[i].first : 0;
+    long long to = i < (int)seg_trims_.size() ? seg_trims_[i].second : 0;
+    long long eff = full;
+    if (to > 0 && to < eff) eff = to;
+    eff -= ss;
+    if (eff < 0) eff = 0;
+    seg_dur_ms_.push_back(eff);
+    seg_frame_dur_ms_.push_back(vfd > afd ? vfd : afd);
+    total_ms_ += eff;
+    if (eff > 0) {
+      if (hv && vfd > 0) video_total_frames_ += (int)(eff / vfd);
+      if (ha && afd > 0) audio_total_frames_ += (int)(eff / afd);
+    }
+  }
+  if (total_ms_ <= 0) total_ms_ = 1;  // 防止除零
+
+  // 打开输出编码器+封装(一次, 后续段不复用编码器重开)
+  AVCodecParameters* tmp_video_para = nullptr;
+  AVCodecParameters* tmp_audio_para = nullptr;
+  if (!OpenEncoders(video_para, video_time_base, audio_para, audio_time_base,
+                    video_opts, audio_opts, &tmp_video_para, &tmp_audio_para)) {
+    return;
+  }
+  AVRational enc_video_time_base = {1, 1000};
+  AVRational enc_audio_time_base = {1, 1000};
+  if (video_encode_.is_open())
+    enc_video_time_base = video_encode_.GetCodecContext()->time_base;
+  if (audio_encode_.is_open())
+    enc_audio_time_base = audio_encode_.GetCodecContext()->time_base;
+  mux_.ignoreMaxPkts(true);
+  if (!mux_.Open(out_url, tmp_video_para, &enc_video_time_base, tmp_audio_para,
+                 &enc_audio_time_base)) {
+    error_ = "创建输出文件失败: ";
+    if (tmp_video_para) avcodec_parameters_free(&tmp_video_para);
+    if (tmp_audio_para) avcodec_parameters_free(&tmp_audio_para);
+    return;
+  }
+  if (tmp_video_para) avcodec_parameters_free(&tmp_video_para);
+  if (tmp_audio_para) avcodec_parameters_free(&tmp_audio_para);
+
+  total_frame_count_ = (video_encode_.is_open() ? video_total_frames_ : 0) +
+                       (audio_encode_.is_open() ? audio_total_frames_ : 0);
+  if (total_frame_count_ <= 0) total_frame_count_ = 1;  // 防止除零
+
+  // 打开第0段(复用之前Open的解封装/解码器会被重开)并启动流水线
+  if (!OpenSegment(0)) return;
+  XThread::Start();
+  StartPipeline();
+}
+
+void XConvertor::MainConcat() {
+  while (!is_exit_) {
+    if (is_pause()) {
+      MSleep(1);
+      continue;
+    }
+
+    if (!end_of_decode_ && end_of_file_) {
+      video_decode_.Exit();
+      audio_decode_.Exit();
+      end_of_decode_ = true;
+    }
+
+    if (end_of_decode_ &&
+        (!video_decode_.is_open() || video_decode_.EndOfDecode()) &&
+        (!audio_decode_.is_open() || audio_decode_.EndOfDecode())) {
+      if (!last_seg_) {
+        // ---- 段边界: 各解码器已排空, 算本段实际时长并切到下一段 ----
+        long long dur = 0;
+        if (video_decode_.is_open()) dur = video_decode_.cur_ms();
+        if (audio_decode_.is_open())
+          dur = audio_decode_.cur_ms() > dur ? audio_decode_.cur_ms() : dur;
+        long long ts = cur_seg_ < (int)seg_trims_.size()
+                           ? seg_trims_[cur_seg_].first
+                           : 0;
+        long long fd = cur_seg_ < (int)seg_frame_dur_ms_.size()
+                           ? seg_frame_dur_ms_[cur_seg_]
+                           : 40;
+        dur -= ts;  // cur_ms是段内绝对位置
+        if (dur <= 0 && cur_seg_ < (int)seg_dur_ms_.size())
+          dur = seg_dur_ms_[cur_seg_];  // 兜底用探测有效时长
+        // 加一帧时长, 避免段尾段首时间戳重叠
+        pts_offset_ms_ += dur + fd;
+        // 上一段线程已排空退出, join后线程对象才能复用
+        demux_.Wait();
+        video_decode_.Wait();
+        audio_decode_.Wait();
+        seg_start_ms_ += seg_dur_ms_[cur_seg_];
+        ++cur_seg_;
+        last_seg_ = (cur_seg_ == seg_count_ - 1);
+        end_of_file_ = end_of_decode_ = false;
+        // 编码器复用, 段间空闲时更新偏移/截取(供下一段帧Do()使用)
+        video_encode_.set_pts_offset_ms(pts_offset_ms_);
+        audio_encode_.set_pts_offset_ms(pts_offset_ms_);
+        long long ss = cur_seg_ < (int)seg_trims_.size()
+                           ? seg_trims_[cur_seg_].first
+                           : 0;
+        video_encode_.set_trim_start_ms(ss);
+        audio_encode_.set_trim_start_ms(ss);
+        if (!OpenSegment(cur_seg_)) {
+          finished_ = true;
+          break;
+        }
+        demux_.Start();
+        if (video_decode_.is_open()) video_decode_.Start();
+        if (audio_decode_.is_open()) audio_decode_.Start();
+        continue;
+      }
+      // 最后一段: 编码器排空收尾
+      video_encode_.Exit();
+      audio_encode_.Exit();
+      end_of_encode_ = true;
+    }
+
+    if (!end_of_mux_ && end_of_encode_ &&
+        (!video_encode_.is_open() || video_encode_.EndEncode()) &&
+        (!audio_encode_.is_open() || audio_encode_.EndEncode())) {
+      mux_.Exit();
+      end_of_mux_ = true;
+    }
+
+    if (end_of_mux_ && mux_.EndOfMux()) {
+      if (mux_.has_error()) {
+        error_ = mux_.error();
+      }
+      finished_ = true;
+      if (show_progress_) {
+        int dp = 0, dc = 0, ec = 0, mp = 0, bn = 4;
+        CalcStages(dp, dc, ec, mp, bn);
+        if (!mux_.has_error()) {
+          dp = dc = ec = mp = 100;
+          bn = 4;
+        }
+        PrintStageLine(dp == 100 ? 100
+                                 : (last_percent_ >= 0 ? last_percent_ : 0),
+                       dp, dc, ec, mp, bn, true);
+        progress_open_ = false;
+      }
+      break;
+    }
+
+    if (show_progress_) {
+      int percent = (int)(GetPos() * 100);
+      if (percent != last_percent_) {
+        int dp = 0, dc = 0, ec = 0, mp = 0, bn = 4;
+        CalcStages(dp, dc, ec, mp, bn);
+        PrintStageLine(percent, dp, dc, ec, mp, bn, false);
+        last_percent_ = percent;
+        progress_open_ = true;
       }
     }
-    // 时间轴进度受"末帧pts<容器时长"误差影响到不了100, 阶段真正完成后按完成标志置100
-    if (end_of_file_) raw[0] = 100;  // 解封装已读到EOF(所有包已读取)
-    if (end_of_mux_) raw[3] = 100;   // 写入已结束(编码器输出全部排空)
-    // 瓶颈: 收敛前原始值中的最小者, 全部相等时无瓶颈
-    bottleneck = 4;
-    {
-      int bi = 0;
-      for (int i = 1; i < 4; ++i)
-        if (raw[i] < raw[bi]) bi = i;
-      if (!(raw[0] == raw[1] && raw[1] == raw[2] && raw[2] == raw[3]))
-        bottleneck = bi;
-    }
-    // 链式收敛: 下游不可能快于上游
-    demux_p = raw[0];
-    dec_p = raw[1] < raw[0] ? raw[1] : raw[0];
-    enc_p = raw[2] < dec_p ? raw[2] : dec_p;
-    mux_p = raw[3] < enc_p ? raw[3] : enc_p;
-  };
+    MSleep(1);
+  }
+}
 
+void XConvertor::Main() {
+  if (concat_mode_) {
+    MainConcat();
+    return;
+  }
   while (!is_exit_) {
     if (is_pause()) {
       MSleep(1);
@@ -351,7 +686,7 @@ void XConvertor::Main() {
       if (show_progress_) {
         // 完成: 正常时各阶段为100, 出错时按实际值渲染并换行收尾
         int dp = 0, dc = 0, ec = 0, mp = 0, bn = 4;
-        calc_stages(dp, dc, ec, mp, bn);
+        CalcStages(dp, dc, ec, mp, bn);
         if (!mux_.has_error()) {
           dp = dc = ec = mp = 100;
           bn = 4;
@@ -369,7 +704,7 @@ void XConvertor::Main() {
       int percent = (int)(GetPos() * 100);
       if (percent != last_percent_) {
         int dp = 0, dc = 0, ec = 0, mp = 0, bn = 4;
-        calc_stages(dp, dc, ec, mp, bn);
+        CalcStages(dp, dc, ec, mp, bn);
         PrintStageLine(percent, dp, dc, ec, mp, bn, false);
         last_percent_ = percent;
         progress_open_ = true;

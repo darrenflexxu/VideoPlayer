@@ -51,12 +51,22 @@ public:
 
     ///停止线程并清理资源，需要Wait等待线程结束
     void Stop();
+
+    //设置截取区间(毫秒, 源时间轴), 0=不限; 在Open前调用生效
+    void set_trim(long long start_ms, long long end_ms)
+    {
+        trim_start_ms_ = start_ms;
+        trim_end_ms_ = end_ms;
+    }
 private:
     XDemux demux_;
     std::string url_;
     int timeout_ms_ = 0;//超时时间
     XSYN_TYPE syn_type_ = XSYN_NONE;
     bool is_eof_ = false;
+    bool trim_end_reached_ = false;  //截取终点已读到, 停止转发
+    long long trim_start_ms_ = 0;    //截取起点(毫秒), 0=不截
+    long long trim_end_ms_ = 0;      //截取终点(毫秒), 0=不截
     int read_pkt_count_ = 0;
     long long read_ms_ = 0;  //已读包的最大源时间位置(毫秒)
 };

@@ -29,6 +29,25 @@ class XCODEC_API XConvertor : public XThread {
 
   void Pause(bool is_pause) override;
 
+  // 单文件截取区间(毫秒, 源时间轴), 0=不限; 在Open前调用
+  void set_trim_ms(long long start_ms, long long end_ms) {
+    start_ms_ = start_ms;
+    end_ms_ = end_ms;
+  }
+
+  // 多片段拼接: urls为各片段(输出参数统一取第0段/用户指定), out_url为输出文件,
+  // seg_trims[i]为该片段的截取区间(毫秒, 源时间轴, 0=不限); 需先Open(urls[0])
+  void StartConcat(
+      const std::vector<std::string>& urls,
+      const char* out_url,
+      AVCodecParameters* video_para,
+      AVRational* video_time_base,
+      AVCodecParameters* audio_para,
+      AVRational* audio_time_base,
+      const std::map<std::string, std::string>& video_opts,
+      const std::map<std::string, std::string>& audio_opts,
+      const std::vector<std::pair<long long, long long>>& seg_trims);
+
   void set_gpu_decode(bool gpu) { gpu_decode_ = gpu; }
   void set_gpu_encode(bool gpu) { gpu_encode_ = gpu; }
 
@@ -53,6 +72,28 @@ class XCODEC_API XConvertor : public XThread {
   bool video_decode_gpu_used() { return video_decode_.gpu_used(); }
 
  protected:
+  // 打开输出编码器(不涉及mux), 生成临时输出参数(out_video_para/out_audio_para, 调用方释放)
+  bool OpenEncoders(AVCodecParameters* video_para,
+                    AVRational* video_time_base,
+                    AVCodecParameters* audio_para,
+                    AVRational* audio_time_base,
+                    const std::map<std::string, std::string>& video_opts,
+                    const std::map<std::string, std::string>& audio_opts,
+                    AVCodecParameters** out_video_para,
+                    AVCodecParameters** out_audio_para);
+  // 打开某一片段的解封装+解码器(含截取seek与流布局校验), 并启动其线程
+  bool OpenSegment(int i);
+  void StartPipeline();  // 启动 mux/编码/解码/demux 线程
+  void MainConcat();     // 拼接主循环(段切换/结束)
+  // 分阶段进度: 解封装/写入按时间轴, 解码/编码按帧数, 链式收敛保证顺序
+  void CalcStages(int& demux_p, int& dec_p, int& enc_p, int& mux_p,
+                  int& bottleneck);
+
+  // 解封装在输出时间轴上的毫秒位置(拼接时为各段累计)
+  long long demux_pos_ms() {
+    return concat_mode_ ? (seg_start_ms_ + demux_.read_ms()) : demux_.read_ms();
+  }
+
   XDemuxTask demux_;          // 解封装
   XDecodeTask audio_decode_;  // 音频解码
   XDecodeTask video_decode_;  // 视频解码
@@ -75,4 +116,18 @@ class XCODEC_API XConvertor : public XThread {
   bool show_progress_ = true;
   int last_percent_ = -1;
   bool progress_open_ = false;
+  long long start_ms_ = 0;  // 单文件截取起点(毫秒), 0=不截
+  long long end_ms_ = 0;    // 单文件截取终点(毫秒), 0=不截
+  bool concat_mode_ = false;
+  std::vector<std::string> seg_urls_;
+  std::vector<std::pair<long long, long long>> seg_trims_;
+  std::vector<long long> seg_dur_ms_;     // 各片段有效时长(毫秒)
+  std::vector<long long> seg_frame_dur_ms_;  // 各片段帧时长(毫秒, 段间留隙用)
+  std::vector<bool> seg_has_video_;       // 各片段是否有视频流(布局校验)
+  std::vector<bool> seg_has_audio_;
+  int cur_seg_ = 0;
+  int seg_count_ = 0;
+  long long seg_start_ms_ = 0;  // 当前段之前各段有效时长之和(进度用)
+  long long pts_offset_ms_ = 0; // 当前段输出时间轴偏移(毫秒)
+  bool last_seg_ = false;       // 当前是否为最后一段
 };
