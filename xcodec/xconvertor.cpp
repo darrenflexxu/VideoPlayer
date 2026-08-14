@@ -391,6 +391,9 @@ bool XConvertor::OpenSegment(int i) {
         return false;
       }
       video_decode_.set_time_base(vp->time_base);
+      // 编码器跨段复用, 各段源时间基数可能不同(如mkv为1/1000), 必须同步更新,
+      // 否则毫秒模式用第0段的时间基数换算本段帧pts会产生错误时间戳
+      if (video_encode_.is_open()) video_encode_.set_time_base(vp->time_base);
     } else {
       // 本段无视频: 关闭解码器, 该段视频留空
       video_decode_.Stop();
@@ -412,6 +415,7 @@ bool XConvertor::OpenSegment(int i) {
         return false;
       }
       audio_decode_.set_time_base(ap->time_base);
+      if (audio_encode_.is_open()) audio_encode_.set_time_base(ap->time_base);
     } else {
       // 本段无音频: 关闭解码器, 该段音频静音
       audio_decode_.Stop();

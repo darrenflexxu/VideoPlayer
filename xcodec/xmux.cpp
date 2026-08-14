@@ -72,6 +72,9 @@ bool XMux::Write(AVPacket* pkt)
         pkt->pts = 0;
         pkt->dts = 0;
     }
+    // 异步编码器(QSV等)偶发dts缺失, 用pts兜底, 避免按INT64_MIN换算后变负
+    if (pkt->dts == AV_NOPTS_VALUE)
+        pkt->dts = pkt->pts;
     if (pkt->stream_index == video_index_)
     {
         if (begin_video_pts_ < 0)
@@ -98,6 +101,25 @@ bool XMux::Write(AVPacket* pkt)
         lock.unlock();
         RescaleTime(pkt, begin_audio_pts_, src_audio_time_base_);
         lock.lock();
+    }
+
+    // av_interleaved_write_frame 要求每个流的dts严格递增(相等也会被拒绝)且
+    // dts<=pts, 异步编码器(aac/QSV)在毫秒时间基下偶发发出重复/回退/缺失/
+    // 超过pts的dts导致写入失败, 这里兜底: dts恒<=pts且严格递增
+    if (pkt->stream_index == video_index_ || pkt->stream_index == audio_index_)
+    {
+        long long& last = pkt->stream_index == video_index_
+                              ? last_video_dts_
+                              : last_audio_dts_;
+        if (pkt->dts > pkt->pts)
+            pkt->dts = pkt->pts;
+        if (last != LLONG_MIN && pkt->dts <= last)
+        {
+            pkt->dts = last + 1;
+            if (pkt->dts > pkt->pts)
+                pkt->pts = pkt->dts;  // 同步抬升pts, 保持pts>=dts
+        }
+        last = pkt->dts;
     }
 
     //写入一帧数据，内部缓冲排序dts，通过pkt=null 可以写入缓冲
@@ -134,6 +156,8 @@ bool XMux::WriteHead()
     av_dump_format(c_, 0, c_->url, 1);
     this->begin_audio_pts_ = -1;
     this->begin_video_pts_ = -1;
+    this->last_video_dts_ = LLONG_MIN;
+    this->last_audio_dts_ = LLONG_MIN;
 
 
     return true;

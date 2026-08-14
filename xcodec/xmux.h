@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include "xformat.h"
+#include <climits>
 //////////////////////////////////////
 /// 媒体封装
 
@@ -34,6 +35,8 @@ private:
     long long begin_video_pts_ = -1;//原视频开始时间
     long long begin_audio_pts_ = -1;//原音频开始时间
     long long output_ms_ = 0;       //已写入的最大源时间位置(毫秒)
+    long long last_video_dts_ = LLONG_MIN;//已写入视频包的最大dts(输出时间基数, 强制单调)
+    long long last_audio_dts_ = LLONG_MIN;//已写入音频包的最大dts(输出时间基数, 强制单调)
     int video_stream_index_ = 0;
     int audio_stream_index_ = 0;
 };

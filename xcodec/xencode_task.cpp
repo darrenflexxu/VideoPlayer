@@ -301,6 +301,14 @@ void XEncodeTask::Main() {
     frame_queue_.pop_front();
     return f;
   };
+  // 编码包统一出口: 异步编码器(QSV等)偶发dts缺失或超过pts, 先归一化再入重排
+  // 缓存, 否则dts排序错乱或movenc拒绝写入(要求dts<=pts且单流单调递增)
+  auto push_packet = [&](AVPacket* p) {
+    if (!p) return;
+    if (p->dts == AV_NOPTS_VALUE || p->dts > p->pts) p->dts = p->pts;
+    p->stream_index = stream_index_;
+    NextPacket(p);
+  };
   // 送帧; 失败(EAGAIN输入缓冲满)时先收包腾出缓冲再重试, 保持帧序
   auto send_one = [&](AVFrame* frame) -> bool {
     int tries = 0;
@@ -308,8 +316,7 @@ void XEncodeTask::Main() {
       if (encode_.Send(frame)) return true;
       auto p = av_packet_alloc();
       if (encode_.Recv(p)) {
-        p->stream_index = stream_index_;
-        NextPacket(p);
+        push_packet(p);
       } else {
         av_packet_free(&p);
       }
@@ -347,8 +354,7 @@ void XEncodeTask::Main() {
     auto ret = encode_.Recv(pkg);
 
     if (ret) {
-      pkg->stream_index = stream_index_;
-      NextPacket(pkg);
+      push_packet(pkg);
       continue;
     }
     av_packet_free(&pkg);
@@ -376,14 +382,12 @@ void XEncodeTask::Main() {
       av_packet_free(&pkg);
       break;
     }
-    pkg->stream_index = stream_index_;
-    NextPacket(pkg);
+    push_packet(pkg);
   }
   auto pkgs = encode_.End();
 
   for (auto pkg : pkgs) {
-    pkg->stream_index = stream_index_;
-    NextPacket(pkg);
+    push_packet(pkg);
   }
 
   while (!pkts_cache_.empty()) {
