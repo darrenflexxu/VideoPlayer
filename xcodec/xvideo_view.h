@@ -3,7 +3,9 @@
 
 #include "xtools.h"
 
+#ifdef WIN32
 struct IDirect3DSurface9;
+#endif
 
 ////////////////////////////////////
 /// 视频渲染接口类
@@ -97,7 +99,9 @@ private:
     AVFrame* frame_ = nullptr;
     unsigned char* cache_ = nullptr;//复制NV12缓冲
     bool gpu_render_direct_ = false;
+#ifdef WIN32
     IDirect3DSurface9* back_ = nullptr;
+#endif
 };
 
 #endif

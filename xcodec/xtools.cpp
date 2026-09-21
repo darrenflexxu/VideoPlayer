@@ -1,5 +1,10 @@
 ﻿#include "predefine_header.h"
 
+#ifndef WIN32
+#include <unistd.h>
+#include <limits.h>
+#endif
+
 using namespace std;
 
 //根据时间基数计算
@@ -224,4 +229,25 @@ void XTools::copy_side_data(const AVFrame* src,
       av_dict_copy(&dst_sd->metadata, src_sd->metadata, 0);
     }
   }
+}
+
+std::string XTools::get_app_path() {
+  char buffer[4096] = {0};
+#ifdef WIN32
+  GetModuleFileNameA(NULL, buffer, sizeof(buffer));
+  std::string::size_type pos = std::string(buffer).find_last_of("\\/");
+  return std::string(buffer).substr(0, pos);
+#else
+  ssize_t len = readlink("/proc/self/exe", buffer, sizeof(buffer) - 1);
+  if (len != -1) {
+    buffer[len] = '\0';
+    std::string::size_type pos = std::string(buffer).find_last_of("/");
+    return std::string(buffer).substr(0, pos);
+  }
+  // Fallback to current working directory
+  if (getcwd(buffer, sizeof(buffer))) {
+    return std::string(buffer);
+  }
+  return ".";
+#endif
 }

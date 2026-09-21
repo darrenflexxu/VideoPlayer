@@ -1,6 +1,7 @@
 #include "GLContext.h"
 #include <iostream>
 
+#ifdef WIN32
 GLContext::GLContext() {
     _format = 0;
     _hWnd = 0;
@@ -89,3 +90,45 @@ void    GLContext::shutdown() {
 void GLContext::swapBuffer() {
     SwapBuffers(_hDC);
 }
+#else
+GLContext::GLContext() : _window(nullptr), _glContext(nullptr) {
+}
+
+GLContext::~GLContext() {
+    shutdown();
+}
+
+bool GLContext::setup(SDL_Window* window) {
+    _window = window;
+    _glContext = SDL_GL_CreateContext(window);
+    if (!_glContext) {
+        std::cerr << "Failed to create OpenGL context: " << SDL_GetError() << std::endl;
+        return false;
+    }
+    glewExperimental = GL_TRUE;
+    GLenum err = glewInit();
+    if (err != GLEW_OK) {
+        std::cerr << "Failed to initialize GLEW: " << glewGetErrorString(err) << std::endl;
+        return false;
+    }
+    const GLubyte* renderer = glGetString(GL_RENDERER);
+    const GLubyte* version = glGetString(GL_VERSION);
+    printf("OpenGL实现的版本号：%s\n", version);
+    printf("硬件平台：%s\n", renderer);
+    return true;
+}
+
+void GLContext::shutdown() {
+    if (_glContext) {
+        SDL_GL_DeleteContext(_glContext);
+        _glContext = nullptr;
+    }
+    _window = nullptr;
+}
+
+void GLContext::swapBuffer() {
+    if (_window) {
+        SDL_GL_SwapWindow(_window);
+    }
+}
+#endif

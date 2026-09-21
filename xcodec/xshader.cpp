@@ -1,13 +1,26 @@
 #include "predefine_header.h"
 
+#ifdef WIN32
+#include <windows.h>
+#else
+#include <SDL.h>
+#endif
+
 XShader::XShader() {
 }
 
 void XShader::Close() {
   ctx_.reset();
+#ifndef WIN32
+  if (sdl_window_) {
+    SDL_DestroyWindow(sdl_window_);
+    sdl_window_ = nullptr;
+  }
+#endif
 }
 
 bool XShader::Init(int w, int h, Format fmt) {
+#ifdef WIN32
   HWND hwnd = (HWND)win_id_;
   auto dc = GetDC(hwnd);
   RECT rect;
@@ -16,6 +29,26 @@ bool XShader::Init(int w, int h, Format fmt) {
   ctx_->setup(hwnd, dc);
   width_ = rect.right - rect.left;
   height_ = rect.bottom - rect.top;
+#else
+  SDL_Window* window = nullptr;
+  if (win_id_) {
+    window = SDL_CreateWindowFrom(win_id_);
+  }
+  if (!window) {
+    return false;
+  }
+  ctx_ = std::make_shared<GLContext>();
+  if (!ctx_->setup(window)) {
+    SDL_DestroyWindow(window);
+    return false;
+  }
+  int w_w, w_h;
+  SDL_GetWindowSize(window, &w_w, &w_h);
+  width_ = w_w;
+  height_ = w_h;
+  // Store window for later use
+  sdl_window_ = window;
+#endif
   pix_w_ = w;
   pix_h_ = h;
   return true;
@@ -30,11 +63,17 @@ bool XShader::Draw(
   const unsigned  char* u, int u_pitch,
   const unsigned  char* v, int v_pitch
 ) {
+#ifdef WIN32
   HWND hwnd = (HWND)win_id_;
   RECT rect;
   GetClientRect(hwnd, &rect);
   int width = rect.right - rect.left;
   int height = rect.bottom - rect.top;
+#else
+  if (!sdl_window_) return false;
+  int width, height;
+  SDL_GetWindowSize(sdl_window_, &width, &height);
+#endif
 
   if (width != width_ || height != height_) {
     width_ = width;
@@ -62,11 +101,17 @@ bool XShader::DrawFrame(AVFrame* frame, AVCodecContext* ctx) {
     count_ = 0;
     beg_ms_ = clock();
   }
+#ifdef WIN32
   HWND hwnd = (HWND)win_id_;
   RECT rect;
   GetClientRect(hwnd, &rect);
   int width = rect.right - rect.left;
   int height = rect.bottom - rect.top;
+#else
+  if (!sdl_window_) return false;
+  int width, height;
+  SDL_GetWindowSize(sdl_window_, &width, &height);
+#endif
 
   if (width != width_ || height != height_) {
     width_ = width;

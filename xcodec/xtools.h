@@ -120,11 +120,12 @@ private:
 };
 
 class XTools {
- public:
+  public:
   static double get_rotation_from_frame(const AVFrame* frame);
   static void copy_side_data(const AVFrame* src,
                       AVFrame* dst,
                       int type);
+  static std::string get_app_path();
 };
 //音视频参数
 class XCODEC_API XPara {

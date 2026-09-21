@@ -111,9 +111,7 @@ void rotateVertices(GLfloat* vertices, int numVertices, float angle) {
 
 //Init Shader  
 int XShaderYV12::InitShader(double rotate) {
-  char pBuf[MAX_PATH] = {0};                                 //存放路径的变量     
-  GetCurrentDirectory(MAX_PATH, pBuf);                   //获取程序的当前目录
-  std::string app_path = pBuf;
+  std::string app_path = XTools::get_app_path();
   // Dark blue background
   glClearColor(0.0f, 0.0f, 0.4f, 0.0f);
 
@@ -145,7 +143,7 @@ int XShaderYV12::InitShader(double rotate) {
 //     fs = textFileRead("Shader.fsh");  
 
   std::string strfv;
-  std::ifstream fvStream(app_path + "\\Shader.vsh", std::ios::in);
+  std::ifstream fvStream(app_path + "/Shader.vsh", std::ios::in);
   if (fvStream.is_open()) {
     std::stringstream svStream;
     svStream << fvStream.rdbuf();
@@ -157,7 +155,7 @@ int XShaderYV12::InitShader(double rotate) {
   }
 
   std::string strff;
-  std::ifstream ffStream(app_path + "\\Shader.fsh", std::ios::in);
+  std::ifstream ffStream(app_path + "/Shader.fsh", std::ios::in);
   if (ffStream.is_open()) {
     std::stringstream sfStream;
     sfStream << ffStream.rdbuf();

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.6)
+cmake_minimum_required(VERSION 3.16)
 
 # 命令行版转码工具, 只依赖XCodec(不链接Qt/OpenCV/SDL)
 add_executable(XVideoTranscodeCLI main.cpp)
@@ -12,7 +12,9 @@ target_include_directories(XVideoTranscodeCLI PRIVATE
   "../xcodec"
   "${ThirdParty}/ffmpeg/include")
 # 源码为UTF-8(GUI等旧目录是GBK, 这里单独声明, 避免中文被按GBK误读)
-target_compile_options(XVideoTranscodeCLI PRIVATE /utf-8)
+if(WIN32)
+    target_compile_options(XVideoTranscodeCLI PRIVATE /utf-8)
+endif()
 
 IF(WIN32)
 add_custom_command(

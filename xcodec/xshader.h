@@ -16,6 +16,10 @@
 #include "xshader_yv12.h"
 #include "xshader_nv12.h"
 
+#ifndef WIN32
+#include <SDL.h>
+#endif
+
 extern "C"{
 // Include GLEW
 #include <GL/glew.h>
@@ -32,6 +36,9 @@ class XShader :public XVideoView {
   int height_ = 0;
   int pix_h_ = 0;
   int pix_w_ = 0;
+#ifndef WIN32
+  SDL_Window* sdl_window_ = nullptr;
+#endif
 public:
   XShader();
 

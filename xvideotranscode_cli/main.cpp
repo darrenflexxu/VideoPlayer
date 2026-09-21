@@ -8,7 +8,10 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+
+#ifdef WIN32
 #include <windows.h>
+#endif
 
 using std::string;
 
@@ -317,8 +320,10 @@ int RunTranscode(const Options& opt) {
 }  // namespace
 
 int main(int argc, char** argv) {
+#ifdef WIN32
   // 让中文提示在GBK控制台上正常显示
   SetConsoleOutputCP(CP_UTF8);
+#endif
 
   if (argc < 2) {
     PrintUsage();

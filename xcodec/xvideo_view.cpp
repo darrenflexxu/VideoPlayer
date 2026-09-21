@@ -2,6 +2,7 @@
 
 using namespace std;
 
+#ifdef WIN32
 struct DXVA2DevicePriv {
     HMODULE d3dlib;
     HMODULE dxva2lib;
@@ -31,6 +32,7 @@ void DrawFrameWithHandle(AVFrame* frame, AVCodecContext* c, void* hwnd, int widt
         device->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &back);
     device->StretchRect(surface, 0, back, 0, D3DTEXF_LINEAR);
 }
+#endif
 
 bool XVideoView::Init(AVCodecParameters* para)
 {
@@ -169,10 +171,12 @@ void yuv420sp_to_yuv420p(unsigned char* yuv420sp, unsigned char* yuv420p, int wi
 
 bool XVideoView::DrawFrame(AVFrame* frame, AVCodecContext* ctx)
 {
+#ifdef WIN32
     if (gpu_render_direct_ && frame->format == AV_PIX_FMT_DXVA2_VLD && frame->data[3]) {
         DrawFrameWithHandle(frame, ctx, win_id_, width_, height_, back_);
         return true;
     }
+#endif
     if (!frame || !frame->data[0])return false;
     count_++;
     if (beg_ms_ <= 0)
