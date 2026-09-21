@@ -1,4 +1,5 @@
 #include "xplayvideo.h"
+#include "x_qt_opengl_widget.h"
 #include <QCheckBox>
 #include <QDebug>
 #include <QLayout>
@@ -92,21 +93,12 @@ bool XPlayVideo::Open(const char* url) {
   player.set_gpu_decode(gpu_decode_);
   player.set_gpu_direct_render_(gpu_direct_render_);
 
-  // QtOpenGL 渲染直接绘制到控件，无需窗口句柄
+  //注入 UI 层的 QOpenGLWidget 作为渲染对象(Qt 实现不进 XCodec)
+  player.set_view(video_widget_);
+
+  // QOpenGLWidget 直接绘制到控件, 无需窗口句柄
   if (!player.Open(url, nullptr))
     return false;
-
-  //用 XPlayer 创建的 XQtOpenGLWidget 替换占位控件 ui.video
-  auto* video_widget = dynamic_cast<QWidget*>(player.view());
-  if (video_widget && main_splitter_ && ui.video) {
-    int index = main_splitter_->indexOf(ui.video);
-    if (index >= 0) {
-      main_splitter_->replaceWidget(index, video_widget);
-      delete ui.video;
-      ui.video = nullptr;
-      video_widget->show();
-    }
-  }
 
   player.Start();
   player.Pause(false);  // ����״̬
@@ -118,7 +110,11 @@ XPlayVideo::XPlayVideo(QWidget* parent) : QWidget(parent) {
   ui.setupUi(this);
   auto main_layout = new QVBoxLayout(this);
   main_splitter_ = new QSplitter(Qt::Vertical, this);
-  main_splitter_->addWidget(ui.video);
+  //用 UI 层渲染控件替换占位控件 ui.video
+  video_widget_ = new XQtOpenGLWidget(main_splitter_);
+  main_splitter_->addWidget(video_widget_);
+  delete ui.video;
+  ui.video = nullptr;
   main_layout->addWidget(main_splitter_);
   auto control_layout = new QSplitter(Qt::Horizontal, this);
   control_layout->addWidget(ui.play);

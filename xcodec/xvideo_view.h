@@ -27,7 +27,6 @@ public:
     {
         SDL = 0,
         Shader,
-        QtOpenGL,   //基于 QOpenGLWidget 的渲染
     };
     static XVideoView* Create(RenderType type=SDL);
 

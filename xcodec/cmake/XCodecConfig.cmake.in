@@ -1,0 +1,11 @@
+@PACKAGE_INIT@
+
+# XCodec 动态库使用说明:
+#   find_package(XCodec REQUIRED)
+#   target_link_libraries(<app> PRIVATE XCodec::XCodec)
+#
+# 运行时依赖(FFmpeg/SDL2/OpenCV/GLEW/Qt)需由使用方自行提供并位于可搜索路径中。
+
+include("${CMAKE_CURRENT_LIST_DIR}/XCodecTargets.cmake")
+
+check_required_components(XCodec)

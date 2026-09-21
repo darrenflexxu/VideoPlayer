@@ -2,13 +2,15 @@
 
 //兼容Linux  _WIN32 windows 32为和64位
 #ifdef _WIN32
+// MSVC 显式导出/导入: 编译 XCodec 时由 CMake 定义 XCODEC_EXPORTS, 外部应用则为导入
 #ifdef XCODEC_EXPORTS
 #define XCODEC_API __declspec(dllexport)
 #else
 #define XCODEC_API __declspec(dllimport)
 #endif
 #else
-#define XCODEC_API
+// macOS/Linux 默认可见, 显式声明默认可见性便于将来开启 -fvisibility=hidden
+#define XCODEC_API __attribute__((visibility("default")))
 #endif
 
 #include <thread>
@@ -119,7 +121,7 @@ private:
     XThread *next_ = nullptr;//责任链下一个节点
 };
 
-class XTools {
+class XCODEC_API XTools {
   public:
   static double get_rotation_from_frame(const AVFrame* frame);
   static void copy_side_data(const AVFrame* src,

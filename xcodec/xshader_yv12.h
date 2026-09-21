@@ -16,10 +16,12 @@ extern "C"{
 #include <GL/glew.h>
 }
 
+#include "xtools.h"
+
 #define ATTRIB_VERTEX 3  
 #define ATTRIB_TEXTURE 4 
 
-class XShaderYV12 {
+class XCODEC_API XShaderYV12 {
   GLuint id_y;
   GLuint id_u;
   GLuint id_v; // Texture id  

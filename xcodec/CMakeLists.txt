@@ -14,8 +14,15 @@ include_directories(.
 
 ADD_LIBRARY(XCodec SHARED ${VIDEO_PLAYER_SRC} ${VIDEO_PLAYER_HEADER})
 
-# XQtOpenGLWidget 基于 Qt OpenGL，需链接 Qt 模块(含 AUTOMOC 所需的 moc)
-target_link_libraries(XCodec PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets Qt6::OpenGLWidgets)
+# 公共头文件目录: 自身编译用源码目录, 外部应用安装后使用 include/XCodec
+target_include_directories(XCodec PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:include/XCodec>)
+
+# 编译 XCodec 自身时导出符号(与 xtools.h 中的 XCODEC_API 对应)
+target_compile_definitions(XCodec PRIVATE XCODEC_EXPORTS)
+
+# 注意: XCodec 不依赖 Qt, Qt 渲染实现位于 UI 层(xvideoview/x_qt_opengl_widget.*)
 
 # 源码为UTF-8, 强制/utf-8保证字面量为UTF-8, 与CLI(SetConsoleOutputCP(CP_UTF8))一致, 否则中文/进度条字符编译成GBK乱码
 if(WIN32)
@@ -43,3 +50,43 @@ else()
         target_link_libraries(XCodec PRIVATE ${APPKIT})
     endif()
 endif()
+
+# ------------------------------------------------------------------
+# 安装与导出: 供外部应用程序以动态链接方式引入
+#   install 后可用: find_package(XCodec REQUIRED)
+#                   target_link_libraries(app PRIVATE XCodec::XCodec)
+# 依赖(FFmpeg/SDL2/OpenCV/GLEW/Qt)由使用方自行提供, 此处不打包
+# ------------------------------------------------------------------
+set(XCODEC_VERSION 1.0.0)
+
+install(TARGETS XCodec
+    EXPORT XCodecTargets
+    RUNTIME DESTINATION bin      # Windows: XCodec.dll
+    LIBRARY DESTINATION lib      # macOS/Linux: libXCodec.dylib/.so
+    ARCHIVE DESTINATION lib)     # Windows: XCodec.lib 导入库
+
+# 安装公共头文件 -> <prefix>/include/XCodec/*.h
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/
+    DESTINATION include/XCodec
+    FILES_MATCHING PATTERN "*.h")
+
+include(CMakePackageConfigHelpers)
+
+configure_package_config_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/XCodecConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/XCodecConfig.cmake
+    INSTALL_DESTINATION lib/cmake/XCodec)
+
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/XCodecConfigVersion.cmake
+    VERSION ${XCODEC_VERSION}
+    COMPATIBILITY SameMajorVersion)
+
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/XCodecConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/XCodecConfigVersion.cmake
+    DESTINATION lib/cmake/XCodec)
+
+install(EXPORT XCodecTargets
+    NAMESPACE XCodec::
+    DESTINATION lib/cmake/XCodec)

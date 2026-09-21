@@ -42,7 +42,10 @@ public:
     void set_gpu_decode(bool gpu) { gpu_decode_ = gpu; }
     void set_gpu_direct_render_(bool gpu_render) { gpu_direct_render_ = gpu_render; }
 
-    //获取视频渲染对象(QtOpenGL 时同时是 QWidget)
+    //注入外部创建的渲染对象(如 UI 层的 QOpenGLWidget), 生命周期由调用方管理
+    void set_view(XVideoView* v) { view_ = v; own_view_ = false; }
+
+    //获取视频渲染对象
     XVideoView* view() { return view_; }
 
 protected:
@@ -53,6 +56,7 @@ protected:
     XDecodeTask audio_decode_;      //音频解码
     XDecodeTask video_decode_;      //视频解码
     XVideoView* view_ = nullptr;    //视频渲染
+    bool own_view_ = false;         //view_ 是否由 XPlayer 创建(负责释放)
     bool gpu_decode_ = false;
     bool gpu_direct_render_ = false;
 };

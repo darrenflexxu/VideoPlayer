@@ -1,5 +1,10 @@
 #pragma once
 
+// GLEW 必须先于 Qt/OpenGL 头文件包含, 否则 __gl_h_ 已被定义导致 GLEW 类型缺失
+extern "C" {
+#include <GL/glew.h>
+}
+
 #include <QOpenGLWidget>
 
 #include <memory>
@@ -10,10 +15,11 @@
 #include "xshader_nv12.h"
 
 //////////////////////////////////////
-/// 基于 QOpenGLWidget 的视频渲染实现
+/// 基于 QOpenGLWidget 的视频渲染实现(UI 层)
+/// 属于应用程序, 不进入 XCodec, 保证 XCodec 不依赖 Qt
 /// 生产者(XPlayer::Update) 推送解码帧 -> 消费者(paintGL) 在 GUI 线程渲染
 /// 避免手动管理窗口句柄和 GL 上下文
-class XCODEC_API XQtOpenGLWidget : public QOpenGLWidget, public XVideoView
+class XQtOpenGLWidget : public QOpenGLWidget, public XVideoView
 {
     Q_OBJECT
 public:

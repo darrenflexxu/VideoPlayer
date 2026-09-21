@@ -31,8 +31,11 @@ void XPlayer::Stop()
     if (view_)
     {
         view_->Close();
-        delete view_;
+        //外部注入的 view(如 UI 层 QOpenGLWidget)由调用方释放
+        if (own_view_)
+            delete view_;
         view_ = nullptr;
+        own_view_ = false;
     }
     XAudioPlay::Instance()->Close();
 }
@@ -59,9 +62,12 @@ bool XPlayer::Open(const char* url, void* winid)
         video_decode_.set_stream_index(demux_.video_index());
         //缓冲
         video_decode_.set_block_size(100);
-        //视频渲染 使用 QOpenGLWidget 集成到 Qt 渲染管线
+        //视频渲染: 默认由 XCodec 自建(Qt 无关); UI 层可通过 set_view 注入自定义实现
         if (!view_)
-            view_ = XVideoView::Create(XVideoView::QtOpenGL);
+        {
+            view_ = XVideoView::Create(XVideoView::Shader);
+            own_view_ = true;
+        }
         view_->set_win_id(winid);
         if (!view_->Init(vp->para))
             return false;
