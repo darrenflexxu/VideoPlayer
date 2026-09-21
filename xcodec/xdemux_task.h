@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include <atomic>
 #include "xdemux.h"
 enum XSYN_TYPE
 {
@@ -30,6 +31,9 @@ public:
     bool Open(std::string url,int timeout_ms = 1000);
 
     void ClearEOF();
+
+    //seek快进目标(毫秒), >0时读取不做速度限制直到越过目标; 0表示正常限速
+    void set_fast_forward_ms(long long ms) { fast_forward_ms_ = ms; }
 
     //复制视频参数
     std::shared_ptr<XPara> CopyVideoPara()
@@ -69,5 +73,6 @@ private:
     long long trim_end_ms_ = 0;      //截取终点(毫秒), 0=不截
     int read_pkt_count_ = 0;
     long long read_ms_ = 0;  //已读包的最大源时间位置(毫秒)
+    std::atomic<long long> fast_forward_ms_{0};  //seek快进目标(毫秒), 读取到该位置前不限速
 };
 

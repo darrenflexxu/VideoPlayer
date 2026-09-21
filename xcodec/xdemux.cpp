@@ -44,8 +44,7 @@ bool XDemux::Seek(long long pts, int stream_index)
 {
     unique_lock<mutex> lock(mux_);
     if (!c_)return false;
-    auto re = av_seek_frame(c_, stream_index, pts,
-               AVSEEK_FLAG_FRAME | AVSEEK_FLAG_BACKWARD);
+    auto re = av_seek_frame(c_, stream_index, pts, AVSEEK_FLAG_BACKWARD);
     BERR(re);
     return true;
 }

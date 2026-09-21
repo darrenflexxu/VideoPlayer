@@ -193,10 +193,10 @@ void XDecodeTask::Main()
             continue;
         }
         
-        //同步
+        //同步(seek丢弃目标前的帧时不做同步等待)
         while (!is_exit_)
         {
-            if (syn_pts_ >= 0 && cur_pts_ > syn_pts_)
+            if (seek_target_ms_ < 0 && syn_pts_ >= 0 && cur_pts_ > syn_pts_)
             {
                 MSleep(1);
                 continue;
@@ -241,12 +241,26 @@ void XDecodeTask::Main()
 
             if(decode_.Recv(frame_))
             { 
-                need_view_ = true;
+                long long frame_ms = time_base_
+                    ? av_rescale_q(frame_->pts, *time_base_, { 1,1000 })
+                    : 0;
+
+                //seek定位: 丢弃目标时间之前的帧, 保证从目标位置开始
+                //丢弃期间不更新cur_ms_, 保持为目标值, 避免进度条回跳
+                if (seek_target_ms_ >= 0)
+                {
+                    if (frame_ms < seek_target_ms_)
+                    {
+                        continue;
+                    }
+                    seek_target_ms_ = -1;
+                }
+
                 cur_pts_ = frame_->pts;
                 //转换成毫秒
-                if(time_base_)
-                    cur_ms_ = av_rescale_q(frame_->pts,*time_base_, 
-                    { 1,1000 });;
+                cur_ms_ = frame_ms;
+
+                need_view_ = true;
 
                 if (has_next()) {
                   decode_frame_count_ += 1;

@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include <atomic>
 #include "xdecode.h"
 class XCODEC_API XDecodeTask :public XThread
 {
@@ -34,6 +35,16 @@ public:
     //设置同步时间
     void set_syn_pts(long long p) { syn_pts_ = p; }
     void set_block_size(int s) { block_size_ = s; }
+
+    //seek目标位置(毫秒), 定位后丢弃该时间之前的帧; <0表示无
+    //同时把当前进度置为目标值, 避免UI进度条回跳到旧位置
+    void set_seek_target_ms(long long ms)
+    {
+        seek_target_ms_ = ms;
+        if (ms >= 0)
+            cur_ms_ = ms;
+    }
+    long long seek_target_ms() { return seek_target_ms_; }
     /// <summary>
     /// 清理缓存
     /// </summary>
@@ -65,6 +76,7 @@ private:
     long long cur_pts_ = -1;//当前解码到的pts（以解码数据为准）
     AVRational* time_base_ = nullptr;
     long long cur_ms_ = 0;  //当前播放位置的毫秒
+    std::atomic<long long> seek_target_ms_{-1}; //seek目标(毫秒), 解码侧丢弃目标前的帧
     int block_size_ = 0;    //阻塞大小
     long long syn_pts_ = -1;//同步时间 -1不同步
     bool is_open_ = false;

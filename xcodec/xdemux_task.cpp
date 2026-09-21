@@ -81,19 +81,13 @@ void XDemuxTask::Main()
         }
 
         //播放速度控制
-        if (syn_type_ == XSYN_VIDEO &&
-            pkt.stream_index == demux_.video_index())
-        {
-            auto dur = demux_.RescaleToMs(pkt.duration, pkt.stream_index);
-            if (dur <= 0)
-                dur = 40;
-            //pkt.duration
-            MSleep(dur);
-        }
         read_pkt_count_ += 1;
         long long ms = -1;
         if (pkt.pts != AV_NOPTS_VALUE) {
           ms = demux_.RescaleToMs(pkt.pts, pkt.stream_index);
+          //seek快进: 已越过目标位置则恢复限速
+          if (fast_forward_ms_ > 0 && ms >= fast_forward_ms_)
+            fast_forward_ms_ = 0;
           // 截取时进度按段内有效位置(减去起点)计算, 保证从0开始
           long long pos = ms;
           if (trim_start_ms_ > 0) {
@@ -101,6 +95,19 @@ void XDemuxTask::Main()
             if (pos < 0) pos = 0;
           }
           if (pos > read_ms_) read_ms_ = pos;
+        }
+        //播放速度控制(seek快进期间不限速)
+        if (syn_type_ == XSYN_VIDEO &&
+            pkt.stream_index == demux_.video_index())
+        {
+            if (fast_forward_ms_ <= 0)
+            {
+                auto dur = demux_.RescaleToMs(pkt.duration, pkt.stream_index);
+                if (dur <= 0)
+                    dur = 40;
+                //pkt.duration
+                MSleep(dur);
+            }
         }
         if (trim_end_ms_ > 0 && ms > trim_end_ms_) {
           // 超过截取终点: 丢弃该包并当作本段结束(注入EOF标记一次)

@@ -12,10 +12,19 @@ void XPlayer::Pause(bool is_pause)
 //设置视频播放位置，毫秒
 bool XPlayer::Seek(long long ms)
 {
+    //解封装定位到目标之前的关键帧
     demux_.Seek(ms);
+    //快进读取到目标位置(绕过实时限速)
+    demux_.set_fast_forward_ms(ms);
+    //先清空解码缓存
     audio_decode_.Clear();
     video_decode_.Clear();
     XAudioPlay::Instance()->Clear();
+    //再设置seek目标: 关键帧与目标之间的帧由解码侧丢弃, 保证从目标位置开始播放
+    //同时把当前进度置为目标值, 避免UI进度条先跳回旧位置
+    video_decode_.set_seek_target_ms(ms);
+    audio_decode_.set_seek_target_ms(ms);
+    this->pos_ms_ = ms;
     return true;
 }
 void XPlayer::Stop()
@@ -89,6 +98,9 @@ bool XPlayer::Open(const char* url, void* winid)
 
         //frame 缓冲
         audio_decode_.set_frame_cache(true);
+
+        //时间基数(用于seek后丢弃目标前的帧)
+        audio_decode_.set_time_base(ap->time_base);
 
         //初始化音频播放
         XAudioPlay::Instance()->Open(*ap);
