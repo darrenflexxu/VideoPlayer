@@ -18,6 +18,23 @@ void XPlayVideo::pumpSDLEvents() {
 #endif
 }
 
+//毫秒转播放时间文本, 超1小时显示 h:mm:ss
+static QString msToTime(long long ms) {
+  if (ms < 0) ms = 0;
+  long long total_s = ms / 1000;
+  long long h = total_s / 3600;
+  long long m = (total_s % 3600) / 60;
+  long long s = total_s % 60;
+  if (h > 0)
+    return QString("%1:%2:%3")
+        .arg(h)
+        .arg(m, 2, 10, QChar('0'))
+        .arg(s, 2, 10, QChar('0'));
+  return QString("%1:%2")
+      .arg(m, 2, 10, QChar('0'))
+      .arg(s, 2, 10, QChar('0'));
+}
+
 void XPlayVideo::timerEvent(QTimerEvent* ev) {
   if (player.is_pause()) {
     setPlayIcon(QPixmap(":/XViewer/img/play.png"));
@@ -30,6 +47,7 @@ void XPlayVideo::timerEvent(QTimerEvent* ev) {
   auto pos = player.pos_ms();
   auto total = player.total_ms();
   ui.pos->setMaximum(total);
+  ui.timelabel->setText(msToTime(pos) + " / " + msToTime(total));
 
   if (!moved_) {
     ui.pos->setValue(pos);
@@ -179,6 +197,7 @@ XPlayVideo::XPlayVideo(QWidget* parent) : QWidget(parent) {
   control_layout->addWidget(ui.speedtxt);
   control_layout->addWidget(ui.vollabel);
   control_layout->addWidget(ui.volume);
+  control_layout->addWidget(ui.timelabel);
   connect(ui.volume, &QSlider::valueChanged, this, &XPlayVideo::SetVolume);
   auto gpu_decode_button = new QCheckBox(tr("GPU Decode"), this);
   gpu_decode_button->setChecked(gpu_decode_);

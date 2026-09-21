@@ -118,6 +118,19 @@
     <enum>Qt::Horizontal</enum>
    </property>
   </widget>
+  <widget class="QLabel" name="timelabel">
+   <property name="geometry">
+     <rect>
+      <x>420</x>
+      <y>10</y>
+      <width>100</width>
+      <height>16</height>
+     </rect>
+   </property>
+   <property name="text">
+    <string>00:00 / 00:00</string>
+   </property>
+  </widget>
   <widget class="QSlider" name="pos">
    <property name="geometry">
     <rect>
