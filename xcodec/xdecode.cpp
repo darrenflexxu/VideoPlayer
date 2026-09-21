@@ -22,16 +22,23 @@ bool XDecode::InitHW() {
   unique_lock<mutex> lock(mux_);
   if (!c_)
     return false;
-  ;
+  // 平台硬件解码设备: Windows 用 QSV, macOS 用 VideoToolbox
+#ifdef __APPLE__
+  const AVHWDeviceType dev_type = AV_HWDEVICE_TYPE_VIDEOTOOLBOX;
+  const AVPixelFormat hw_fmt = AV_PIX_FMT_VIDEOTOOLBOX;
+#else
+  const AVHWDeviceType dev_type = AV_HWDEVICE_TYPE_QSV;
+  const AVPixelFormat hw_fmt = AV_PIX_FMT_QSV;
+#endif
   AVBufferRef* ctx = nullptr;  // 硬件加速上下文
-  auto re = av_hwdevice_ctx_create(&ctx, AV_HWDEVICE_TYPE_QSV, NULL, NULL, 0);
+  auto re = av_hwdevice_ctx_create(&ctx, dev_type, NULL, NULL, 0);
   if (re != 0) {
     PrintErr(re);
     return false;
   }
   c_->hw_device_ctx = av_buffer_ref(ctx);
   av_buffer_unref(&ctx);  // 释放本地引用, 由 c_->hw_device_ctx 持有
-  c_->pix_fmt = AV_PIX_FMT_QSV;
+  c_->pix_fmt = hw_fmt;
   cout << "硬件加速：" << endl;
   return true;
 }
@@ -85,33 +92,37 @@ bool XDecode::RecvFrame(AVFrame* frame) {
   if (re == 0) {
     if (c_->hw_device_ctx && !gpu_direct_render_)  // GPU解码
     {
-      // 显存转内存 GPU =》 CPU
+      // 显存转内存 GPU =》 CPU (VideoToolbox/QSV 均输出 NV12)
       re = av_hwframe_transfer_data(frame, f, 0);
-      // 创建 swsContext
-      static MyDecoder decoder;
-      struct SwsContext* sws_ctx = decoder.get_or_create_sws(
-          frame->width, frame->height, (enum AVPixelFormat)frame->format,
-          frame->width, frame->height, AV_PIX_FMT_YUV420P);
-      // 准备输出帧
-      AVFrame* yuv420p_frame = av_frame_alloc();
-      yuv420p_frame->format = AV_PIX_FMT_YUV420P;
-      yuv420p_frame->width = frame->width;
-      yuv420p_frame->height = frame->height;
-      av_frame_get_buffer(yuv420p_frame, 1);  // 分配数据缓冲
-      // 格式转换
-      sws_scale(sws_ctx, (const uint8_t* const*)frame->data, frame->linesize, 0,
-                frame->height, yuv420p_frame->data, yuv420p_frame->linesize);
-      // 之后 yuv420p_frame 就是你要的 YUV420P（420P）格式了
-      av_frame_replace(frame, yuv420p_frame);
-      av_frame_free(&yuv420p_frame);
+      if (re != 0) {
+        PrintErr(re);
+        av_frame_free(&f);
+        return false;
+      }
+      // 已是 NV12 则保留, 直接走硬件解码 NV12 渲染路径; 其它格式软件转 YUV420P
+      if (frame->format != AV_PIX_FMT_NV12) {
+        // 创建 swsContext
+        static MyDecoder decoder;
+        struct SwsContext* sws_ctx = decoder.get_or_create_sws(
+            frame->width, frame->height, (enum AVPixelFormat)frame->format,
+            frame->width, frame->height, AV_PIX_FMT_YUV420P);
+        // 准备输出帧
+        AVFrame* yuv420p_frame = av_frame_alloc();
+        yuv420p_frame->format = AV_PIX_FMT_YUV420P;
+        yuv420p_frame->width = frame->width;
+        yuv420p_frame->height = frame->height;
+        av_frame_get_buffer(yuv420p_frame, 1);  // 分配数据缓冲
+        // 格式转换
+        sws_scale(sws_ctx, (const uint8_t* const*)frame->data, frame->linesize, 0,
+                  frame->height, yuv420p_frame->data, yuv420p_frame->linesize);
+        // 之后 yuv420p_frame 就是你要的 YUV420P（420P）格式了
+        av_frame_replace(frame, yuv420p_frame);
+        av_frame_free(&yuv420p_frame);
+      }
       frame->pts = f->pts;
       frame->pkt_dts = f->pkt_dts;
       XTools::copy_side_data(f, frame, AV_FRAME_DATA_DISPLAYMATRIX);
       av_frame_free(&f);
-      if (re != 0) {
-        PrintErr(re);
-        return false;
-      }
     }
     return true;
   }

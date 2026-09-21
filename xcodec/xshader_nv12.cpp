@@ -70,7 +70,10 @@ bool XShaderNV12::Draw(
   //Y  
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, id_y);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, y_pitch, pixel_h, 0, GL_RED,
+  // 行宽按 pitch 指定, 纹理宽取可见宽度: 兼容硬解(VideoToolbox)带对齐填充的 linesize
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+  glPixelStorei(GL_UNPACK_ROW_LENGTH, y_pitch);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, pixel_w, pixel_h, 0, GL_RED,
                GL_UNSIGNED_BYTE, y);
   //   glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &MVP[0][0]);
   glUniform1i(textureUniformY, 0);
@@ -78,7 +81,9 @@ bool XShaderNV12::Draw(
   //UV  
   glActiveTexture(GL_TEXTURE1);
   glBindTexture(GL_TEXTURE_2D, id_uv);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RG, u_pitch, pixel_h / 2, 0, GL_RG,
+  // NV12 的 UV 交织, 1 个纹素 = 2 字节(U,V), 故行宽(纹素)= pitch/2
+  glPixelStorei(GL_UNPACK_ROW_LENGTH, u_pitch / 2);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RG, pixel_w / 2, pixel_h / 2, 0, GL_RG,
                GL_UNSIGNED_BYTE, uv);
   glUniform1i(textureUniformUV, 1);
 

@@ -71,7 +71,10 @@ bool XShaderYV12::Draw(
   //Y  
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, id_y);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, y_pitch, pixel_h, 0, GL_RED,
+  // 行宽按 pitch 指定, 纹理宽取可见宽度: 兼容带对齐填充的 linesize
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+  glPixelStorei(GL_UNPACK_ROW_LENGTH, y_pitch);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, pixel_w, pixel_h, 0, GL_RED,
                GL_UNSIGNED_BYTE, y);
   //   glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &MVP[0][0]);
   glUniform1i(textureUniformY, 0);
@@ -79,14 +82,16 @@ bool XShaderYV12::Draw(
   //U  
   glActiveTexture(GL_TEXTURE1);
   glBindTexture(GL_TEXTURE_2D, id_u);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, u_pitch, pixel_h / 2, 0, GL_RED,
+  glPixelStorei(GL_UNPACK_ROW_LENGTH, u_pitch);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, pixel_w / 2, pixel_h / 2, 0, GL_RED,
                GL_UNSIGNED_BYTE, u);
   glUniform1i(textureUniformU, 1);
 
   //V  
   glActiveTexture(GL_TEXTURE2);
   glBindTexture(GL_TEXTURE_2D, id_v);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, v_pitch, pixel_h / 2, 0, GL_RED,
+  glPixelStorei(GL_UNPACK_ROW_LENGTH, v_pitch);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, pixel_w / 2, pixel_h / 2, 0, GL_RED,
                GL_UNSIGNED_BYTE, v);
   glUniform1i(textureUniformV, 2);
 
