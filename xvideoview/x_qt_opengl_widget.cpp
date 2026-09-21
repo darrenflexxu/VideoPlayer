@@ -139,11 +139,46 @@ void XQtOpenGLWidget::paintGL() {
     if (!cur)
         return;
 
-    //Qt 已绑定上下文与 FBO，这里按设备像素设置视口并铺满控件
+    //Qt 已绑定上下文与 FBO，这里按设备像素设置视口
     const int fw = static_cast<int>(width() * devicePixelRatioF());
     const int fh = static_cast<int>(height() * devicePixelRatioF());
+
+    //视频显示尺寸(像素)：旋转 90/270 时宽高互换
+    int vw = pix_w_;
+    int vh = pix_h_;
+    if (cur->format == AV_PIX_FMT_YUV420P ||
+        cur->format == AV_PIX_FMT_YUVJ420P) {
+        double rotate = XTools::get_rotation_from_frame(cur);
+        int r = (int)rotate % 180;
+        if (r < 0) r += 180;
+        if (r == 90) {
+            vw = pix_h_;
+            vh = pix_w_;
+        }
+    }
+
+    //整体清屏，等比缩放区域之外填背景色
     glViewport(0, 0, fw, fh);
     glClear(GL_COLOR_BUFFER_BIT);
+
+    //按视频宽高比计算 letterbox 视口，窗口缩放时保持等比例
+    int rect_x = 0, rect_y = 0, rect_w = fw, rect_h = fh;
+    if (vw > 0 && vh > 0) {
+        double frame_ratio = (double)vw / (double)vh;
+        double win_ratio = (double)fw / (double)fh;
+        if (win_ratio > frame_ratio) {
+            rect_h = fh;
+            rect_w = (int)(fh * frame_ratio + 0.5);
+            rect_x = (fw - rect_w) / 2;
+        } else {
+            rect_w = fw;
+            rect_h = (int)(fw / frame_ratio + 0.5);
+            rect_y = (fh - rect_h) / 2;
+        }
+        if (rect_w < 1) rect_w = 1;
+        if (rect_h < 1) rect_h = 1;
+    }
+    glViewport(rect_x, rect_y, rect_w, rect_h);
 
     switch (cur->format) {
     case AV_PIX_FMT_YUV420P:

@@ -2,6 +2,7 @@
 #include "x_qt_opengl_widget.h"
 #include <QCheckBox>
 #include <QDebug>
+#include <QKeyEvent>
 #include <QLayout>
 #include <QSplitter>
 
@@ -93,6 +94,52 @@ void XPlayVideo::SetVolume() {
 void XPlayVideo::closeEvent(QCloseEvent* ev) {
   Close();
 }
+void XPlayVideo::ToggleFullScreen() {
+  if (isFullScreen()) {
+    showNormal();
+    if (control_layout_) control_layout_->show();
+  } else {
+    showFullScreen();
+    //进入全屏后先保留控制栏, 无操作时自动隐藏
+    if (control_layout_) control_layout_->show();
+    if (hide_timer_) hide_timer_->start();
+  }
+}
+void XPlayVideo::HideControls() {
+  if (isFullScreen() && control_layout_ && control_layout_->isVisible())
+    control_layout_->hide();
+}
+bool XPlayVideo::eventFilter(QObject* o, QEvent* ev) {
+  if (o == video_widget_) {
+    //双击视频区域切换全屏
+    if (ev->type() == QEvent::MouseButtonDblClick) {
+      ToggleFullScreen();
+      return true;
+    }
+    //全屏下移动鼠标唤起控制栏并重新计时
+    if (ev->type() == QEvent::MouseMove && isFullScreen()) {
+      if (control_layout_ && !control_layout_->isVisible())
+        control_layout_->show();
+      if (hide_timer_) hide_timer_->start();
+    }
+  }
+  return QWidget::eventFilter(o, ev);
+}
+void XPlayVideo::keyPressEvent(QKeyEvent* ev) {
+  if (ev->key() == Qt::Key_Escape) {
+    if (isFullScreen()) {
+      showNormal();
+      if (control_layout_) control_layout_->show();
+      ev->accept();
+      return;
+    }
+  } else if (ev->key() == Qt::Key_F) {
+    ToggleFullScreen();
+    ev->accept();
+    return;
+  }
+  QWidget::keyPressEvent(ev);
+}
 bool XPlayVideo::Open(const char* url) {
   player.set_gpu_decode(gpu_decode_);
   player.set_gpu_direct_render_(gpu_direct_render_);
@@ -117,10 +164,14 @@ XPlayVideo::XPlayVideo(QWidget* parent) : QWidget(parent) {
   //用 UI 层渲染控件替换占位控件 ui.video
   video_widget_ = new XQtOpenGLWidget(main_splitter_);
   main_splitter_->addWidget(video_widget_);
+  //双击视频切换全屏, 全屏时鼠标移动(重新)唤起控制栏
+  video_widget_->installEventFilter(this);
+  video_widget_->setMouseTracking(true);
   delete ui.video;
   ui.video = nullptr;
   main_layout->addWidget(main_splitter_);
   auto control_layout = new QSplitter(Qt::Horizontal, this);
+  control_layout_ = control_layout;
   control_layout->addWidget(ui.play);
   control_layout->addWidget(ui.pos);
   control_layout->addWidget(ui.speed);
@@ -145,6 +196,12 @@ XPlayVideo::XPlayVideo(QWidget* parent) : QWidget(parent) {
   ui.play->setFixedSize(30, 30);
   setPlayIcon(QPixmap(":/XViewer/img/play.png"));
   setLayout(main_layout);
+
+  //全屏时控制栏自动隐藏(鼠标移动会重新唤起)
+  hide_timer_ = new QTimer(this);
+  hide_timer_->setSingleShot(true);
+  hide_timer_->setInterval(3000);
+  connect(hide_timer_, &QTimer::timeout, this, &XPlayVideo::HideControls);
 }
 
 XPlayVideo::~XPlayVideo() {
