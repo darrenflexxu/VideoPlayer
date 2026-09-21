@@ -14,6 +14,9 @@ include_directories(.
 
 ADD_LIBRARY(XCodec SHARED ${VIDEO_PLAYER_SRC} ${VIDEO_PLAYER_HEADER})
 
+# XQtOpenGLWidget 基于 Qt OpenGL，需链接 Qt 模块(含 AUTOMOC 所需的 moc)
+target_link_libraries(XCodec PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets Qt6::OpenGLWidgets)
+
 # 源码为UTF-8, 强制/utf-8保证字面量为UTF-8, 与CLI(SetConsoleOutputCP(CP_UTF8))一致, 否则中文/进度条字符编译成GBK乱码
 if(WIN32)
     target_compile_options(XCodec PRIVATE /utf-8)

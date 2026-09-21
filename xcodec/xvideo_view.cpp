@@ -1,4 +1,5 @@
 ﻿#include "predefine_header.h"
+#include "x_qt_opengl_widget.h"
 
 using namespace std;
 
@@ -136,6 +137,8 @@ XVideoView* XVideoView::Create(RenderType type)
         break;
     case XVideoView::Shader:
         return new XShader();
+    case XVideoView::QtOpenGL:
+        return new XQtOpenGLWidget();
     default:
         break;
     }

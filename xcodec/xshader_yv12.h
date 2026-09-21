@@ -25,6 +25,7 @@ class XShaderYV12 {
   GLuint id_v; // Texture id  
   GLuint textureUniformY, textureUniformU,textureUniformV; 
   GLuint vertexbuffer, uvbuffer;
+  GLuint vao = 0;   //核心模式必须绑定 VAO
   GLuint p;
 
   GLsizei pixel_w;

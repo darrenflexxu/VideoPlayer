@@ -42,6 +42,9 @@ public:
     void set_gpu_decode(bool gpu) { gpu_decode_ = gpu; }
     void set_gpu_direct_render_(bool gpu_render) { gpu_direct_render_ = gpu_render; }
 
+    //获取视频渲染对象(QtOpenGL 时同时是 QWidget)
+    XVideoView* view() { return view_; }
+
 protected:
 
     long long total_ms_ = 0;

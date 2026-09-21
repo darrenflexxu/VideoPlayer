@@ -2,6 +2,9 @@
 
 #include <QWidget>
 #include <QTimer>
+
+class QSplitter;
+
 #include "ui_xplayvideo.h"
 #include "xplayer.h"
 
@@ -41,6 +44,7 @@ private:
 
     Ui::XPlayVideo ui;
     XPlayer player;
+    QSplitter* main_splitter_ = nullptr;
     bool moved_ = false;
     bool gpu_decode_ = true;
     bool gpu_direct_render_ = false;

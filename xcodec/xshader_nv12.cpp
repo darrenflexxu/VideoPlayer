@@ -39,7 +39,10 @@ bool XShaderNV12::Draw(
   //Clear
   glClear(GL_COLOR_BUFFER_BIT);
 
-  glLinkProgram(p);
+  //核心模式下属性状态保存在 VAO 中，绘制前必须重新绑定
+  glBindVertexArray(vao);
+
+  glUseProgram(p);
 
   glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
   glVertexAttribPointer(
@@ -94,6 +97,7 @@ int XShaderNV12::InitShader() {
   GLuint VertexArrayID;
   glGenVertexArrays(1, &VertexArrayID);
   glBindVertexArray(VertexArrayID);
+  vao = VertexArrayID;
 
   glGenBuffers(1, &uvbuffer);
   glBindBuffer(GL_ARRAY_BUFFER, uvbuffer);

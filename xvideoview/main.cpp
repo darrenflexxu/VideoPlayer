@@ -1,10 +1,19 @@
 ﻿#include <QApplication>
 #include <QDebug>
 #include <QFileDialog>
+#include <QSurfaceFormat>
 #include "xplayer.h"
 #include "xplayvideo.h"
 
 int main(int argc, char* argv[]) {
+  // 视频着色器使用 GLSL 330 core，需请求 OpenGL 3.3+ 核心模式( macOS 最高 4.1 )
+  QSurfaceFormat format;
+  format.setRenderableType(QSurfaceFormat::OpenGL);
+  format.setProfile(QSurfaceFormat::CoreProfile);
+  format.setVersion(4, 1);
+  format.setSwapBehavior(QSurfaceFormat::DoubleBuffer);
+  QSurfaceFormat::setDefaultFormat(format);
+
   QApplication a(argc, argv);
   auto arg_list = a.arguments();
   auto play_video = new XPlayVideo();

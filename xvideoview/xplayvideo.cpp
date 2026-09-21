@@ -92,8 +92,22 @@ bool XPlayVideo::Open(const char* url) {
   player.set_gpu_decode(gpu_decode_);
   player.set_gpu_direct_render_(gpu_direct_render_);
 
-  if (!player.Open(url, (void*)ui.video->winId()))
+  // QtOpenGL 渲染直接绘制到控件，无需窗口句柄
+  if (!player.Open(url, nullptr))
     return false;
+
+  //用 XPlayer 创建的 XQtOpenGLWidget 替换占位控件 ui.video
+  auto* video_widget = dynamic_cast<QWidget*>(player.view());
+  if (video_widget && main_splitter_ && ui.video) {
+    int index = main_splitter_->indexOf(ui.video);
+    if (index >= 0) {
+      main_splitter_->replaceWidget(index, video_widget);
+      delete ui.video;
+      ui.video = nullptr;
+      video_widget->show();
+    }
+  }
+
   player.Start();
   player.Pause(false);  // ����״̬
   startTimer(10);
@@ -103,9 +117,9 @@ bool XPlayVideo::Open(const char* url) {
 XPlayVideo::XPlayVideo(QWidget* parent) : QWidget(parent) {
   ui.setupUi(this);
   auto main_layout = new QVBoxLayout(this);
-  auto main_splitter = new QSplitter(Qt::Vertical, this);
-  main_splitter->addWidget(ui.video);
-  main_layout->addWidget(main_splitter);
+  main_splitter_ = new QSplitter(Qt::Vertical, this);
+  main_splitter_->addWidget(ui.video);
+  main_layout->addWidget(main_splitter_);
   auto control_layout = new QSplitter(Qt::Horizontal, this);
   control_layout->addWidget(ui.play);
   control_layout->addWidget(ui.pos);

@@ -24,6 +24,7 @@ class XShaderNV12 {
   GLuint id_uv;
   GLuint textureUniformY, textureUniformUV;
   GLuint vertexbuffer, uvbuffer;
+  GLuint vao = 0;   //核心模式必须绑定 VAO
   GLuint p;
 
   GLsizei pixel_w;
