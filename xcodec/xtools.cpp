@@ -3,6 +3,10 @@
 #ifndef WIN32
 #include <unistd.h>
 #include <limits.h>
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#include <stdint.h>
+#endif
 #endif
 
 using namespace std;
@@ -237,6 +241,17 @@ std::string XTools::get_app_path() {
   GetModuleFileNameA(NULL, buffer, sizeof(buffer));
   std::string::size_type pos = std::string(buffer).find_last_of("\\/");
   return std::string(buffer).substr(0, pos);
+#elif defined(__APPLE__)
+  uint32_t size = sizeof(buffer);
+  if (_NSGetExecutablePath(buffer, &size) == 0) {
+    std::string::size_type pos = std::string(buffer).find_last_of("/");
+    return std::string(buffer).substr(0, pos);
+  }
+  // Fallback to current working directory
+  if (getcwd(buffer, sizeof(buffer))) {
+    return std::string(buffer);
+  }
+  return ".";
 #else
   ssize_t len = readlink("/proc/self/exe", buffer, sizeof(buffer) - 1);
   if (len != -1) {

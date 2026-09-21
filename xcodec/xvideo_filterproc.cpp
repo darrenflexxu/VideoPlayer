@@ -137,8 +137,11 @@ bool CVUMatToAVFrame(const cv::UMat& inUMat, AVFrame* frame) {
 
 struct XVideoFilterProc::Context {
   Context() {
-    if (!faceCascade.load("haarcascade_frontalface_default.xml")) {
-      std::cout << "错误：无法加载 Haar 级联分类器！" << std::endl;
+    std::string cascade_path =
+        XTools::get_app_path() + "/haarcascade_frontalface_default.xml";
+    if (!faceCascade.load(cascade_path)) {
+      std::cout << "错误：无法加载 Haar 级联分类器！" << cascade_path
+                << std::endl;
     }
   }
 
