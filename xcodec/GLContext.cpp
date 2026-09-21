@@ -100,6 +100,13 @@ GLContext::~GLContext() {
 
 bool GLContext::setup(SDL_Window* window) {
     _window = window;
+    // Request OpenGL 3.3 core profile on macOS
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+    
     _glContext = SDL_GL_CreateContext(window);
     if (!_glContext) {
         std::cerr << "Failed to create OpenGL context: " << SDL_GetError() << std::endl;

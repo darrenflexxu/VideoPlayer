@@ -1,8 +1,13 @@
 #pragma once
 
 #include <QWidget>
+#include <QTimer>
 #include "ui_xplayvideo.h"
 #include "xplayer.h"
+
+#ifndef WIN32
+#include <SDL.h>
+#endif
 
 class XPlayVideo : public QWidget
 {
@@ -23,19 +28,21 @@ Q_SIGNALS:
     void ReOpen();
 
 public slots:
-    void SetSpeed();    //¿ØÖÆ²¥·ÅËÙ¶È
-    void PlayPos();     //¿ØÖÆ²¥·Å½ø¶È ½ø¶ÈÌõËÉ¿ª
-    void Pause();       //²¥·ÅºÍÔÝÍ£
-    void Move();        //½ø¶ÈÌõÍÏ¶¯
+    void SetSpeed();    //ï¿½ï¿½ï¿½Æ²ï¿½ï¿½ï¿½ï¿½Ù¶ï¿½
+    void PlayPos();     //ï¿½ï¿½ï¿½Æ²ï¿½ï¿½Å½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½É¿ï¿½
+    void Pause();       //ï¿½ï¿½ï¿½Åºï¿½ï¿½ï¿½Í£
+    void Move();        //ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¶ï¿½
     void EnableGPUDecode(int enable);
     void EnableGPUDirectRender(int enable);
 
 private:
     void setPlayIcon(const QPixmap& pic);
+    void pumpSDLEvents();
 
     Ui::XPlayVideo ui;
     XPlayer player;
     bool moved_ = false;
     bool gpu_decode_ = true;
     bool gpu_direct_render_ = false;
+    QTimer* sdl_timer_ = nullptr;
 };

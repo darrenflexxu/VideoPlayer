@@ -6,6 +6,8 @@
 #include <SDL.h>
 #endif
 
+extern "C" SDL_Window* SDL_CreateWindowFromNSView(void* nsView);
+
 XShader::XShader() {
 }
 
@@ -32,18 +34,39 @@ bool XShader::Init(int w, int h, Format fmt) {
 #else
   SDL_Window* window = nullptr;
   if (win_id_) {
+#if defined(__APPLE__)
+    window = SDL_CreateWindowFromNSView(win_id_);
+    if (!window) {
+      printf("XShader: Failed to create SDL window from NSView (win_id_=%p)\n", win_id_);
+    }
+#else
     window = SDL_CreateWindowFrom(win_id_);
+#endif
+  } else {
+    // Create standalone window
+    window = SDL_CreateWindow("VideoPlayer",
+        SDL_WINDOWPOS_CENTERED,
+        SDL_WINDOWPOS_CENTERED,
+        w, h, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_SHOWN);
+    if (window) {
+      SDL_ShowWindow(window);
+    }
   }
   if (!window) {
+    printf("XShader: No window created, win_id_=%p\n", win_id_);
     return false;
   }
+  printf("XShader: SDL window created: %p\n", window);
   ctx_ = std::make_shared<GLContext>();
   if (!ctx_->setup(window)) {
+    printf("XShader: GLContext setup failed\n");
     SDL_DestroyWindow(window);
     return false;
   }
+  printf("XShader: GLContext setup success\n");
   int w_w, w_h;
   SDL_GetWindowSize(window, &w_w, &w_h);
+  printf("XShader: Window size: %dx%d\n", w_w, w_h);
   width_ = w_w;
   height_ = w_h;
   // Store window for later use

@@ -6,9 +6,15 @@ FILE(GLOB XVIDEO_VIEW_UI "./*.ui")
 add_executable(XVideoView ${XVIDEO_VIEW_SRC} ${XVIDEO_VIEW_HEADER} ${XVIDEO_VIEW_UI} ${XVIDEO_VIEW_QRC})
 
 TARGET_LINK_LIBRARIES(XVideoView PRIVATE XCodec Qt6::Widgets Qt6::Core Qt6::Gui)
-TARGET_LINK_DIRECTORIES(XVideoView PRIVATE "${ThirdParty}/ffmpeg/lib" "${ThirdParty}/SDL2/lib" "${ThirdParty}/GLEW/lib")
 target_include_directories(XVideoView PRIVATE "." "../xcodec")
 target_compile_definitions(XVideoView PRIVATE -DUNICODE)
+if(NOT WIN32)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(SDL2 REQUIRED sdl2)
+    target_include_directories(XVideoView PRIVATE ${SDL2_INCLUDE_DIRS})
+    # Use pkg-config for linker flags (includes -L path and -lSDL2)
+    target_link_libraries(XVideoView PRIVATE ${SDL2_LDFLAGS})
+endif()
 
 IF(WIN32)
 add_custom_command(

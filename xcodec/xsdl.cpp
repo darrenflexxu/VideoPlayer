@@ -2,6 +2,8 @@
 
 using namespace std;
 #pragma comment(lib,"SDL2.lib")
+
+extern "C" SDL_Window* SDL_CreateWindowFromNSView(void* nsView);
 static bool InitVideo()
 {
     static bool is_first = true;
@@ -70,16 +72,28 @@ bool XSDL::Init(int w, int h,Format fmt)
         if (!win_id_)
         {
             //新建窗口
-            win_ = SDL_CreateWindow("",
-                SDL_WINDOWPOS_UNDEFINED,
-                SDL_WINDOWPOS_UNDEFINED,
-                w, h, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE
+            win_ = SDL_CreateWindow("VideoPlayer",
+                SDL_WINDOWPOS_CENTERED,
+                SDL_WINDOWPOS_CENTERED,
+                w, h, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_SHOWN
             );
+            if (win_) {
+                SDL_ShowWindow(win_);
+                SDL_RaiseWindow(win_);
+                SDL_SetWindowInputFocus(win_);
+                printf("XSDL: Created standalone window: %p\n", win_);
+            }
         }
         else
         {
             //渲染到控件窗口
+#if defined(__APPLE__)
+            win_ = SDL_CreateWindowFromNSView(win_id_);
+            printf("XSDL: Wrapped NSView window: %p\n", win_);
+#else
             win_ = SDL_CreateWindowFrom(win_id_);
+            printf("XSDL: Wrapped window: %p\n", win_);
+#endif
         }
     }
     if (!win_)
@@ -87,6 +101,7 @@ bool XSDL::Init(int w, int h,Format fmt)
         cerr << SDL_GetError() << endl;
         return false;
     }
+    printf("XSDL: Window created: %p\n", win_);
 
     /// 2 创建渲染器
 
@@ -129,6 +144,7 @@ bool XSDL::Init(int w, int h,Format fmt)
         cerr << SDL_GetError() << endl;
         return false;
     }
+
     return true;
 }
 bool XSDL::Draw(

@@ -1,6 +1,11 @@
 FILE(GLOB_RECURSE VIDEO_PLAYER_SRC "*.cpp")
 FILE(GLOB_RECURSE VIDEO_PLAYER_HEADER "*.h")
 
+if(APPLE)
+    list(APPEND VIDEO_PLAYER_SRC macos_window.mm)
+    set_source_files_properties(macos_window.mm PROPERTIES LANGUAGE OBJCXX)
+endif()
+
 include_directories(.
 "${ThirdParty}/ffmpeg/include"
 "${ThirdParty}/SDL2/include"
@@ -30,4 +35,8 @@ else()
     
     # FFMPEG_LIBRARIES contains flags like -L... -lavcodec -lavdevice ...
     target_link_libraries(XCodec PRIVATE ${FFMPEG_LIBRARIES} ${FFMPEG_LDFLAGS} ${OPENCV_LIBRARIES} ${OPENCV_LDFLAGS} ${SDL2_LIBRARY} ${GLEW_LIBRARY} ${OPENGL_LIBRARY})
+    if(APPLE)
+        find_library(APPKIT AppKit)
+        target_link_libraries(XCodec PRIVATE ${APPKIT})
+    endif()
 endif()

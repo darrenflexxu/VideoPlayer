@@ -4,6 +4,18 @@
 #include <QLayout>
 #include <QSplitter>
 
+#ifndef WIN32
+#include <SDL.h>
+#endif
+
+void XPlayVideo::pumpSDLEvents() {
+#ifndef WIN32
+    for (int i = 0; i < 5; ++i) {
+        SDL_PumpEvents();
+    }
+#endif
+}
+
 void XPlayVideo::timerEvent(QTimerEvent* ev) {
   if (player.is_pause()) {
     setPlayIcon(QPixmap(":/XViewer/img/play.png"));
@@ -27,6 +39,8 @@ void XPlayVideo::timerEvent(QTimerEvent* ev) {
     ui.pos->setValue(0);
     player.ClearFinish();
   }
+  
+  pumpSDLEvents();
 }
 void XPlayVideo::Close() {
   player.Stop();
@@ -34,7 +48,7 @@ void XPlayVideo::Close() {
 void XPlayVideo::Pause() {
   player.Pause(!player.is_pause());
 }
-void XPlayVideo::Move()  // ½ø¶ÈÌõÍÏ¶¯
+void XPlayVideo::Move()  // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¶ï¿½
 {
   player.Pause(true);
   moved_ = true;
@@ -54,7 +68,7 @@ void XPlayVideo::setPlayIcon(const QPixmap& pic) {
   ui.play->setIconSize(ui.play->size());
 }
 
-void XPlayVideo::PlayPos()  // ¿ØÖÆ²¥·Å½ø¶È
+void XPlayVideo::PlayPos()  // ï¿½ï¿½ï¿½Æ²ï¿½ï¿½Å½ï¿½ï¿½ï¿½
 {
   player.Seek(ui.pos->value());
   player.Pause(false);
@@ -81,7 +95,7 @@ bool XPlayVideo::Open(const char* url) {
   if (!player.Open(url, (void*)ui.video->winId()))
     return false;
   player.Start();
-  player.Pause(false);  // ²¥·Å×´Ì¬
+  player.Pause(false);  // ï¿½ï¿½ï¿½ï¿½×´Ì¬
   startTimer(10);
   return true;
 }
