@@ -1,78 +1,72 @@
-# Implementation Plan: Migrate XVideoView to QOpenGLWidget
+# Implementation Plan: Volume Control for XVideoView
 
 ## Context
-Currently, `XVideoView` uses either SDL (`XSDL`) or a manual OpenGL context (`XShader`) to render video. This approach requires manual window handle management (`winId`) and manual GL context creation, which is fragile (especially on macOS) and conflicts with Qt's own rendering pipeline. 
-
-The goal is to replace this with `QOpenGLWidget`, integrating the video rendering directly into the Qt framework. This will improve stability, provide better integration with the UI, and leverage Qt's managed OpenGL lifecycle.
+The current version of `XVideoView` allows for video playback and speed control but lacks a user-facing mechanism to adjust audio volume. The underlying audio engine, `XAudioPlay`, already supports volume adjustment via `SDL_MixAudio` using a value range of 0-128. This plan describes how to expose this functionality through the UI.
 
 ## Recommended Approach
 
-The core of the migration is the introduction of a new class, `XQtOpenGLWidget`, which inherits from both `QOpenGLWidget` (for rendering) and `XVideoView` (for interface compatibility). 
+We will bridge the UI layer (`XPlayVideo`) to the audio engine (`XAudioPlay`) by extending the playback controller (`XPlayer`).
 
-Instead of the current synchronous "Decode $\rightarrow$ Draw" flow, we will move to an asynchronous "Produce $\rightarrow$ Consume" flow:
-1. **Producer (`XPlayer`)**: Pushes decoded `AVFrame` to the widget's internal buffer and triggers `update()`.
-2. **Consumer (`XQtOpenGLWidget`)**: In `paintGL()`, uploads the buffered frame to textures and executes the YUV $\rightarrow$ RGB shader.
+### Critical Files to Modify
 
-### Critical Files to Modify/Create
+#### 1. Core Logic (`xcodec/`)
+- [xcodec/xplayer.h](xcodec/xplayer.h): Add `SetVolume(float volume)` method.
+- [xcodec/xplayer.cpp](xcodec/xplayer.cpp): Implement the mapping from 0.0-1.0 float to 0-128 integer for `XAudioPlay`.
 
-#### 1. New Files
-- [xcodec/x_qt_opengl_widget.h](xcodec/x_qt_opengl_widget.h): Definition of the `QOpenGLWidget` implementation.
-- [xcodec/x_qt_opengl_widget.cpp](xcodec/x_qt_opengl_widget.cpp): Implementation of GL lifecycle (`initializeGL`, `resizeGL`, `paintGL`) and `XVideoView` methods.
-
-#### 2. Existing Files
-- [xcodec/xvideo_view.h](xcodec/xvideo_view.h): Add `QtOpenGL` to `RenderType` enum.
-- [xcodec/xvideo_view.cpp](xcodec/xvideo_view.cpp): Update `Create()` factory to instantiate `XQtOpenGLWidget`.
-- [xvideoview/xplayvideo.cpp](xvideoview/xplayvideo.cpp): Replace the generic `ui.video` widget with an instance of `XQtOpenGLWidget`.
-- [xcodec/xplayer.cpp](xcodec/xplayer.cpp): Update `Update()` to push frames to the widget instead of calling a synchronous `DrawFrame`.
+#### 2. UI Layer (`xvideoview/`)
+- [xvideoview/xplayvideo.ui](xvideoview/xplayvideo.ui): Add a `QSlider` for volume and an associated `QLabel`.
+- [xvideoview/xplayvideo.h](xvideoview/xplayvideo.h): Declare a slot to handle volume changes.
+- [xvideoview/xplayvideo.cpp](xvideoview/xplayvideo.cpp): Connect the slider signal to the player's volume method and manage the layout.
 
 ---
 
 ## Implementation Steps
 
-### Step 1: Define the Interface Extension
-- **Action**: Add `QtOpenGL` to `XVideoView::RenderType` in `xvideo_view.h`.
-- **Action**: Update `XVideoView::Create` in `xvideo_view.cpp` to return `new XQtOpenGLWidget()` when `QtOpenGL` is requested.
-- **Verification**: Project compiles.
+### Step 1: Extend `XPlayer` Interface
+- **Action**: Add `void SetVolume(float volume);` to the public section of `XPlayer` in `xplayer.h`.
+- **Action**: Implement the method in `xplayer.cpp`:
+  ```cpp
+  void XPlayer::SetVolume(float volume) {
+      int sdl_vol = (int)(volume * 128.0f);
+      XAudioPlay::Instance()->set_volume(sdl_vol);
+  }
+  ```
+- **Verification**: Project compiles successfully.
 
-### Step 2: Implement `XQtOpenGLWidget`
-- **Action**: Create the widget class.
-- **Implementation Details**:
-    - Implement `initializeGL()`: Load and compile shaders (reusing logic from `XShaderYV12`/`XShaderNV12`).
-    - Implement `paintGL()`: 
-        - Lock internal `AVFrame` buffer.
-        - Upload Y, U, V planes to textures using `glTexSubImage2D`.
-        - Draw a full-screen quad with the YUV shader.
-    - Implement `XVideoView::DrawFrame()`: Store the frame in the buffer and call `this->update()`.
-- **Verification**: Widget compiles and can be instantiated.
+### Step 2: Update UI Layout
+- **Action**: Modify `xplayvideo.ui` to include:
+    - A `QSlider` (Horizontal) named `volume` with a range of `0` to `100`.
+    - A `QLabel` named `vollabel` with the text "Volume:".
+- **Action**: Add these widgets to the control bar in `xplayvideo.cpp` constructor, ensuring they are placed alongside the speed and position controls.
+- **Verification**: Launch the app; the volume slider is visible in the control bar.
 
-### Step 3: Integrate Widget into UI
-- **Action**: In `XPlayVideo::XPlayVideo`, replace the `ui.video` widget in the layout with the new `XQtOpenGLWidget`.
-- **Action**: Update `XPlayVideo::Open` to ensure the `XPlayer` uses the `QtOpenGL` render type.
-- **Verification**: The application launches, and the video area is occupied by the `XQtOpenGLWidget`.
-
-### Step 4: Update Playback Loop
-- **Action**: In `XPlayer::Update`, ensure `view_->DrawFrame(f, ...)` is called. Since `XQtOpenGLWidget::DrawFrame` now just triggers `update()`, this effectively shifts the rendering to the GUI thread.
-- **Verification**: Video playback starts, and frames are updated on screen.
+### Step 3: Connect UI to Core Logic
+- **Action**: Add `void SetVolume();` as a slot in `XPlayVideo` in `xplayvideo.h`.
+- **Action**: Implement the slot in `xplayvideo.cpp`:
+  ```cpp
+  void XPlayVideo::SetVolume() {
+      float vol = ui.volume->value() / 100.0f;
+      player.SetVolume(vol);
+  }
+  ```
+- **Action**: In the `XPlayVideo` constructor, connect the slider's `valueChanged` signal to the `SetVolume` slot.
+- **Verification**: Moving the slider triggers the `SetVolume` function.
 
 ---
 
 ## Verification Plan
 
-### 1. Build and Launch
-- **Action**: Run the full build and launch `XVideoView`.
-- **Expected Result**: No compilation errors; the app opens normally.
+### 1. Functional Testing
+- **Action**: Open a video file with audio.
+- **Test Cases**:
+    - **Mute**: Slide the volume to `0`. Expected result: No audio output.
+    - **Full Volume**: Slide the volume to `100`. Expected result: Audio at maximum level.
+    - **Gradual Adjustment**: Move the slider slowly from 0 to 100. Expected result: Smooth increase in audio volume.
 
-### 2. Rendering Verification
-- **Action**: Play a variety of video formats (YUV420P, NV12).
-- **Expected Result**: 
-    - Video is displayed correctly without flickering.
-    - Colors are accurate (correct YUV $\rightarrow$ RGB conversion).
-    - Performance is smooth (no GUI thread blocking).
+### 2. Boundary Analysis
+- **Action**: Test values at the extreme ends (0, 1, 100).
+- **Expected Result**: No crashes or audio clipping; `XAudioPlay` receives values strictly within the 0-128 range.
 
-### 3. Integration Verification
-- **Action**: Resize the window.
-- **Expected Result**: `resizeGL` is called, and the video scales correctly to fill the widget area.
-
-### 4. Resource Leak Check
-- **Action**: Open and close multiple videos.
-- **Expected Result**: No memory leaks or OpenGL context errors in the console.
+### 3. UI Consistency Check
+- **Action**: Verify that the volume slider behaves consistently with the other controls (speed and position) in terms of layout and responsiveness.
+- **Expected Result**: UI remains responsive and the slider is intuitively placed.

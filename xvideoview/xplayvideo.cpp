@@ -86,6 +86,10 @@ void XPlayVideo::SetSpeed() {
   ui.speedtxt->setText(QString::number(speed));
   player.SetSpeed(speed);
 }
+void XPlayVideo::SetVolume() {
+  float vol = ui.volume->value() / 100.0f;
+  player.SetVolume(vol);
+}
 void XPlayVideo::closeEvent(QCloseEvent* ev) {
   Close();
 }
@@ -122,6 +126,9 @@ XPlayVideo::XPlayVideo(QWidget* parent) : QWidget(parent) {
   control_layout->addWidget(ui.speed);
   control_layout->addWidget(ui.label);
   control_layout->addWidget(ui.speedtxt);
+  control_layout->addWidget(ui.vollabel);
+  control_layout->addWidget(ui.volume);
+  connect(ui.volume, &QSlider::valueChanged, this, &XPlayVideo::SetVolume);
   auto gpu_decode_button = new QCheckBox(tr("GPU Decode"), this);
   gpu_decode_button->setChecked(gpu_decode_);
   gpu_decode_button->setEnabled(false);

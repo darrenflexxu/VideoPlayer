@@ -33,6 +33,7 @@ Q_SIGNALS:
 
 public slots:
     void SetSpeed();    //���Ʋ����ٶ�
+    void SetVolume();   //���Ʋ���������
     void PlayPos();     //���Ʋ��Ž��� �������ɿ�
     void Pause();       //���ź���ͣ
     void Move();        //�������϶�

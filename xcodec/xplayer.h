@@ -28,6 +28,9 @@ public:
 
     void SetSpeed(float s);
 
+    //设置音量 0.0~1.0
+    void SetVolume(float volume);
+
     //总时长 毫秒
     long long total_ms() { return total_ms_; }
 

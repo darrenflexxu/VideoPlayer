@@ -170,6 +170,14 @@ void XPlayer::SetSpeed(float s)
 {
     XAudioPlay::Instance()->SetSpeed(s);
 }
+//设置音量 0.0~1.0, 内部换算为SDL的0~128
+void XPlayer::SetVolume(float volume)
+{
+    if (volume < 0.0f) volume = 0.0f;
+    if (volume > 1.0f) volume = 1.0f;
+    int sdl_vol = (int)(volume * 128.0f);
+    XAudioPlay::Instance()->set_volume(sdl_vol);
+}
 void XPlayer::Main()
 {
     long long syn = 0;
