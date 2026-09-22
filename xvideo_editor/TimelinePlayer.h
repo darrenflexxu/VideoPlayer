@@ -1,4 +1,6 @@
 #pragma once
+#include <thread>
+#include <mutex>
 #include "xplayer.h"
 #include "TimelineModel.h"
 
@@ -8,6 +10,11 @@ class XQtOpenGLWidget;
 class TimelinePlayer
 {
 public:
+    TimelinePlayer() = default;
+    ~TimelinePlayer();
+    TimelinePlayer(const TimelinePlayer&) = delete;
+    TimelinePlayer& operator=(const TimelinePlayer&) = delete;
+
     void setModel(TimelineModel* m) { model_ = m; }
     void setView(XQtOpenGLWidget* w);
 
@@ -31,8 +38,16 @@ public:
 private:
     bool switchTo(int idx);   //打开并开始第idx段
     void releasePlayer();     //停掉并释放当前播放器
+    XPlayer* buildPlayer(const Clip& c);  //新建并打开播放器(未启动线程)
+    void startPrefetch(int idx);      //后台预热第idx段第一帧
+    void joinPrefetch();              //回收并等待预热线程结束
+    bool takePrefetched();            //把预热好的播放器接收为当前, 失败返回false
 
     XPlayer* player_ = nullptr;   //每个片段独立播放器实例(重开不再复用旧解码状态)
+    XPlayer* next_player_ = nullptr;  //后台预热好的下一段播放器(解锁持有)
+    std::thread prefetch_th_;         //预热线程(最多并存一个, 换代前先join)
+    std::mutex next_mtx_;             //保护 next_player_与prefetch_gen_
+    int prefetch_gen_ = 0;            //代际: 用于作废过期预热
     TimelineModel* model_ = nullptr;
     XQtOpenGLWidget* view_ = nullptr;
     int active_idx_ = -1;            //当前打开的片段索引, -1=尚未打开

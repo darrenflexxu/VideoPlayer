@@ -1,7 +1,6 @@
 #include "x_qt_opengl_widget.h"
 
 #include <cstdio>
-
 #include <GL/glew.h>
 
 extern "C" {
@@ -28,6 +27,7 @@ bool XQtOpenGLWidget::Init(int w, int h, Format fmt) {
     width_ = w;
     height_ = h;
     fmt_ = fmt;
+    last_drawn_pts_ = -1;   //新文件/新解码起点, 重置去重计数
     return true;
 }
 
@@ -65,6 +65,11 @@ bool XQtOpenGLWidget::DrawFrame(AVFrame* frame, AVCodecContext* ctx) {
     (void)ctx;
     if (!frame || !frame->data[0])
         return false;
+
+    //跳过重复帧: 高频拉取时只有新帧才触发重绘, 避免重绘风暴并平滑节拍
+    if (frame->pts == last_drawn_pts_)
+        return false;
+    last_drawn_pts_ = frame->pts;
 
     //统计显示帧率
     count_++;

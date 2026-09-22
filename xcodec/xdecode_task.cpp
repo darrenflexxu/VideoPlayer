@@ -121,6 +121,7 @@ bool XDecodeTask::Open(AVCodecParameters* para)
     is_open_ = true;
     // 重开解码器用于下一段拼接: 结束标志清掉, 帧计数跨段累计(进度单调)
     end_decode_ = false;
+    preroll_paused_ = false;
     return true;
 }
 
@@ -280,6 +281,11 @@ void XDecodeTask::Main()
                   }
                   Next(av_frame_clone(frame_));
                   continue;
+                }
+                //后台预热: 出第一帧后自暂停, 等待前台切换取走这帧
+                if (preroll_) {
+                  preroll_paused_ = true;
+                  Pause(true);
                 }
             }
             if (frame_cache_)

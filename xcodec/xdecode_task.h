@@ -23,6 +23,14 @@ public:
     bool IsVideoFinish();
     void ClearFinish();
 
+    //后台预热: 解码出第一帧后自身暂停(用于无缝跨片段切换)
+    void set_preroll_one(bool v)
+    {
+        preroll_ = v;
+        preroll_paused_ = false;
+    }
+    bool preroll_paused() const { return preroll_paused_; }
+
     void set_stream_index(int i) { stream_index_ = i; }
     int stream_index() { return stream_index_; }
 
@@ -94,5 +102,7 @@ private:
     int decode_frame_count_ = 0;
     bool end_decode_ = false;
     int recv_packet_count_ = 0;
+    std::atomic<bool> preroll_ {false};        // 预热模式: 出第一帧即暂停
+    std::atomic<bool> preroll_paused_ {false}; // 预热已完成(已解析第一帧)
 };
 

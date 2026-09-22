@@ -1,6 +1,7 @@
 #include "TimelinePlayer.h"
 #include "x_qt_opengl_widget.h"
-#include <algorithm>
+#include <chrono>
+#include <thread>
 
 void TimelinePlayer::setView(XQtOpenGLWidget* w)
 {
@@ -18,12 +19,8 @@ void TimelinePlayer::releasePlayer()
     player_ = nullptr;
 }
 
-bool TimelinePlayer::switchTo(int idx)
+XPlayer* TimelinePlayer::buildPlayer(const Clip& c)
 {
-    if (!model_ || idx < 0 || idx >= model_->clipCount())
-        return false;
-    const Clip& c = model_->clip(idx);
-
     auto* p = new XPlayer();
     p->set_view(view_);
     p->set_gpu_decode(false);
@@ -31,6 +28,19 @@ bool TimelinePlayer::switchTo(int idx)
 
     if (!p->Open(c.url.toLocal8Bit().constData(), nullptr)) {
         delete p;
+        return nullptr;
+    }
+    return p;
+}
+
+bool TimelinePlayer::switchTo(int idx)
+{
+    if (!model_ || idx < 0 || idx >= model_->clipCount())
+        return false;
+    const Clip& c = model_->clip(idx);
+
+    XPlayer* p = buildPlayer(c);
+    if (!p) {
         paused_ = true;
         timeline_pos_ms_ = c.pos_ms;
         return false;
@@ -44,7 +54,75 @@ bool TimelinePlayer::switchTo(int idx)
         player_->Seek(c.source_start_ms);
     player_->Start();
     player_->Pause(paused_);
+    startPrefetch(idx + 1);
     return true;
+}
+
+void TimelinePlayer::startPrefetch(int idx)
+{
+    if (!model_ || idx < 0 || idx >= model_->clipCount())
+        return;
+    joinPrefetch();   // 回收上一次预热线程, 并作废其可能已发布的播放器
+    const Clip c = model_->clip(idx);
+    int gen = ++prefetch_gen_;
+    prefetch_th_ = std::thread([this, c, gen]() {
+        XPlayer* p = buildPlayer(c);
+        if (!p)
+            return;
+        p->set_preroll_one(true);
+        p->Start();
+        // 轮询等待第一帧解码完成(后台预热); 超时或作废则主动停止
+        for (int i = 0; i < 400 && !p->preroll_ready(); i++)
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        // 预热完成即整体暂停(decode+demux): 防止demux继续把整段灌进缓存,
+        // 换装恢复时才能按真实帧率被demux限速逐步解码
+        p->Pause(true);
+        {
+            std::lock_guard<std::mutex> lk(next_mtx_);
+            if (gen != prefetch_gen_ || !p->preroll_ready()) {
+                // 已作废或预热失败: 在本线程释放(不触碰外部view)
+                p->set_view(nullptr);
+                p->Stop();
+                delete p;
+                return;
+            }
+            if (next_player_)
+                delete next_player_;
+            next_player_ = p;
+        }
+    });
+}
+
+void TimelinePlayer::joinPrefetch()
+{
+    prefetch_gen_++;   // 作废在途预热, worker 发现代际不符会自行清理
+    {
+        std::lock_guard<std::mutex> lk(next_mtx_);
+        if (next_player_) {
+            delete next_player_;
+            next_player_ = nullptr;
+        }
+    }
+    if (prefetch_th_.joinable())
+        prefetch_th_.join();
+}
+
+bool TimelinePlayer::takePrefetched()
+{
+    std::lock_guard<std::mutex> lk(next_mtx_);
+    if (!next_player_)
+        return false;
+    releasePlayer();
+    player_ = next_player_;
+    next_player_ = nullptr;
+    player_->set_preroll_one(false);   // 预热完成, 解除"出帧即停"
+    return true;
+}
+
+TimelinePlayer::~TimelinePlayer()
+{
+    joinPrefetch();
+    releasePlayer();
 }
 
 bool TimelinePlayer::play()
@@ -107,9 +185,20 @@ void TimelinePlayer::Update()
         return;
     int nx = active_idx_ + 1;
     if (nx < model_->clipCount()) {
-        switchTo(nx);
-        if (player_)
-            player_->Pause(false);  // 跨片段保持播放
+        if (takePrefetched()) {
+            // 后台已预热好下一段: 直接换装, 片段边界几乎无卡顿
+            active_idx_ = nx;
+            const Clip& nxt = model_->clip(nx);
+            if (nxt.source_start_ms > 0)
+                player_->Seek(nxt.source_start_ms);
+            player_->Pause(false);   // 恢复解码(预热后停在第一帧)
+            timeline_pos_ms_ = nxt.pos_ms;
+        } else {
+            switchTo(nx);            // 预热未就绪时退回同步打开
+            if (player_)
+                player_->Pause(false);  // 跨片段保持播放
+        }
+        startPrefetch(nx + 1);
     } else {
         paused_ = true;        // 播放到结尾
         if (player_)

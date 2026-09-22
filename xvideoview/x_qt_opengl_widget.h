@@ -61,4 +61,5 @@ private:
     std::shared_ptr<XShaderYV12> yv12_; //YUV420P 着色器
     std::shared_ptr<XShaderNV12> nv12_; //NV12 着色器
     bool gl_ready_ = false;     //GL 上下文是否可用
+    long long last_drawn_pts_ = -1; //上一次绘制的pts, 用于跳过重复帧(节拍平滑)
 };

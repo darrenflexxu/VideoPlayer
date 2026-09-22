@@ -11,6 +11,8 @@
 
 using namespace std;
 
+#include <chrono>
+
 //根据时间基数计算
 XCODEC_API long long XRescale(long long pts,
                               AVRational* src_time_base,
@@ -39,15 +41,18 @@ void XFreePacket(AVPacket ** packet) {
 }
 
 void MSleep(unsigned int ms) {
-    auto beg = clock();
-    for (int i = 0; i < ms; i++) {
-        this_thread::sleep_for(std::chrono::milliseconds(1));
-        if ((clock() - beg) / (CLOCKS_PER_SEC / 1000) >= ms)
-            break;
+    //注意: 不能用 clock() —— macOS 上它是进程CPU时间, 会让本函数随进程负载变长/变短;
+    //     用稳态时钟(wall time)保证按真实毫秒睡眠。
+    auto beg = chrono::steady_clock::now();
+    auto dur = chrono::milliseconds(ms);
+    while (chrono::steady_clock::now() - beg < dur) {
+        this_thread::sleep_for(chrono::milliseconds(1));
     }
 }
 long long NowMs() {
-    return clock() / (CLOCKS_PER_SEC / 1000);
+    return chrono::duration_cast<chrono::milliseconds>(
+               chrono::steady_clock::now().time_since_epoch())
+        .count();
 }
 
 //启动线程

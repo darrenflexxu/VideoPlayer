@@ -11,6 +11,7 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QFileInfo>
+#include <QTimerEvent>
 #include <algorithm>
 #include <thread>
 
@@ -59,11 +60,15 @@ XVideoEditorWindow::XVideoEditorWindow(QWidget* parent)
     auto* bar = new QHBoxLayout;
     play_btn_ = new QPushButton("播放", this);
     add_btn_ = new QPushButton("添加视频", this);
+    zoom_in_btn_ = new QPushButton("放大", this);
+    zoom_out_btn_ = new QPushButton("缩小", this);
     export_btn_ = new QPushButton("导出", this);
     status_ = new QLabel("00:00 / 00:00", this);
     status_->setMinimumWidth(180);
     bar->addWidget(play_btn_);
     bar->addWidget(add_btn_);
+    bar->addWidget(zoom_in_btn_);
+    bar->addWidget(zoom_out_btn_);
     bar->addWidget(export_btn_);
     bar->addStretch(1);
     bar->addWidget(status_);
@@ -83,11 +88,23 @@ XVideoEditorWindow::XVideoEditorWindow(QWidget* parent)
             &XVideoEditorWindow::togglePlay);
     connect(add_btn_, &QPushButton::clicked, this,
             &XVideoEditorWindow::onAddClicked);
+    //放大/缩小: 以时间轴视图中心为锚点缩放
+    connect(zoom_in_btn_, &QPushButton::clicked, this,
+            [this]() {
+                timeline_->zoomBy(1.4, timeline_->mapToScene(
+                    timeline_->viewport()->rect().center()));
+            });
+    connect(zoom_out_btn_, &QPushButton::clicked, this,
+            [this]() {
+                timeline_->zoomBy(1.0 / 1.4, timeline_->mapToScene(
+                    timeline_->viewport()->rect().center()));
+            });
     connect(export_btn_, &QPushButton::clicked, this,
             &XVideoEditorWindow::doExport);
 
     resize(960, 640);
-    startTimer(33);
+    startTimer(33);            //UI 刷新: 播放头/状态/导出
+    frame_timer_ = startTimer(8);  //高频拉帧: 平滑节拍(空闲时开销极小)
 }
 
 bool XVideoEditorWindow::importFiles(const QStringList& files)
@@ -136,10 +153,12 @@ void XVideoEditorWindow::onAddClicked()
 
 void XVideoEditorWindow::togglePlay()
 {
-    if (player_.paused())
+    if (player_.paused()) {
+        timeline_->resumeFollow();   //开始播放时恢复播放头自动跟随
         player_.play();
-    else
+    } else {
         player_.pause();
+    }
     play_btn_->setText(player_.paused() ? "播放" : "暂停");
 }
 
@@ -218,10 +237,17 @@ void XVideoEditorWindow::updateLabels()
     status_->setText(msToMinSec(player_.pos_ms()) + " / " + msToMinSec(player_.total_ms()));
 }
 
+void XVideoEditorWindow::onFrameTimer()
+{
+    player_.Update();          // 高频拉取解码帧, 由控件去重并按解码节奏渲染
+}
+
 void XVideoEditorWindow::timerEvent(QTimerEvent* ev)
 {
-    Q_UNUSED(ev);
-    player_.Update();
+    if (ev->timerId() == frame_timer_) {
+        onFrameTimer();
+        return;
+    }
     timeline_->setPlayheadMs(player_.pos_ms());
     updateLabels();
 

@@ -23,6 +23,10 @@ public:
 
     void ClearFinish();
 
+    //后台预热: 解码出第一帧后自暂停, 供跨片段无缝切换
+    void set_preroll_one(bool v) { video_decode_.set_preroll_one(v); }
+    bool preroll_ready() const { return video_decode_.preroll_paused(); }
+
     //渲染视频 播放音频
     void Update();
 

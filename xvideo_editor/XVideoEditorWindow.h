@@ -23,6 +23,7 @@ protected:
     void timerEvent(QTimerEvent* ev) override;
 
 private:
+    void onFrameTimer();
     long long probeDurationMs(const QString& url);
     void addClip(const QString& url);
     void onAddClicked();
@@ -35,9 +36,12 @@ private:
     TimelineWidget* timeline_ = nullptr;
     TimelinePlayer player_;
     XQtOpenGLWidget* preview_ = nullptr;
+    int frame_timer_ = 0;   //高频拉帧定时器(仅播放时有效)
 
     QPushButton* play_btn_ = nullptr;
     QPushButton* add_btn_ = nullptr;
+    QPushButton* zoom_in_btn_ = nullptr;
+    QPushButton* zoom_out_btn_ = nullptr;
     QPushButton* export_btn_ = nullptr;
     QLabel* status_ = nullptr;
 
