@@ -17,10 +17,24 @@
 static const double kRulerHeight = 26.0;
 static const double kTrackTop = 34.0;
 static const double kTrackHeight = 180.0;
+static const double kTrackGap = 8.0;            //相邻轨道行间距
 static const double kSceneWidth = 12000.0;
 static const double kSceneHeight = 260.0;
 static const double kMinPixelPerSecond = 1e-6;   //无限缩小: 仅保留极小下限防除零
 static const double kMaxPixelPerSecond = 200.0;
+
+//某轨道片段所在的行纵坐标(顶部标尺下方, 每条轨道一行)
+static double trackRowY(int trackIndex)
+{
+    return kTrackTop + trackIndex * (kTrackHeight + kTrackGap);
+}
+
+//场景总高度: 标尺 + 所有轨道行 + 底部留白
+static double sceneHeightWith(int maxTrackIndex)
+{
+    return kRulerHeight + kTrackGap +
+           (maxTrackIndex + 1) * kTrackHeight + kTrackGap;
+}
 
 //毫秒 -> 时间字符串 (mm:ss / h:mm:ss)
 static QString msToText(long long ms)
@@ -140,9 +154,9 @@ ClipItem::ClipItem(int index, TimelineModel* model, double pps, QGraphicsItem* p
 void ClipItem::syncFromModel()
 {
     const Clip& c = model_->clip(index_);
-    //始终从 0 时长起可见(宽度1px便于抓取)
+    //始终从 0 时长起可见(宽度1px便于抓取); 每条轨道独占一行
     double w = std::max(msToX(c.duration_ms()), 1.0);
-    setRect(QRectF(msToX(c.pos_ms), kTrackTop, w, kTrackHeight));
+    setRect(QRectF(msToX(c.pos_ms), trackRowY(c.trackIndex), w, kTrackHeight));
     update();
 }
 
@@ -296,6 +310,13 @@ void TimelineWidget::refresh()
     scene_->clear();
     playhead_ = nullptr;
     ruler_ = nullptr;
+
+    //场景高度按最高轨道动态扩展, 每条轨道一行
+    int maxTrack = 0;
+    for (int i = 0; i < model_->clipCount(); ++i)
+        maxTrack = std::max(maxTrack, model_->clip(i).trackIndex);
+    const double sceneH = sceneHeightWith(maxTrack);
+
     for (int i = 0; i < model_->clipCount(); ++i) {
         ClipItem* it = new ClipItem(i, model_, pixelPerSecond_);
         it->changed = [this]() { emit timelineChanged(); };
@@ -306,14 +327,15 @@ void TimelineWidget::refresh()
     ruler_->setZValue(50);
     scene_->addItem(ruler_);
     //播放头
-    playhead_ = scene_->addLine(QLineF(0, 0, 0, kSceneHeight), QPen(Qt::red, 2));
+    playhead_ = scene_->addLine(QLineF(0, 0, 0, sceneH), QPen(Qt::red, 2));
     playhead_->setZValue(100);
     setPlayheadMs(playhead_ms_);
-    //重新延展场景宽度
+    //重新延展场景尺寸
     long long total = model_->total_ms();
     double w = msToX(total) + 200;
     w = std::max(w, kSceneWidth);
-    scene_->setSceneRect(0, 0, w, kSceneHeight);
+    sceneH_ = sceneH;
+    scene_->setSceneRect(0, 0, w, sceneH);
     if (ruler_) ruler_->update();
 }
 
@@ -334,14 +356,14 @@ void TimelineWidget::setPlayheadMs(long long ms)
     playhead_ms_ = std::max(0LL, ms);
     if (!playhead_) return;
     double x = msToX(playhead_ms_);
-    playhead_->setLine(x, 0, x, kSceneHeight);
+    playhead_->setLine(x, 0, x, sceneH_);
     //播放头超出可视范围时扩展场景
     QRectF sr = scene_->sceneRect();
     if (x > sr.right() - 30)
-        scene_->setSceneRect(0, 0, x + 100, kSceneHeight);
+        scene_->setSceneRect(0, 0, x + 100, sceneH_);
     //仅在自动跟随模式下随播放头居中(用户手动滚动/编辑时保持不动)
     if (follow_playhead_)
-        centerOn(x, kSceneHeight / 2);
+        centerOn(x, sceneH_ / 2);
 }
 
 void TimelineWidget::mousePressEvent(QMouseEvent* ev)

@@ -47,17 +47,18 @@ void TimelineModel::addClip(const Clip& c)
     clips_.push_back(c);
 }
 
-void TimelineModel::addClip(const QString& url, long long src_start, long long src_end)
+void TimelineModel::addClip(const QString& url, long long src_start, long long src_end,
+                            int trackIndex)
 {
     Clip c;
     c.type = ClipType::VIDEO;
     c.url = url;
     c.source_start_ms = src_start;
     c.source_end_ms = src_end;
-    c.trackIndex = 0;
+    c.trackIndex = trackIndex;
     c.rect = ClipRect{0.0, 0.0, 1.0, 1.0};
     c.alpha = 1.0;
-    c.pos_ms = nextPosition(0);
+    c.pos_ms = nextPosition(trackIndex);
     addClip(c);
 }
 

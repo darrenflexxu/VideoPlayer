@@ -68,8 +68,9 @@ public:
 
     //通用添加片段(可指定类型/轨道/矩形/透明度)
     void addClip(const Clip& c);
-    //兼容旧接口: 追加视频片段到轨道0(全屏), 位置接在当前轨道0末尾
-    void addClip(const QString& url, long long src_start, long long src_end);
+    //兼容旧接口: 追加全屏视频片段到指定轨道末尾(trackIndex 默认0)
+    void addClip(const QString& url, long long src_start, long long src_end,
+                 int trackIndex = 0);
     const std::vector<Clip>& clips() const { return clips_; }
     int clipCount() const { return (int)clips_.size(); }
     bool empty() const { return clips_.empty(); }

@@ -137,7 +137,10 @@ void XVideoEditorWindow::addClip(const QString& url)
     long long dur = probeDurationMs(url);
     if (dur <= 0)
         return;
-    model_.addClip(url, 0, dur);
+    //每个导入文件独占一条新轨道(多轨叠加), 从时间轴0开始
+    int track = model_.clipCount();
+    model_.addTrack(track, ClipType::VIDEO, QString("视频轨 %1").arg(track + 1));
+    model_.addClip(url, 0, dur, track);
     timeline_->refresh();
     timeline_->setPlayheadMs(player_.pos_ms());
     updateLabels();

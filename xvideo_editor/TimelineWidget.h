@@ -86,5 +86,6 @@ private:
     TimelineRuler* ruler_ = nullptr;
     double pixelPerSecond_ = 50.0;   //每秒占像素
     long long playhead_ms_ = 0;
+    double sceneH_ = 260.0;          //当前场景总高度(随轨道数扩展)
     bool follow_playhead_ = true;    //播放时是否自动跟随播放头(用户滚动/编辑时关闭)
 };
