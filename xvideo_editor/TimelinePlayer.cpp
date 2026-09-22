@@ -71,13 +71,27 @@ bool TimelinePlayer::switchToBase(int idx)
     releaseBase();
     player_ = p;
     active_idx_ = idx;
-    timeline_pos_ms_ = c.pos_ms;
     if (c.source_start_ms > 0)
         player_->Seek(c.source_start_ms);
     player_->Start();
     player_->Pause(paused_);
     startPrefetch(idx + 1);
     return true;
+}
+
+//剪切后基片重同步: 若当前播放位置落入被裁掉的源区间, 重定位到可见窗口起点
+void TimelinePlayer::resyncBase()
+{
+    if (!model_ || active_idx_ < 0 || active_idx_ >= model_->clipCount())
+        return;
+    if (!player_)
+        return;
+    const Clip& c = model_->clip(active_idx_);
+    long long cur = player_->pos_ms();
+    if (cur < c.source_start_ms || cur >= c.source_end_ms) {
+        player_->Seek(c.source_start_ms);
+        timeline_pos_ms_ = c.pos_ms;
+    }
 }
 
 //统一创建叠加层播放器: 无view(合成器取帧)、独立混音源、不再打开SDL设备
@@ -184,8 +198,24 @@ int TimelinePlayer::nextBaseClip(int idx) const
     if (!model_)
         return -1;
     for (int i = idx > 0 ? idx : 0; i < model_->clipCount(); ++i)
-        if (model_->clip(i).type == ClipType::VIDEO && model_->clip(i).trackIndex == 0)
+        if (model_->clip(i).type == ClipType::VIDEO)
             return i;
+    return -1;
+}
+
+//timeline_ms 处最低轨激活视频片段(基片): 按Z序最底层, 无则-1
+int TimelinePlayer::activeVideoClipIndex(long long ms) const
+{
+    if (!model_)
+        return -1;
+    auto act = model_->getActiveClips(ms);
+    for (const Clip* p : act) {
+        if (p->type != ClipType::VIDEO)
+            continue;
+        for (int i = 0; i < model_->clipCount(); ++i)
+            if (&model_->clip(i) == p)
+                return i;
+    }
     return -1;
 }
 
@@ -311,12 +341,17 @@ void TimelinePlayer::reconcileOverlays()
     if (!model_)
         return;
     auto act = model_->getActiveClips(timeline_pos_ms_);
-    std::vector<const Clip*> want;   //轨>=1的激活片段(底层在前)
+    //基片 = 当前激活的最低轨视频片段; 其余视频/音频均为叠加层(不含基片自身)
+    const Clip* base = nullptr;
+    if (active_idx_ >= 0 && active_idx_ < (int)model_->clips().size())
+        base = &model_->clip(active_idx_);
+    std::vector<const Clip*> want;   //叠加层集合(按Z序, 底层在前)
     for (const Clip* p : act) {
         if (p->type != ClipType::VIDEO && p->type != ClipType::AUDIO)
             continue;
-        if (p->trackIndex >= 1)
-            want.push_back(p);
+        if (base && p == base)
+            continue;
+        want.push_back(p);
     }
 
     //移除不再需要/片段已变更的叠加层
@@ -376,13 +411,22 @@ bool TimelinePlayer::play()
     if (!model_ || model_->empty())
         return false;
     if (active_idx_ < 0) {
-        // 尚未打开主片段: 从播放头所在片段开始
-        int idx = model_->clipAt(timeline_pos_ms_);
-        if (idx < 0) idx = 0;
+        // 尚未打开基片: 从播放头处最低轨视频开始, 找不到则取第一个视频片段
+        int idx = activeVideoClipIndex(timeline_pos_ms_);
+        if (idx < 0) {
+            for (int i = 0; i < model_->clipCount(); ++i)
+                if (model_->clip(i).type == ClipType::VIDEO) { idx = i; break; }
+        }
+        if (idx < 0)
+            idx = 0;
         paused_ = false;
-        return switchToBase(idx);
+        if (!switchToBase(idx))
+            return false;
+        timeline_pos_ms_ = model_->clip(idx).pos_ms;
+        return true;
     }
     paused_ = false;
+    resyncBase();               //剪切后起点前移时, 重定位避免被裁掉的前段仍被播放
     if (player_)
         player_->Pause(false);
     for (auto& o : overlays_)
@@ -395,13 +439,12 @@ bool TimelinePlayer::seekTo(long long timeline_ms)
 {
     if (!model_ || model_->empty())
         return false;
-    long long local = 0;
-    int idx = model_->clipAt(timeline_ms, &local);
+    int idx = activeVideoClipIndex(timeline_ms);
     if (idx < 0)
         return false;
     timeline_pos_ms_ = timeline_ms;
     paused_ = false;
-    //主轨对齐
+    //基片对齐
     if (idx != active_idx_) {
         if (!switchToBase(idx))
             return false;
@@ -414,7 +457,7 @@ bool TimelinePlayer::seekTo(long long timeline_ms)
     }
     if (player_) {
         const Clip& c = model_->clip(idx);
-        player_->Seek(c.source_start_ms + local);
+        player_->Seek(c.source_start_ms + (timeline_ms - c.pos_ms));
     }
     if (view_)
         view_->clearOverlays();
@@ -510,10 +553,11 @@ void TimelinePlayer::Update()
 
     const Clip& c = model_->clip(active_idx_);
     long long local = player_->pos_ms();
-    timeline_pos_ms_ = c.pos_ms + local;
+    //时间轴位置 = 片段起点 + (当前源位置 - 裁剪起点), 前段被裁时播放头才准
+    timeline_pos_ms_ = c.pos_ms + std::max(0LL, local - c.source_start_ms);
 
-    // 主轨片段用尽(带容差)或源已放完 -> 切到下一段
-    bool exhausted = local >= c.duration_ms() - 60 || player_->IsFinish();
+    // 主片段可见窗口用尽(以裁剪终点为界, 带容差)或源已放完 -> 切到下一段
+    bool exhausted = local >= c.source_end_ms - 60 || player_->IsFinish();
     if (!exhausted)
         return;
     int nx = nextBaseClip(active_idx_);
@@ -529,6 +573,8 @@ void TimelinePlayer::Update()
             startPrefetch(nx + 1);
         } else {
             switchToBase(nx);   // 预热未就绪时退回同步打开(内部会重新预热下一段)
+            if (nx < model_->clipCount())
+                timeline_pos_ms_ = model_->clip(nx).pos_ms;
         }
     } else {
         paused_ = true;        // 播放到结尾

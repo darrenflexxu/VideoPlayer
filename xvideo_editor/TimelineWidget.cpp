@@ -142,6 +142,18 @@ private:
     double pps_;
 };
 
+//按片段类型取固定配色: 不同类型颜色不同, 相同类型颜色相同
+static QColor clipColor(ClipType t)
+{
+    switch (t) {
+    case ClipType::VIDEO:    return QColor(70, 160, 255);
+    case ClipType::AUDIO:    return QColor(90, 200, 120);
+    case ClipType::STICKER:  return QColor(230, 110, 250);
+    case ClipType::SUBTITLE: return QColor(255, 190, 80);
+    }
+    return QColor(150, 150, 150);
+}
+
 //------------------ ClipItem ------------------
 
 ClipItem::ClipItem(int index, TimelineModel* model, double pps, QGraphicsItem* parent)
@@ -154,22 +166,28 @@ ClipItem::ClipItem(int index, TimelineModel* model, double pps, QGraphicsItem* p
 void ClipItem::syncFromModel()
 {
     const Clip& c = model_->clip(index_);
-    //始终从 0 时长起可见(宽度1px便于抓取); 每条轨道独占一行
-    double w = std::max(msToX(c.duration_ms()), 1.0);
-    setRect(QRectF(msToX(c.pos_ms), trackRowY(c.trackIndex), w, kTrackHeight));
+    //可见窗口 = 时间轴上实际展现的片段区段
+    vis_x_ = msToX(c.pos_ms);
+    vis_y_ = trackRowY(c.trackIndex);
+    vis_w_ = std::max(msToX(c.duration_ms()), 1.0);
+    //整条 = 原片总长: 左边灰 = 截取起点前被裁掉的部分, 右边灰 = 截取终点后未用的部分
+    double fullW = std::max(msToX(c.source_length_ms()), vis_w_);
+    setRect(QRectF(vis_x_ - msToX(c.source_start_ms), vis_y_, fullW, kTrackHeight));
     update();
 }
 
 void ClipItem::mousePressEvent(QGraphicsSceneMouseEvent* ev)
 {
     double x = ev->scenePos().x();
-    const QRectF r = rect();
-    if (x - r.left() <= 8.0)
+    double visRight = vis_x_ + vis_w_;
+    if (mode_ == None && x - vis_x_ <= 8.0 && x >= vis_x_ - 8.0)
         mode_ = LeftTrim;
-    else if (r.right() - x <= 8.0)
+    else if (mode_ == None && visRight - x <= 8.0 && x <= visRight + 8.0)
         mode_ = RightTrim;
-    else
+    else if (x >= vis_x_ && x <= visRight)
         mode_ = MoveMode;
+    else
+        mode_ = None;               //灰色不可见区: 原片总长不可调整, 不响应剪切
     press_scene_ = ev->scenePos();
     const Clip& c = model_->clip(index_);
     orig_pos_ms_ = c.pos_ms;
@@ -189,27 +207,21 @@ void ClipItem::mouseMoveEvent(QGraphicsSceneMouseEvent* ev)
     long long dms = (long long)(dpx * 1000.0 / pps_);
 
     Clip& c = model_->clip(index_);
-    switch (mode_) {
-    case MoveMode:
+    if (mode_ == MoveMode) {
         //整体移动, 限制不小于0
         c.pos_ms = std::max(0LL, orig_pos_ms_ + dms);
-        break;
-    case LeftTrim: {
-        //左边缘: 时间轴位置与源起点同步移动, 右边缘固定
+    } else if (mode_ == LeftTrim) {
+        //左边缘: 时间轴位置与源起点同步移动, 右边缘固定; 
+        //窗口只能在原片总长内滑动(起点不越过0与终点)
         long long dclamp = std::max(-orig_start_ms_,
                                     std::min(dms, orig_dur_ms_));
         c.pos_ms = orig_pos_ms_ + dclamp;
         c.source_start_ms = orig_start_ms_ + dclamp;
-        break;
-    }
-    case RightTrim: {
-        //右边缘: 只改片段终点/源终点, 左边缘固定
-        long long nd = std::max(0LL, orig_dur_ms_ + dms);
+    } else if (mode_ == RightTrim) {
+        //右边缘: 只改片段终点; 终点不得超过原片总长(原片长度不可调整)
+        long long limit = c.source_length_ms() - orig_start_ms_;
+        long long nd = std::max(1LL, std::min(orig_dur_ms_ + dms, limit));
         c.source_end_ms = orig_start_ms_ + nd;
-        break;
-    }
-    default:
-        break;
     }
     syncFromModel();
     ev->accept();
@@ -229,11 +241,14 @@ void ClipItem::mouseReleaseEvent(QGraphicsSceneMouseEvent* ev)
 void ClipItem::hoverMoveEvent(QGraphicsSceneHoverEvent* ev)
 {
     double x = ev->scenePos().x();
-    const QRectF r = rect();
-    if (x - r.left() <= 8.0 || r.right() - x <= 8.0)
+    double visRight = vis_x_ + vis_w_;
+    if ((x - vis_x_ <= 8.0 && x >= vis_x_ - 8.0) ||
+        (visRight - x <= 8.0 && x <= visRight + 8.0))
         setCursor(Qt::SizeHorCursor);
-    else
+    else if (x >= vis_x_ && x <= visRight)
         setCursor(Qt::OpenHandCursor);
+    else
+        unsetCursor();
     ev->accept();
 }
 
@@ -248,36 +263,43 @@ void ClipItem::paint(QPainter* p, const QStyleOptionGraphicsItem* opt, QWidget* 
     Q_UNUSED(opt);
     Q_UNUSED(w);
     const Clip& c = model_->clip(index_);
-    QRectF r = rect();
+    QRectF full = rect();
+    QRectF vis(vis_x_, vis_y_, vis_w_, kTrackHeight);
 
-    //片段底色
-    QColor fill = QColor::fromHsv((index_ * 47) % 360, 120, 150);
-    p->setPen(QPen(QColor(30, 30, 30), 1.5));
-    p->setBrush(fill);
-    p->drawRoundedRect(r, 6, 6);
+    //1) 灰色底 = 原片全片(不可见区: 截取范围之外的部分), 原片长度固定不可调整
+    p->setPen(QPen(QColor(55, 55, 55), 1.5));
+    p->setBrush(QColor(105, 105, 105));
+    p->drawRoundedRect(full, 6, 6);
 
-    //左右边缘裁剪把手
+    //2) 亮色 = 可见区(类型固定颜色: 同类型同色, 不同类型异色)
+    QColor base = clipColor(c.type);
+    p->setPen(QPen(QColor(25, 25, 25), 1.5));
+    p->setBrush(base);
+    p->drawRoundedRect(vis, 4, 4);
+
+    //3) 左右边缘裁剪把手(可见区边界)
     double hw = 6.0;
     p->setPen(Qt::NoPen);
-    p->setBrush(QColor(255, 255, 255, 220));
-    p->drawRect(QRectF(r.left(), r.top(), hw, r.height()));
-    p->drawRect(QRectF(r.right() - hw, r.top(), hw, r.height()));
-    p->setPen(QPen(QColor(90, 90, 90), 1));
-    double cx = r.left() + hw / 2;
-    p->drawLine(QPointF(cx, r.top() + 12), QPointF(cx, r.bottom() - 12));
-    cx = r.right() - hw / 2;
-    p->drawLine(QPointF(cx, r.top() + 12), QPointF(cx, r.bottom() - 12));
+    p->setBrush(QColor(255, 255, 255, 230));
+    p->drawRect(QRectF(vis.left(), vis.top(), hw, vis.height()));
+    p->drawRect(QRectF(vis.right() - hw, vis.top(), hw, vis.height()));
+    p->setPen(QPen(QColor(70, 70, 70), 1));
+    double cx = vis.left() + hw / 2;
+    p->drawLine(QPointF(cx, vis.top() + 12), QPointF(cx, vis.bottom() - 12));
+    cx = vis.right() - hw / 2;
+    p->drawLine(QPointF(cx, vis.top() + 12), QPointF(cx, vis.bottom() - 12));
 
-    //文本
-    QString txt = QString("片段%1\n时间轴 %2 ~ %3\n源 %4 ~ %5\n%6")
+    //4) 文本(画在可见区内)
+    QString txt = QString("片段%1\n时间轴 %2 ~ %3\n源 %4 ~ %5 / 全片 %6\n%7")
                       .arg(index_ + 1)
                       .arg(msToText(c.pos_ms))
                       .arg(msToText(c.pos_ms + c.duration_ms()))
                       .arg(msToText(c.source_start_ms))
                       .arg(msToText(c.source_end_ms))
+                      .arg(msToText(c.source_length_ms()))
                       .arg(QFileInfo(c.url).fileName());
     p->setPen(Qt::white);
-    p->drawText(r.adjusted(12, 10, -12, -10),
+    p->drawText(vis.adjusted(12, 10, -12, -10),
                 Qt::AlignLeft | Qt::AlignVCenter | Qt::TextWordWrap, txt);
 }
 

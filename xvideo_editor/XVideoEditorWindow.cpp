@@ -83,7 +83,10 @@ XVideoEditorWindow::XVideoEditorWindow(QWidget* parent)
                 play_btn_->setText(player_.paused() ? "播放" : "暂停");
             });
     connect(timeline_, &TimelineWidget::timelineChanged, this,
-            [this]() { updateLabels(); });
+            [this]() {
+                player_.resyncBase();   //剪切前段后立即重定位, 避免被裁区继续播放
+                updateLabels();
+            });
     connect(play_btn_, &QPushButton::clicked, this,
             &XVideoEditorWindow::togglePlay);
     connect(add_btn_, &QPushButton::clicked, this,

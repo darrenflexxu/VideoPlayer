@@ -9,8 +9,8 @@
 class XQtOpenGLWidget;
 
 //时间轴播放控制器(Controller): 多轨道并行播放 + 画中画合成
-// - 轨0为主轨(全屏视频), 沿用单播放器顺序播放+后台预热(跨片段无卡顿)
-// - 轨>=1为叠加层(画中画/音频), 按播放头位置按需打开播放器, 逐帧取帧供合成器叠加
+// - 基片 = 播放头处最低轨(Z序底层)的激活视频片段, 负责SDL音频与全屏画面
+// - 其余激活片段(视频/音频/贴纸/字幕)作叠加层, 按播放头位置按需打开播放器
 // - 每个播放器音频注入XAudioPlay的不同混音源, 由混音器求和输出
 class TimelinePlayer
 {
@@ -31,6 +31,9 @@ public:
     //定位到时间轴某个位置并开始播放
     bool seekTo(long long timeline_ms);
 
+    //剪切/移动片段后重定位基片(防止被裁掉的源区间仍被播放)
+    void resyncBase();
+
     //每帧调用: 渲染合成帧并处理片段边界切换
     void Update();
 
@@ -42,13 +45,14 @@ public:
 
 private:
     //主轨底层播放(轨0): 保留原有预热换装机制
-    bool switchToBase(int idx);   //打开并开始第idx段
+    bool switchToBase(int idx);   //打开并开始第idx段(基片, 任意轨道最低层视频)
     void releaseBase();           //停掉并释放当前主播放器
     XPlayer* buildBasePlayer(const Clip& c);  //新建并打开主播放器(未启动线程)
     void startPrefetch(int idx);      //后台预热下一段主播放器
     void joinPrefetch();              //回收并等待预热线程结束
     bool takePrefetched();            //把预热好的播放器换成当前主播放器
-    int nextBaseClip(int idx) const;  //idx 之后(含)下一个轨道0视频片段索引, 无则-1
+    int nextBaseClip(int idx) const;  //idx 之后(含)下一个视频片段索引, 无则-1
+    int activeVideoClipIndex(long long ms) const;  //ms处最低轨激活视频片段索引, 无则-1
 
     //叠加层播放(轨>=1)
     struct XOverlayPlay {

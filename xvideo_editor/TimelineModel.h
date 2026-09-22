@@ -27,6 +27,7 @@ struct Clip
     QString url;                //源文件
     long long source_start_ms = 0;   //源截取起点(毫秒)
     long long source_end_ms = 0;     //源截取终点(毫秒), 0=到文件尾
+    long long source_total_ms = 0;   //源文件原片总长(毫秒), 剪切时不可调整
     long long pos_ms = 0;            //片段在时间轴上的偏移(毫秒)
     int trackIndex = 0;              //所在轨道(层索引, 越大越靠上)
     ClipRect rect;                   //画面矩形(仅视频/贴纸/字幕有意义)
@@ -36,6 +37,15 @@ struct Clip
     long long duration_ms() const
     {
         return source_end_ms > source_start_ms ? source_end_ms - source_start_ms : 0;
+    }
+
+    //原片总长(优先使用记录值, 旧数据回退到截取终点); 剪切时保持固定
+    long long source_length_ms() const
+    {
+        long long t = source_total_ms > 0 ? source_total_ms
+                                          : (source_end_ms > source_start_ms ? source_end_ms
+                                                                             : duration_ms());
+        return t > 0 ? t : duration_ms();
     }
 
     //该片段在 timeline_ms 时刻是否处于激活区间

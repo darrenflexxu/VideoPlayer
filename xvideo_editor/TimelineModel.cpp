@@ -58,6 +58,7 @@ void TimelineModel::addClip(const QString& url, long long src_start, long long s
     c.trackIndex = trackIndex;
     c.rect = ClipRect{0.0, 0.0, 1.0, 1.0};
     c.alpha = 1.0;
+    c.source_total_ms = src_end - src_start;   //导入时为全片窗口, 原片总长即窗口长度
     c.pos_ms = nextPosition(trackIndex);
     addClip(c);
 }

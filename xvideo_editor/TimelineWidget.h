@@ -44,6 +44,9 @@ private:
     Mode mode_ = None;
     QPointF press_scene_;
     long long orig_pos_ms_ = 0, orig_start_ms_ = 0, orig_end_ms_ = 0, orig_dur_ms_ = 0;
+
+    //可见窗口几何(场景坐标): 灰色为原片不可见区, 亮色为可见区
+    double vis_x_ = 0.0, vis_y_ = 0.0, vis_w_ = 0.0;
 };
 
 //时间轴视图(View): 展示片段并驱动播放头
