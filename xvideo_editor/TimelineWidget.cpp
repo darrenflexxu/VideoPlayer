@@ -16,10 +16,10 @@
 //轨道与场景尺寸
 static const double kRulerHeight = 26.0;
 static const double kTrackTop = 34.0;
-static const double kTrackHeight = 180.0;
+static const double kTrackHeight = 64.0;
 static const double kTrackGap = 8.0;            //相邻轨道行间距
 static const double kSceneWidth = 12000.0;
-static const double kSceneHeight = 260.0;
+static const double kSceneHeight = 106.0;       //单轨道默认场景高
 static const double kMinPixelPerSecond = 1e-6;   //无限缩小: 仅保留极小下限防除零
 static const double kMaxPixelPerSecond = 200.0;
 
@@ -289,18 +289,17 @@ void ClipItem::paint(QPainter* p, const QStyleOptionGraphicsItem* opt, QWidget* 
     cx = vis.right() - hw / 2;
     p->drawLine(QPointF(cx, vis.top() + 12), QPointF(cx, vis.bottom() - 12));
 
-    //4) 文本(画在可见区内)
-    QString txt = QString("片段%1\n时间轴 %2 ~ %3\n源 %4 ~ %5 / 全片 %6\n%7")
-                      .arg(index_ + 1)
+    //4) 文本(简化显示: 文件名 + 时间轴区间, 画在可见区内)
+    QString txt = QString("%1\n%2 ~ %3")
+                      .arg(QFileInfo(c.url).fileName())
                       .arg(msToText(c.pos_ms))
-                      .arg(msToText(c.pos_ms + c.duration_ms()))
-                      .arg(msToText(c.source_start_ms))
-                      .arg(msToText(c.source_end_ms))
-                      .arg(msToText(c.source_length_ms()))
-                      .arg(QFileInfo(c.url).fileName());
+                      .arg(msToText(c.pos_ms + c.duration_ms()));
+    QFont tf = p->font();
+    tf.setPixelSize(11);
+    p->setFont(tf);
     p->setPen(Qt::white);
-    p->drawText(vis.adjusted(12, 10, -12, -10),
-                Qt::AlignLeft | Qt::AlignVCenter | Qt::TextWordWrap, txt);
+    p->drawText(vis.adjusted(14, 6, -14, -6),
+                Qt::AlignLeft | Qt::AlignVCenter, txt);
 }
 
 //------------------ TimelineWidget ------------------

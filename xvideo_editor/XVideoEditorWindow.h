@@ -8,6 +8,7 @@
 
 class QPushButton;
 class QLabel;
+class QSlider;
 class XQtOpenGLWidget;
 
 //视频编辑器主窗口: 预览 + 时间轴 + 播放控制 + 导出
@@ -44,6 +45,8 @@ private:
     QPushButton* zoom_out_btn_ = nullptr;
     QPushButton* export_btn_ = nullptr;
     QLabel* status_ = nullptr;
+    QLabel* time_overlay_ = nullptr;   //预览画面上的时间水印
+    QSlider* volume_slider_ = nullptr;
 
     std::atomic<bool> exporting_{false};
     std::atomic<bool> export_done_{false};

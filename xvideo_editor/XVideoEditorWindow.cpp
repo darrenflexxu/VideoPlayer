@@ -8,6 +8,7 @@
 #include <QHBoxLayout>
 #include <QPushButton>
 #include <QLabel>
+#include <QSlider>
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QFileInfo>
@@ -57,6 +58,15 @@ XVideoEditorWindow::XVideoEditorWindow(QWidget* parent)
     split->setSizes({480, 300});
     root->addWidget(split);
 
+    //播放时间水印(QLabel 覆盖预览左上角, 避免在GL画布上用QPainter画字乱码)
+    time_overlay_ = new QLabel(preview_);
+    time_overlay_->setStyleSheet(
+        "color:#ffffff; background-color:rgba(0,0,0,150);"
+        "border-radius:6px; padding:4px 10px; font-size:14px; font-weight:bold;");
+    time_overlay_->setAttribute(Qt::WA_TransparentForMouseEvents);
+    time_overlay_->adjustSize();
+    time_overlay_->move(12, 10);
+
     auto* bar = new QHBoxLayout;
     play_btn_ = new QPushButton("播放", this);
     add_btn_ = new QPushButton("添加视频", this);
@@ -70,6 +80,13 @@ XVideoEditorWindow::XVideoEditorWindow(QWidget* parent)
     bar->addWidget(zoom_in_btn_);
     bar->addWidget(zoom_out_btn_);
     bar->addWidget(export_btn_);
+    bar->addSpacing(16);
+    bar->addWidget(new QLabel("音量", this));
+    volume_slider_ = new QSlider(Qt::Horizontal, this);
+    volume_slider_->setRange(0, 100);
+    volume_slider_->setValue(100);
+    volume_slider_->setMaximumWidth(140);
+    bar->addWidget(volume_slider_);
     bar->addStretch(1);
     bar->addWidget(status_);
     root->addLayout(bar);
@@ -104,6 +121,9 @@ XVideoEditorWindow::XVideoEditorWindow(QWidget* parent)
             });
     connect(export_btn_, &QPushButton::clicked, this,
             &XVideoEditorWindow::doExport);
+    //音量: 0~100 -> 0.0~1.0, 作用于基片与所有叠加层
+    connect(volume_slider_, &QSlider::valueChanged, this,
+            [this](int v) { player_.set_volume(v / 100.0f); });
 
     resize(960, 640);
     startTimer(33);            //UI 刷新: 播放头/状态/导出
@@ -256,6 +276,15 @@ void XVideoEditorWindow::timerEvent(QTimerEvent* ev)
     }
     timeline_->setPlayheadMs(player_.pos_ms());
     updateLabels();
+    //预览画面叠加播放时间水印(播放/拖动时实时更新)
+    if (time_overlay_) {
+        QString t = msToText(player_.pos_ms()) + " / " + msToText(player_.total_ms());
+        if (time_overlay_->text() != t) {
+            time_overlay_->setText(t);
+            time_overlay_->adjustSize();
+            time_overlay_->move(12, 10);
+        }
+    }
 
     if (exporting_ && export_done_) {
         QMutexLocker locker(&export_mutex_);
