@@ -115,6 +115,9 @@ bool XPlayer::Open(const char* url, void* winid)
 
     //解封装数据传到当前类
     demux_.set_next(this);
+
+    //清掉上次解码残留的"帧缓冲/EOF"状态, 保证重开文件走实时逐帧渲染路径
+    ClearFinish();
     return true;
 }
 

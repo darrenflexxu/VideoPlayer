@@ -1,72 +1,69 @@
-# Implementation Plan: Volume Control for XVideoView
+# Implementation Plan: Video Timeline Editor
 
 ## Context
-The current version of `XVideoView` allows for video playback and speed control but lacks a user-facing mechanism to adjust audio volume. The underlying audio engine, `XAudioPlay`, already supports volume adjustment via `SDL_MixAudio` using a value range of 0-128. This plan describes how to expose this functionality through the UI.
+The user requires a new UI tool for video editing based on the `XCodec` and `XVideoTranscode` modules. This tool will transition the project from simple transcoding to a visual editing experience, featuring a timeline for clip manipulation (Cut & Splice) and a real-time playback preview.
 
 ## Recommended Approach
 
-We will bridge the UI layer (`XPlayVideo`) to the audio engine (`XAudioPlay`) by extending the playback controller (`XPlayer`).
+We will create a new module, `XVideoEditor`, that integrates the existing playback (`XPlayer`), rendering (`XQtOpenGLWidget`), and transcoding (`XConvertor`) components into a cohesive visual editor.
 
-### Critical Files to Modify
+### Architecture Overview
 
-#### 1. Core Logic (`xcodec/`)
-- [xcodec/xplayer.h](xcodec/xplayer.h): Add `SetVolume(float volume)` method.
-- [xcodec/xplayer.cpp](xcodec/xplayer.cpp): Implement the mapping from 0.0-1.0 float to 0-128 integer for `XAudioPlay`.
+The editor follows a Model-View-Controller (MVC) pattern:
+1. **Model (`TimelineModel`)**: Stores the project state—a sequence of `Clip` objects, each containing the source file, source trim range (start/end), and the position/duration on the global timeline.
+2. **View (`TimelineWidget`)**: A `QGraphicsView` that visually represents the timeline. It allows users to drag clips to change their offset and resize them to trim the content.
+3. **Controller (`TimelinePlayer`)**: Orchestrates the playback of the timeline. It monitors the current playhead position and instructs `XPlayer` to switch source files and seek when crossing clip boundaries.
 
-#### 2. UI Layer (`xvideoview/`)
-- [xvideoview/xplayvideo.ui](xvideoview/xplayvideo.ui): Add a `QSlider` for volume and an associated `QLabel`.
-- [xvideoview/xplayvideo.h](xvideoview/xplayvideo.h): Declare a slot to handle volume changes.
-- [xvideoview/xplayvideo.cpp](xvideoview/xplayvideo.cpp): Connect the slider signal to the player's volume method and manage the layout.
+### Critical Components and Files
+
+#### 1. New Components (XVideoEditor Module)
+- **`TimelineModel.h/cpp`**: Data structures for `Clip` and the project timeline.
+- **`TimelineWidget.h/cpp`**: Custom `QGraphicsView` for the visual track. Includes `ClipItem` (a draggable/resizable `QGraphicsRectItem`).
+- **`TimelinePlayer.h/cpp`**: A wrapper around `XPlayer` that manages multi-clip playback and seamless transitions.
+- **`XVideoEditorWindow.h/cpp/ui`**: The main application window combining the timeline, the `XQtOpenGLWidget` preview, and global controls.
+
+#### 2. Leveraged Existing Components
+- **`XPlayer`**: Used as the low-level playback engine.
+- **`XQtOpenGLWidget`**: Used as the high-performance preview window.
+- **`XConvertor`**: Used for the final "Export" process via `StartConcat`.
 
 ---
 
 ## Implementation Steps
 
-### Step 1: Extend `XPlayer` Interface
-- **Action**: Add `void SetVolume(float volume);` to the public section of `XPlayer` in `xplayer.h`.
-- **Action**: Implement the method in `xplayer.cpp`:
-  ```cpp
-  void XPlayer::SetVolume(float volume) {
-      int sdl_vol = (int)(volume * 128.0f);
-      XAudioPlay::Instance()->set_volume(sdl_vol);
-  }
-  ```
-- **Verification**: Project compiles successfully.
+### Phase 1: Data Model and Visuals
+1. **Implement `TimelineModel`**: Define the `Clip` structure and logic for managing the sequence of clips.
+2. **Build `TimelineWidget`**: 
+    - Implement the time-to-pixel coordinate transformation.
+    - Create `ClipItem` with interaction handles for moving and trimming.
+    - Implement the playhead (a vertical line) that moves in sync with the current time.
+3. **Verification**: Verify that clips can be added to the timeline, dragged to different positions, and resized without glitches.
 
-### Step 2: Update UI Layout
-- **Action**: Modify `xplayvideo.ui` to include:
-    - A `QSlider` (Horizontal) named `volume` with a range of `0` to `100`.
-    - A `QLabel` named `vollabel` with the text "Volume:".
-- **Action**: Add these widgets to the control bar in `xplayvideo.cpp` constructor, ensuring they are placed alongside the speed and position controls.
-- **Verification**: Launch the app; the volume slider is visible in the control bar.
+### Phase 2: Preview Playback Integration
+1. **Implement `TimelinePlayer`**:
+    - Create a state machine to track the "active clip".
+    - When `currentTimelinePos >= activeClip.end`, automatically call `XPlayer::Open(nextClip.url)` and `XPlayer::Seek(nextClip.sourceStart)`.
+2. **Connect Preview**: Instantiate `XQtOpenGLWidget` and link it to the `TimelinePlayer`.
+3. **Verification**: Play a sequence of 3+ clips. Verify that the video transitions automatically from one clip to the next at the correct timeline boundary.
 
-### Step 3: Connect UI to Core Logic
-- **Action**: Add `void SetVolume();` as a slot in `XPlayVideo` in `xplayvideo.h`.
-- **Action**: Implement the slot in `xplayvideo.cpp`:
-  ```cpp
-  void XPlayVideo::SetVolume() {
-      float vol = ui.volume->value() / 100.0f;
-      player.SetVolume(vol);
-  }
-  ```
-- **Action**: In the `XPlayVideo` constructor, connect the slider's `valueChanged` signal to the `SetVolume` slot.
-- **Verification**: Moving the slider triggers the `SetVolume` function.
+### Phase 3: Export Pipeline
+1. **Export Logic**: Implement a conversion function that transforms the `TimelineModel` into the arguments required by `XConvertor::StartConcat` (`std::vector<std::string> urls`, `std::vector<std::pair<long long, long long>> seg_trims`).
+2. **Export Trigger**: Add an "Export" button to the UI that invokes the `XConvertor` pipeline.
+3. **Verification**: Export a complex timeline with rearranged and trimmed clips. Verify the resulting video matches the visual sequence.
+
+### Phase 4: Final UI Assembly
+1. **Main Window**: Layout the preview window, the timeline widget, and the control bar (Play/Pause, Add File, Export).
+2. **Interactivity**: Ensure that clicking the timeline seeks the `TimelinePlayer` to the correct position.
+3. **Verification**: Conduct a full end-to-end test from file import $\rightarrow$ visual editing $\rightarrow$ preview $\rightarrow$ export.
 
 ---
 
 ## Verification Plan
 
-### 1. Functional Testing
-- **Action**: Open a video file with audio.
-- **Test Cases**:
-    - **Mute**: Slide the volume to `0`. Expected result: No audio output.
-    - **Full Volume**: Slide the volume to `100`. Expected result: Audio at maximum level.
-    - **Gradual Adjustment**: Move the slider slowly from 0 to 100. Expected result: Smooth increase in audio volume.
-
-### 2. Boundary Analysis
-- **Action**: Test values at the extreme ends (0, 1, 100).
-- **Expected Result**: No crashes or audio clipping; `XAudioPlay` receives values strictly within the 0-128 range.
-
-### 3. UI Consistency Check
-- **Action**: Verify that the volume slider behaves consistently with the other controls (speed and position) in terms of layout and responsiveness.
-- **Expected Result**: UI remains responsive and the slider is intuitively placed.
+| Test Case | Action | Expected Result |
+| :--- | :--- | :--- |
+| **Visual Editing** | Drag and resize a clip on the timeline. | Model offsets and durations update instantly. |
+| **Preview Flow** | Play a timeline with multiple clips. | Seamless transition between files; playhead moves linearly. |
+| **Precision Trim** | Set a precise cut point in the timeline. | The exported video starts/ends exactly at the specified millisecond. |
+| **Export Accuracy** | Export a shuffled sequence of clips. | Output file matches the visual order and trimming of the timeline. |
+| **UI Stability** | Add 20+ clips to the timeline. | `QGraphicsView` remains responsive; no memory leaks during playback. |
