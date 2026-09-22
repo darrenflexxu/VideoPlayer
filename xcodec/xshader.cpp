@@ -103,6 +103,7 @@ bool XShader::Draw(
     height_ = height;
     glViewport(0, 0, width, height);
   }
+  glClear(GL_COLOR_BUFFER_BIT);   //着色器不再自行清屏, 独立窗口路径在此统一清屏
   yv12_->Draw(y, y_pitch, u, u_pitch, v, v_pitch); 
   // Show  
   if (ctx_) {
@@ -143,6 +144,7 @@ bool XShader::DrawFrame(AVFrame* frame, AVCodecContext* ctx) {
   }
 
   int linesize = 0;
+  glClear(GL_COLOR_BUFFER_BIT);   //着色器不再自行清屏, 此处统一清屏
   switch (frame->format) {
   case AV_PIX_FMT_YUV420P:
   case AV_PIX_FMT_YUVJ420P:

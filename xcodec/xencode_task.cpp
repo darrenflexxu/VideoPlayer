@@ -5,6 +5,31 @@
 using namespace std;
 
 namespace {
+// FFmpeg 7 新接口获取编码器像素/采样格式; 旧版(或接口失败)回退到 codec->*_fmts
+// (新版里这些废弃成员可能为脏数据, 直接解引用会崩溃)
+static AVPixelFormat FirstPixFmt(const AVCodec* c) {
+  if (!c) return AV_PIX_FMT_NONE;
+  const void* cfg = nullptr;
+  int nb = 0;
+  if (avcodec_get_supported_config(nullptr, c, AV_CODEC_CONFIG_PIX_FORMAT, 0,
+                                   &cfg, &nb) >= 0 && nb > 0 && cfg)
+    return ((const AVPixelFormat*)cfg)[0];
+  if (c->pix_fmts && c->pix_fmts[0] != AV_PIX_FMT_NONE)
+    return c->pix_fmts[0];
+  return AV_PIX_FMT_NONE;
+}
+static AVSampleFormat FirstSampleFmt(const AVCodec* c) {
+  if (!c) return AV_SAMPLE_FMT_NONE;
+  const void* cfg = nullptr;
+  int nb = 0;
+  if (avcodec_get_supported_config(nullptr, c, AV_CODEC_CONFIG_SAMPLE_FORMAT, 0,
+                                   &cfg, &nb) >= 0 && nb > 0 && cfg)
+    return ((const AVSampleFormat*)cfg)[0];
+  if (c->sample_fmts && c->sample_fmts[0] != AV_SAMPLE_FMT_NONE)
+    return c->sample_fmts[0];
+  return AV_SAMPLE_FMT_NONE;
+}
+
 // 视频格式/尺寸转换的 sws 缓存
 class VideoSws {
  public:
@@ -179,22 +204,18 @@ bool XEncodeTask::Open(AVCodecParameters* para,
     if (c->codec_type == AVMEDIA_TYPE_VIDEO) {
       if (gpu) {
         c->pix_fmt = AV_PIX_FMT_NV12;
-      } else if (c->codec && c->codec->pix_fmts &&
-                 c->codec->pix_fmts[0] != AV_PIX_FMT_NONE) {
-        c->pix_fmt = c->codec->pix_fmts[0];
       } else {
-        c->pix_fmt = AV_PIX_FMT_YUV420P;
+        AVPixelFormat pf = FirstPixFmt(c->codec);
+        if (pf == AV_PIX_FMT_NONE) c->pix_fmt = AV_PIX_FMT_YUV420P;
+        else c->pix_fmt = pf;
       }
       // 必须在avcodec_open2之前设置, 否则h264_qsv等会按默认B帧做重排,
       // 输入缓冲持续占满导致送帧EAGAIN丢帧(XConvertor::Start里是open后设, 不生效)
       c->max_b_frames = 0;
     } else if (c->codec_type == AVMEDIA_TYPE_AUDIO) {
-      if (c->codec && c->codec->sample_fmts &&
-          c->codec->sample_fmts[0] != AV_SAMPLE_FMT_NONE) {
-        c->sample_fmt = c->codec->sample_fmts[0];
-      } else {
-        c->sample_fmt = AV_SAMPLE_FMT_FLTP;
-      }
+      AVSampleFormat sf = FirstSampleFmt(c->codec);
+      if (sf == AV_SAMPLE_FMT_NONE) c->sample_fmt = AV_SAMPLE_FMT_FLTP;
+      else c->sample_fmt = sf;
     }
     encode_.set_c(c);
     for (auto& kv : opts) {

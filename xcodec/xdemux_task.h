@@ -32,6 +32,9 @@ public:
 
     void ClearEOF();
 
+    ///读取是否已到文件尾(含截取终点), 供导出等同步消费方判断
+    bool is_eof() { return is_eof_; }
+
     //seek快进目标(毫秒), >0时读取不做速度限制直到越过目标; 0表示正常限速
     void set_fast_forward_ms(long long ms) { fast_forward_ms_ = ms; }
 

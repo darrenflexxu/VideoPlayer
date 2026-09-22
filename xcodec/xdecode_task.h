@@ -23,6 +23,9 @@ public:
     bool IsVideoFinish();
     void ClearFinish();
 
+    // 已缓冲待取的帧数(frame_cache 模式用, 导出背压控制)
+    int cached_frame_count();
+
     //后台预热: 解码出第一帧后自身暂停(用于无缝跨片段切换)
     void set_preroll_one(bool v)
     {

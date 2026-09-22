@@ -46,7 +46,10 @@ void XPlayer::Stop()
         view_ = nullptr;
         own_view_ = false;
     }
-    XAudioPlay::Instance()->Close();
+    //多播放器混音: 移除本源的缓冲; 只有拥有设备的播放器才关闭SDL音频
+    XAudioPlay::Instance()->removeSource(audio_source_);
+    if (own_audio_)
+        XAudioPlay::Instance()->Close();
 }
 bool XPlayer::Open(const char* url, void* winid)
 {
@@ -71,15 +74,18 @@ bool XPlayer::Open(const char* url, void* winid)
         video_decode_.set_stream_index(demux_.video_index());
         //缓冲
         video_decode_.set_block_size(100);
-        //视频渲染: 默认由 XCodec 自建(Qt 无关); UI 层可通过 set_view 注入自定义实现
-        if (!view_)
+        //视频渲染: 叠加层播放器不创建/不绑定view, 由外层合成器取帧
+        if (!view_ && !no_view_)
         {
             view_ = XVideoView::Create(XVideoView::Shader);
             own_view_ = true;
         }
-        view_->set_win_id(winid);
-        if (!view_->Init(vp->para))
-            return false;
+        if (view_)
+        {
+            view_->set_win_id(winid);
+            if (!view_->Init(vp->para))
+                return false;
+        }
     }
 
     auto ap = demux_.CopyAudioPara();
@@ -102,8 +108,10 @@ bool XPlayer::Open(const char* url, void* winid)
         //时间基数(用于seek后丢弃目标前的帧)
         audio_decode_.set_time_base(ap->time_base);
 
-        //初始化音频播放
-        XAudioPlay::Instance()->Open(*ap);
+        //初始化音频播放: 仅拥有设备的播放器(主轨)打开SDL, 并联注册混音源
+        if (own_audio_)
+            XAudioPlay::Instance()->Open(*ap);
+        XAudioPlay::Instance()->addSource(audio_source_);
 
         //设置时间基数
         double time_base = 0;
@@ -162,16 +170,39 @@ void XPlayer::Update()
     }
   }
 
-    //音频播放
+    //音频播放(注入混音器对应源)
     auto au = XAudioPlay::Instance();
     auto f = audio_decode_.GetFrame();
     if (!f)return;
-    au->Push(f);
+    au->PushTo(audio_source_, f);
     XFreeFrame(&f);
 }
 void XPlayer::SetSpeed(float s)
 {
     XAudioPlay::Instance()->SetSpeed(s);
+}
+
+bool XPlayer::GetVideoFrameCopy(AVFrame** out)
+{
+    *out = nullptr;
+    if (!video_decode_.is_open())
+        return false;
+    auto f = video_decode_.GetFrame();
+    if (!f)
+        return false;
+    //与渲染路径一致地应用滤镜(旋转/翻转等)
+    XVideoFilterProc::GetInstance()->Action(f);
+    AVFrame* copy = av_frame_alloc();
+    if (!copy || av_frame_ref(copy, f) < 0)
+    {
+        if (copy)
+            av_frame_free(&copy);
+        XFreeFrame(&f);
+        return false;
+    }
+    XFreeFrame(&f);
+    *out = copy;
+    return true;
 }
 //设置音量 0.0~1.0, 内部换算为SDL的0~128
 void XPlayer::SetVolume(float volume)

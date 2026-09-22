@@ -18,6 +18,12 @@ XQtOpenGLWidget::~XQtOpenGLWidget() {
         av_frame_free(&pending_frame_);
         pending_frame_ = nullptr;
     }
+    for (auto& l : overlay_layers_) {
+        if (l.frame) {
+            av_frame_free(&l.frame);
+            l.frame = nullptr;
+        }
+    }
 }
 
 bool XQtOpenGLWidget::Init(int w, int h, Format fmt) {
@@ -37,6 +43,16 @@ void XQtOpenGLWidget::Close() {
         av_frame_free(&pending_frame_);
         pending_frame_ = nullptr;
     }
+    for (auto& l : overlay_layers_) {
+        if (l.frame) {
+            av_frame_free(&l.frame);
+            l.frame = nullptr;
+        }
+    }
+    overlay_layers_.clear();
+    ov_yv12_.clear();
+    ov_nv12_.clear();
+    ov_rgba_.clear();
 }
 
 bool XQtOpenGLWidget::IsExit() {
@@ -102,6 +118,90 @@ bool XQtOpenGLWidget::DrawFrame(AVFrame* frame, AVCodecContext* ctx) {
     return true;
 }
 
+bool XQtOpenGLWidget::setOverlayFrame(int idx, AVFrame* frame, const XOverlayRect& rect, float alpha) {
+    if (idx < 0)
+        return false;
+    const int cap = 8;   //最大同时叠加层数
+    if (idx >= cap)
+        return false;
+    AVFrame* copy = nullptr;
+    if (frame) {
+        copy = av_frame_alloc();
+        if (!copy)
+            return false;
+        if (av_frame_ref(copy, frame) < 0) {
+            av_frame_free(&copy);
+            return false;
+        }
+    }
+    {
+        std::lock_guard<std::mutex> lock(frame_mtx_);
+        if ((int)overlay_layers_.size() <= idx) {
+            overlay_layers_.resize(idx + 1);
+            ov_yv12_.resize(idx + 1);
+            ov_nv12_.resize(idx + 1);
+            ov_rgba_.resize(idx + 1);
+        }
+        if (overlay_layers_[idx].frame)
+            av_frame_free(&overlay_layers_[idx].frame);
+        overlay_layers_[idx].frame = copy;
+        overlay_layers_[idx].rect = rect;
+        overlay_layers_[idx].alpha = alpha;
+    }
+    update();
+    return true;
+}
+
+void XQtOpenGLWidget::clearOverlays() {
+    std::lock_guard<std::mutex> lock(frame_mtx_);
+    for (auto& l : overlay_layers_) {
+        if (l.frame) {
+            av_frame_free(&l.frame);
+            l.frame = nullptr;
+        }
+    }
+}
+
+//逐层绘制: 先放 base 再放叠加层, 由 glViewport 定位每层的矩形
+void XQtOpenGLWidget::drawVideoFrame(AVFrame* frame, std::shared_ptr<XShaderYV12>& yv12,
+                                     std::shared_ptr<XShaderNV12>& nv12,
+                                     std::shared_ptr<XShaderRGBA>& rgba,
+                                     int pw, int ph, float alpha) {
+    if (!frame || !frame->data[0])
+        return;
+    switch (frame->format) {
+    case AV_PIX_FMT_YUV420P:
+    case AV_PIX_FMT_YUVJ420P: {
+        if (!yv12) {
+            auto rotate = XTools::get_rotation_from_frame(frame);
+            yv12 = std::make_shared<XShaderYV12>(pw, ph, rotate);
+        }
+        yv12->Draw(frame->data[0], frame->linesize[0],
+                   frame->data[1], frame->linesize[1],
+                   frame->data[2], frame->linesize[2]);
+        break;
+    }
+    case AV_PIX_FMT_NV12: {
+        if (!nv12)
+            nv12 = std::make_shared<XShaderNV12>(pw, ph);
+        nv12->Draw(frame->data[0], frame->linesize[0],
+                   frame->data[1], frame->linesize[1]);
+        break;
+    }
+    case AV_PIX_FMT_RGBA:
+    case AV_PIX_FMT_BGRA: {
+        if (!rgba)
+            rgba = std::make_shared<XShaderRGBA>(pw, ph);
+        XShaderRGBA::EnableBlend(true);
+        rgba->Draw(frame->data[0], frame->linesize[0], frame->width,
+                   frame->height, alpha);
+        break;
+    }
+    default:
+        break;
+    }
+}
+
 void XQtOpenGLWidget::initializeGL() {
     //在 Qt 当前的 GL 上下文中初始化 GLEW
     glewExperimental = GL_TRUE;
@@ -131,6 +231,7 @@ void XQtOpenGLWidget::resizeGL(int w, int h) {
 void XQtOpenGLWidget::paintGL() {
     //取最近一帧的引用(保持最近画面，resize/重绘时可重复使用)
     AVFrame* cur = nullptr;
+    std::vector<XOverlayLayer> ov;
     {
         std::lock_guard<std::mutex> lock(frame_mtx_);
         if (pending_frame_) {
@@ -140,6 +241,7 @@ void XQtOpenGLWidget::paintGL() {
                 cur = nullptr;
             }
         }
+        ov = overlay_layers_;   //帧指针为本类持有的引用副本, GUI线程内无释放竞争
     }
     if (!cur)
         return;
@@ -162,7 +264,7 @@ void XQtOpenGLWidget::paintGL() {
         }
     }
 
-    //整体清屏，等比缩放区域之外填背景色
+    //整体清屏，等比缩放区域之外填背景色(各层着色器不再自行清屏)
     glViewport(0, 0, fw, fh);
     glClear(GL_COLOR_BUFFER_BIT);
 
@@ -184,29 +286,33 @@ void XQtOpenGLWidget::paintGL() {
         if (rect_h < 1) rect_h = 1;
     }
     glViewport(rect_x, rect_y, rect_w, rect_h);
+    drawVideoFrame(cur, yv12_, nv12_, rgba_base_, pix_w_, pix_h_, 1.0f);
 
-    switch (cur->format) {
-    case AV_PIX_FMT_YUV420P:
-    case AV_PIX_FMT_YUVJ420P: {
-        if (!yv12_) {
-            auto rotate = XTools::get_rotation_from_frame(cur);
-            yv12_ = std::make_shared<XShaderYV12>(pix_w_, pix_h_, rotate);
+    //合成叠加层(画中画等): 依次按归一化矩形定位绘制
+    int ov_n = (int)ov.size();
+    int ov_shader_n = (int)ov_yv12_.size();
+    for (int i = 0; i < ov_n; ++i) {
+        AVFrame* f = ov[i].frame;
+        if (!f)
+            continue;
+        int ox = (int)(ov[i].rect.x * fw);
+        int oy = (int)(ov[i].rect.y * fh);
+        int ow = (int)(ov[i].rect.w * fw);
+        int oh = (int)(ov[i].rect.h * fh);
+        if (ow < 1) ow = 1;
+        if (oh < 1) oh = 1;
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        //GL 视口左下角为原点, 归一化 y 是左上原点, 需要翻转
+        glViewport(ox, fh - (oy + oh), ow, oh);
+        if (i < ov_shader_n) {
+            drawVideoFrame(f, ov_yv12_[i], ov_nv12_[i], ov_rgba_[i],
+                           f->width, f->height, ov[i].alpha);
+            //视频层(YV12/NV12)输出 alpha 恒为1, 不参与混合; RGBA层全透明处已乘alpha
+            if (f->format != AV_PIX_FMT_RGBA && f->format != AV_PIX_FMT_BGRA)
+                glDisable(GL_BLEND);
         }
-        yv12_->Draw(cur->data[0], cur->linesize[0],  //Y
-                    cur->data[1], cur->linesize[1],  //U
-                    cur->data[2], cur->linesize[2]); //V
-        break;
-    }
-    case AV_PIX_FMT_NV12: {
-        if (!nv12_) {
-            nv12_ = std::make_shared<XShaderNV12>(pix_w_, pix_h_);
-        }
-        nv12_->Draw(cur->data[0], cur->linesize[0],  //Y
-                    cur->data[1], cur->linesize[1]); //UV
-        break;
-    }
-    default:
-        break;
+        glDisable(GL_BLEND);
     }
 
     av_frame_free(&cur);

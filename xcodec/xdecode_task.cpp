@@ -172,6 +172,10 @@ AVFrame* XDecodeTask::GetFrame()
 bool XDecodeTask::IsVideoFinish() {
   return frame_cache_ && frames_.empty();
 }
+int XDecodeTask::cached_frame_count() {
+  unique_lock<mutex> lock(mux_);
+  return (int)frames_.size();
+}
 void XDecodeTask::ClearFinish() {
   frame_cache_ = false;
   frames_.clear();

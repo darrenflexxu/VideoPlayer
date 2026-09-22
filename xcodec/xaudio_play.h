@@ -61,6 +61,15 @@ struct XData
     long long pts = 0;
 };
 
+//多流混音: 每个音频源(对应一条音轨/一个播放器)独立的缓冲队列与音量
+struct XAudioSource
+{
+    int id = 0;
+    int volume = 128; //0~128
+    std::list<XData> datas;
+    long long mixed_bytes = 0; //累计已混音字节数(调试/进度用, 持锁统计)
+};
+
 /// <summary>
 /// 音频播放 单件模式
 /// </summary>
@@ -88,13 +97,33 @@ public:
     //获取当前的播放位置
     virtual long long cur_pts() = 0;
 
+    //向默认音频源(0)推送数据(旧接口兼容)
     void Push(const unsigned char* data, int size,long long pts)
     {
-        std::unique_lock<std::mutex> lock(mux_);
-        audio_datas_.push_back(XData());
-        audio_datas_.back().pts = pts;
-        audio_datas_.back().data.assign(data, data + size);
+        PushTo(0, data, size, pts);
     }
+
+    //指定源推送PCM数据
+    void PushTo(int id, const unsigned char* data, int size, long long pts)
+    {
+        std::unique_lock<std::mutex> lock(mux_);
+        auto& s = source(id);
+        s.datas.push_back(XData());
+        s.datas.back().pts = pts;
+        s.datas.back().data.assign(data, data + size);
+    }
+    //指定源推送解码帧(自动交错平面数据)
+    void PushTo(int id, AVFrame* frame);
+
+    //注册一个音频源(重复注册无害); 播放控制器在打开播放器时调用
+    void addSource(int id);
+    void removeSource(int id);
+    //设置某源音量 0~128
+    void setSourceVolume(int id, int v);
+    //清空所有源缓冲(seek/切换时调用), 不重开SDL设备
+    void ClearBuffers();
+    //某源累计已混音字节数(调试/导出比对用)
+    long long mixedBytes(int id);
 
     //播放速度
     virtual void SetSpeed(float s)
@@ -107,10 +136,10 @@ public:
         spec_.freq = old_freq;
     }
 
-    //音量
+    //音量(默认源)
     void set_volume(int v) 
     { 
-        volume_ = v; 
+        setSourceVolume(0, v);
     }
     
     //时间基数，用于生产播放进度
@@ -125,9 +154,10 @@ protected:
         auto ap = (XAudioPlay*)userdata;
         ap->Callback(stream, len);
     }
-    std::list<XData> audio_datas_;//音频缓冲列表
+//按id取得源引用(若不存在则创建, 需已持锁)
+    XAudioSource& source(int id);
+    std::vector<XAudioSource> sources_;
     std::mutex mux_;
-    unsigned char volume_ = 128;// 0~128 音量
     XAudioSpec spec_;
 };
 

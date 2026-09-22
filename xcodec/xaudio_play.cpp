@@ -1,6 +1,85 @@
 ﻿#include "predefine_header.h"
 
 using namespace std;
+
+//从单个源消费最多 len 字节到 out, 返回实际混入的字节数(持锁时调用)
+static int ConsumeSource(XAudioSource& s, unsigned char* out, int len, long long& cur_pts)
+{
+    if (s.datas.empty())
+        return 0;
+    cur_pts = s.datas.front().pts;
+    int mixed = 0;
+    while (mixed < len && !s.datas.empty())
+    {
+        XData& buf = s.datas.front();
+        int avail = (int)buf.data.size() - buf.offset;
+        if (avail > len - mixed)
+            avail = len - mixed;
+        if (avail > 0)
+        {
+            memcpy(out + mixed, buf.data.data() + buf.offset, avail);
+            mixed += avail;
+            buf.offset += avail;
+        }
+        if (buf.offset >= (int)buf.data.size())
+            s.datas.pop_front();
+    }
+    return mixed;
+}
+
+XAudioSource& XAudioPlay::source(int id)
+{
+    for (auto& s : sources_)
+        if (s.id == id)
+            return s;
+    sources_.push_back(XAudioSource());
+    sources_.back().id = id;
+    return sources_.back();
+}
+
+void XAudioPlay::addSource(int id)
+{
+    std::lock_guard<std::mutex> lock(mux_);
+    source(id);
+}
+
+void XAudioPlay::removeSource(int id)
+{
+    std::lock_guard<std::mutex> lock(mux_);
+    for (auto it = sources_.begin(); it != sources_.end(); ++it)
+    {
+        if (it->id == id)
+        {
+            sources_.erase(it);
+            break;
+        }
+    }
+}
+
+void XAudioPlay::setSourceVolume(int id, int v)
+{
+    if (v < 0) v = 0;
+    if (v > 128) v = 128;
+    std::lock_guard<std::mutex> lock(mux_);
+    source(id).volume = v;
+}
+
+void XAudioPlay::ClearBuffers()
+{
+    std::lock_guard<std::mutex> lock(mux_);
+    for (auto& s : sources_)
+        s.datas.clear();
+}
+
+long long XAudioPlay::mixedBytes(int id)
+{
+    std::lock_guard<std::mutex> lock(mux_);
+    for (auto& s : sources_)
+        if (s.id == id)
+            return s.mixed_bytes;
+    return 0;
+}
+
 class CXAudioPlay :public XAudioPlay
 {
 public:
@@ -49,7 +128,8 @@ public:
     {
         SDL_QuitSubSystem(SDL_INIT_AUDIO);
         unique_lock<mutex> lock(mux_);
-        audio_datas_.clear();
+        for (auto& s : sources_)
+            s.datas.clear();
         cur_pts_ = 0; //当前播放位置
         last_ms_ = 0;  //上次的时间戳
         pause_begin = 0;//暂停开始时间戳
@@ -58,35 +138,25 @@ public:
     {
         SDL_memset(stream, 0, len);
         unique_lock<mutex> lock(mux_);
-        if (audio_datas_.empty())return;
-        auto buf = audio_datas_.front();
-        // 1 buf 大于stream缓冲  offset记录位置
-        // 2 buf 小于stream 缓冲  拼接
-        int mixed_size = 0;     //已经处理的字节数
-        int need_size = len;    //需要处理的字节数
-        cur_pts_ = buf.pts;     //当前播放的pts
-        last_ms_ = NowMs();     //计时开始播放
-
-        while (mixed_size < len)
+        // 多源混音: 每个活跃源各取 len 字节, 用 SDL_MixAudio 累加进同一输出缓冲
+        vector<unsigned char> tmp((size_t)len > 0 ? len : 1);
+        bool any = false;
+        for (auto& s : sources_)
         {
-            if (audio_datas_.empty())break;
-            buf = audio_datas_.front();
-            int size = buf.data.size() - buf.offset;//剩余未处理的数据
-            if (size > need_size)
+            if (s.datas.empty())
+                continue;
+            memset(tmp.data(), 0, len);
+            if (ConsumeSource(s, tmp.data(), len, cur_pts_) > 0)
             {
-                size = need_size;
+                SDL_MixAudio(stream, tmp.data(), len, (Uint8)s.volume);
+                s.mixed_bytes += len;   //累计混音字节数(调试/导出比对用)
+                any = true;
             }
-            SDL_MixAudio(stream + mixed_size,
-                buf.data.data() + buf.offset,
-                size, volume_);
-            need_size -= size;
-            mixed_size += size;
-            buf.offset += size;
-            if (buf.offset >= buf.data.size())
-            {
-                audio_datas_.pop_front();
-            }
+            if (!any)
+                continue;
+            last_ms_ = NowMs();
         }
+        (void)any;
     }
     long long cur_pts() override
     {
@@ -104,7 +174,7 @@ private:
     long long pause_begin = 0;//暂停开始时间戳
 };
 
-void XAudioPlay::Push(AVFrame* frame)
+void XAudioPlay::PushTo(int id, AVFrame* frame)
 {
     if (!frame || !frame->data[0])return;
     vector<unsigned char> buf;
@@ -112,10 +182,9 @@ void XAudioPlay::Push(AVFrame* frame)
     int channels = frame->ch_layout.nb_channels;
     unsigned char* L = frame->data[0];
     unsigned char* R = frame->data[1];
-    unsigned char* data = nullptr;
     if (channels == 1)
     {
-        Push(frame->data[0], frame->nb_samples* sample_size, frame->pts);
+        PushTo(id, frame->data[0], frame->nb_samples* sample_size, frame->pts);
         return;
     }
     //暂时支持双通道
@@ -125,23 +194,26 @@ void XAudioPlay::Push(AVFrame* frame)
     case AV_SAMPLE_FMT_S32P:        ///< signed 32 bits, planar
     case AV_SAMPLE_FMT_FLTP:        ///< float, planar
         buf.resize(frame->linesize[0]);
-        data = buf.data();
         // LLLL RRRR  32
         // LR LR LR LR 4
         for (int i = 0; i < frame->nb_samples; i++)
         {
-            memcpy(data + i * sample_size * channels,
+            memcpy(buf.data() + i * sample_size * channels,
                 L + i * sample_size, sample_size);
-            memcpy(data + i * sample_size * channels + sample_size,
+            memcpy(buf.data() + i * sample_size * channels + sample_size,
                 R + i * sample_size, sample_size);
         }
-        Push(data, frame->linesize[0],frame->pts);
+        PushTo(id, buf.data(), (int)buf.size(), frame->pts);
         return;
         break;
     default:
         break;
     }
-    Push(frame->data[0], frame->linesize[0], frame->pts);
+    PushTo(id, frame->data[0], frame->linesize[0], frame->pts);
+}
+void XAudioPlay::Push(AVFrame* frame)
+{
+    PushTo(0, frame);
 }
 bool XAudioPlay::Open(XPara &para)
 {

@@ -36,10 +36,7 @@ bool XShaderNV12::Draw(
   const unsigned  char* y, int y_pitch,
   const unsigned  char* uv, int u_pitch
 ) {
-  //Clear
-  glClear(GL_COLOR_BUFFER_BIT);
-
-  //核心模式下属性状态保存在 VAO 中，绘制前必须重新绑定
+  //Clear (由外层合成器统一清屏, 便于多图层叠加; 独立使用时可先glClear)
   glBindVertexArray(vao);
 
   glUseProgram(p);

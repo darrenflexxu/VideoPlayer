@@ -55,6 +55,16 @@ public:
     //获取视频渲染对象
     XVideoView* view() { return view_; }
 
+    //多播放器混音: 是否负责打开/关闭SDL音频设备(仅主播放器应打开设备)
+    void set_owns_audio(bool own) { own_audio_ = own; }
+    //多播放器混音: 本播放器音频注入XAudioPlay的源id(默认0)
+    void set_audio_source(int id) { audio_source_ = id; }
+    //叠加层播放器: 不创建/不渲染到view(画面由外部合成器逐层取走)
+    void set_no_view(bool v) { no_view_ = v; }
+
+    //取最新解码视频帧(引用复制), 不渲染到view, 供合成器逐层使用; 无新帧返回false
+    bool GetVideoFrameCopy(AVFrame** out);
+
 protected:
 
     long long total_ms_ = 0;
@@ -66,5 +76,8 @@ protected:
     bool own_view_ = false;         //view_ 是否由 XPlayer 创建(负责释放)
     bool gpu_decode_ = false;
     bool gpu_direct_render_ = false;
+    int audio_source_ = 0;          //混音源id
+    bool own_audio_ = true;         //是否负责SDL音频设备生命周期
+    bool no_view_ = false;          //叠加层播放器: 不创建/不渲染view
 };
 
