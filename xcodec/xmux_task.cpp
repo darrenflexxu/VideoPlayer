@@ -2,6 +2,10 @@
 
 using namespace std;
 
+XMuxTask::~XMuxTask() {
+  XThread::Stop();   //停线程并等其退出(Main尾部写尾并关闭封装)
+}
+
 void XMuxTask::Do(AVPacket* pkt) {
   pkts_.Push(pkt);
   if (block_size_ <= 0)

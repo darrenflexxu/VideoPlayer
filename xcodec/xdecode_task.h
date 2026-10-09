@@ -4,6 +4,8 @@
 class XCODEC_API XDecodeTask :public XThread
 {
 public:
+    ~XDecodeTask() override;   //停线程并释放解码资源
+
     /// <summary>
     /// 打开解码器
     /// </summary>

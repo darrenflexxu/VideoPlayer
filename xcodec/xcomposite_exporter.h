@@ -65,6 +65,7 @@ private:
 
         //分包器: demux 只挂一个下游, 这里按流类型转发给音/视频解码器
         struct Router : XThread {
+            ~Router() = default;   //不启动线程, 仅继承 XThread
             XDecodeTask* v = nullptr;
             XDecodeTask* a = nullptr;
             int v_idx = -1, a_idx = -1;

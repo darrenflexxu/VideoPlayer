@@ -68,6 +68,10 @@ float XConvertor::GetPos() {
   return float(done) / float(total_frame_count_);
 }
 
+XConvertor::~XConvertor() {
+  Stop();   //停全部子线程并释放资源
+}
+
 void XConvertor::Stop() {
   Exit();
   demux_.Exit();

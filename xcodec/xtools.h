@@ -62,6 +62,9 @@ XCODEC_API long long XRescale(long long pts,
                               AVRational* des_time_base);
 class XCODEC_API XThread {
 public:
+    //虚析构: 责任链 XThread* 基类指针析构时正确调用子类析构
+    virtual ~XThread();
+
     //启动线程
     virtual void Start();
 

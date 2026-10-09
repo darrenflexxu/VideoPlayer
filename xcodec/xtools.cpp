@@ -68,6 +68,13 @@ void XThread::Start() {
     ss << "XThread::Start()" << index_;
     LOGINFO(ss.str());
 }
+
+//虚析构: 线程仍挂起时先等其退出, 避免 std::thread 析构触发 terminate
+//(子类析构应调用各自的 Stop() 完成资源清理, 这里仅兜底 join)
+XThread::~XThread() {
+    if (th_.joinable())
+        th_.join();
+}
 void XThread::Exit() {
     stringstream ss;
     ss << "XThread::Exit() begin" << index_;

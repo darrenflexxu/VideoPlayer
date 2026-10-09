@@ -149,6 +149,10 @@ void XEncodeTask::Clear() {
   }
   encode_.Clear();
 }
+XEncodeTask::~XEncodeTask() {
+  Stop();
+}
+
 void XEncodeTask::Stop() {
   XThread::Stop();
 

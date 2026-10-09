@@ -49,6 +49,11 @@ void XDecodeTask::Clear()
     cur_pts_ = -1;
     decode_.Clear();
 }
+XDecodeTask::~XDecodeTask()
+{
+    Stop();
+}
+
 void XDecodeTask::Stop()
 {
     XThread::Stop();

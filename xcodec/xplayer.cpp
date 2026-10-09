@@ -9,6 +9,11 @@ void XPlayer::Pause(bool is_pause)
     video_decode_.Pause(is_pause);
     XAudioPlay::Instance()->Pause(is_pause);
 }
+
+XPlayer::~XPlayer()
+{
+    Stop();   //停各子线程、释放渲染与音频资源
+}
 //设置视频播放位置，毫秒
 bool XPlayer::Seek(long long ms)
 {

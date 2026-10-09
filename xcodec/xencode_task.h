@@ -6,6 +6,8 @@
 
 class XCODEC_API XEncodeTask : public XThread {
  public:
+  ~XEncodeTask() override;   //停线程并释放编码资源
+
   /// <summary>
   /// 打开解码器
   /// </summary>

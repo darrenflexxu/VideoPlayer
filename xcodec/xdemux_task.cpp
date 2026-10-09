@@ -1,6 +1,11 @@
 ﻿#include "predefine_header.h"
 
 using namespace std;
+XDemuxTask::~XDemuxTask()
+{
+    Stop();
+}
+
 bool XDemuxTask::Seek(long long ms)
 {
     auto vp = demux_.CopyVideoPara();

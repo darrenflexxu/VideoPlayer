@@ -6,6 +6,8 @@
 class XCODEC_API XPlayer :public XThread
 {
 public:
+    ~XPlayer() override;   //停线程并释放播放/渲染资源
+
     //回调接收音视频包
     void Do(AVPacket* pkt) override;
     

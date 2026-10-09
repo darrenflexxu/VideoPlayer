@@ -8,6 +8,8 @@
 
 class XCODEC_API XConvertor : public XThread {
  public:
+  ~XConvertor() override;   //停线程并释放转码资源
+
   // 回调接收音视频包
   void Do(AVPacket* pkt) override;
 

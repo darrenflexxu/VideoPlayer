@@ -3,6 +3,8 @@
 
 class XCODEC_API XMuxTask : public XThread {
  public:
+  ~XMuxTask() override;   //停线程并关闭封装器
+
   void Main() override;
   /// <summary>
   /// 打开封装文件

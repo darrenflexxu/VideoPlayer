@@ -10,6 +10,7 @@ enum XSYN_TYPE
 class XCODEC_API XDemuxTask :public XThread
 {
 public:
+    ~XDemuxTask() override;   //停线程并释放解封装资源
 
     bool Seek(long long ms);
 
