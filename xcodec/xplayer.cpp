@@ -156,9 +156,11 @@ void XPlayer::Start()
 }
 
 bool XPlayer::IsFinish() {
-  //纯音频源无视频解码器, 以音频解码EOF判断; 否则以视频EOF判断
+  //纯音频源: 以播放时钟到达总时长判断结束。
+  //不能用解码帧缓存是否清空判断: Update每次只取一帧, 解码缓存会先于实际播放耗尽,
+  //而混音源里仍有大量已缓冲音频在播放, 误判为结束会导致播放被中断。
   if (!video_decode_.is_open())
-    return audio_decode_.IsVideoFinish();
+    return total_ms_ > 0 && pos_ms_ >= total_ms_ - 60;
   return video_decode_.IsVideoFinish();
 }
 
@@ -230,6 +232,7 @@ void XPlayer::Main()
     auto au = XAudioPlay::Instance();
     auto ap = demux_.CopyAudioPara();
     auto vp = demux_.CopyVideoPara();
+    AVRational ms_tb{ 1, 1000 };
     if (vp)
         video_decode_.set_time_base(vp->time_base);
     while (!is_exit_)
@@ -239,13 +242,22 @@ void XPlayer::Main()
             MSleep(1);
             continue;
         }
-        //纯音频源(无视频流)时以音频解码位置作为播放进度, 否则取视频位置
-        this->pos_ms_ = vp ? video_decode_.cur_ms() : audio_decode_.cur_ms();
-        if (ap && vp)
+        if (vp)
         {
-            syn = XRescale(au->cur_pts(), ap->time_base, vp->time_base);
-            audio_decode_.set_syn_pts(au->cur_pts() + 10000);
-            video_decode_.set_syn_pts(syn);
+            //视频源: 播放进度取视频解码位置(已按音频播放时钟同步)
+            this->pos_ms_ = video_decode_.cur_ms();
+            if (ap)
+            {
+                syn = XRescale(au->cur_pts(), ap->time_base, vp->time_base);
+                audio_decode_.set_syn_pts(au->cur_pts() + 10000);
+                video_decode_.set_syn_pts(syn);
+            }
+        }
+        else if (ap)
+        {
+            //纯音频源: 取音频"播放"时钟作为播放进度;
+            //不能用音频解码位置(解码会远跑在播放之前, 导致播放头跑到结尾)
+            this->pos_ms_ = XRescale(au->cur_pts(), ap->time_base, &ms_tb);
         }
         MSleep(1);
     }

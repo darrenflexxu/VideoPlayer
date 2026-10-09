@@ -177,39 +177,38 @@ private:
 void XAudioPlay::PushTo(int id, AVFrame* frame)
 {
     if (!frame || !frame->data[0])return;
-    vector<unsigned char> buf;
     int sample_size = av_get_bytes_per_sample((AVSampleFormat)frame->format);
     int channels = frame->ch_layout.nb_channels;
-    unsigned char* L = frame->data[0];
-    unsigned char* R = frame->data[1];
+    if (sample_size <= 0 || channels <= 0)
+        return;
+    vector<unsigned char> buf;
+    //单声道: 平面即打包, 直接推送
     if (channels == 1)
     {
-        PushTo(id, frame->data[0], frame->nb_samples* sample_size, frame->pts);
+        PushTo(id, frame->data[0], frame->nb_samples * sample_size, frame->pts);
         return;
     }
-    //暂时支持双通道
+    //平面(planar)格式 -> 交错(interleaved): 总字节数 = 样本数 * 通道数 * 每样本字节数
+    //注意: 不能按 linesize[0](单个平面大小)分配, 否则只推送一半数据导致播放速度翻倍
     switch (frame->format)
     {
-        //case AV_SAMPLE_FMT_S16P:        ///< signed 16 bits, planar
-    case AV_SAMPLE_FMT_S32P:        ///< signed 32 bits, planar
-    case AV_SAMPLE_FMT_FLTP:        ///< float, planar
-        buf.resize(frame->linesize[0]);
-        // LLLL RRRR  32
-        // LR LR LR LR 4
+    case AV_SAMPLE_FMT_U8P:
+    case AV_SAMPLE_FMT_S16P:
+    case AV_SAMPLE_FMT_S32P:
+    case AV_SAMPLE_FMT_FLTP:
+    case AV_SAMPLE_FMT_DBLP:
+        buf.resize((size_t)frame->nb_samples * channels * sample_size);
         for (int i = 0; i < frame->nb_samples; i++)
-        {
-            memcpy(buf.data() + i * sample_size * channels,
-                L + i * sample_size, sample_size);
-            memcpy(buf.data() + i * sample_size * channels + sample_size,
-                R + i * sample_size, sample_size);
-        }
+            for (int ch = 0; ch < channels; ch++)
+                memcpy(buf.data() + ((size_t)i * channels + ch) * sample_size,
+                       frame->data[ch] + (size_t)i * sample_size, sample_size);
         PushTo(id, buf.data(), (int)buf.size(), frame->pts);
         return;
-        break;
     default:
         break;
     }
-    PushTo(id, frame->data[0], frame->linesize[0], frame->pts);
+    //打包(interleaved)格式: 数据本已交错
+    PushTo(id, frame->data[0], frame->nb_samples * channels * sample_size, frame->pts);
 }
 void XAudioPlay::Push(AVFrame* frame)
 {

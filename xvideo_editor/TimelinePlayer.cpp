@@ -558,6 +558,18 @@ void TimelinePlayer::Update()
     //时间轴位置 = 片段起点 + (当前源位置 - 裁剪起点), 前段被裁时播放头才准
     timeline_pos_ms_ = c.pos_ms + std::max(0LL, local - c.source_start_ms);
 
+    // 播放头到达时间轴末尾 -> 停止(避免末段被当作"切到下一段"而重头循环)
+    if (timeline_pos_ms_ >= model_->total_ms() - 60) {
+        paused_ = true;
+        if (player_)
+            player_->Pause(true);
+        for (auto& o : overlays_)
+            if (o.player)
+                o.player->Pause(true);
+        timeline_pos_ms_ = model_->total_ms();
+        return;
+    }
+
     // 主片段可见窗口用尽(以裁剪终点为界, 带容差)或源已放完 -> 切到下一段
     bool exhausted = local >= c.source_end_ms - 60 || player_->IsFinish();
     if (!exhausted)
