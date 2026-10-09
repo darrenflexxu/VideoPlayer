@@ -48,10 +48,10 @@ void TimelineModel::addClip(const Clip& c)
 }
 
 void TimelineModel::addClip(const QString& url, long long src_start, long long src_end,
-                            int trackIndex)
+                            int trackIndex, ClipType type)
 {
     Clip c;
-    c.type = ClipType::VIDEO;
+    c.type = type;
     c.url = url;
     c.source_start_ms = src_start;
     c.source_end_ms = src_end;

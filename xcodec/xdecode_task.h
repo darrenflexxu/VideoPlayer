@@ -40,7 +40,7 @@ public:
     int stream_index() { return stream_index_; }
 
     void set_frame_cache(bool is) { frame_cache_ = is; }
-    bool is_open() { return is_open_; }
+    bool is_open() const { return is_open_; }
 
     void set_gpu_decode(bool gpu) { gpu_decode_ = gpu; }
     void set_gpu_direct_render(bool gpu_render) { gpu_direct_render_ = gpu_render; }

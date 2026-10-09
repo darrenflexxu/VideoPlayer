@@ -2,6 +2,8 @@
 #include "x_qt_opengl_widget.h"
 #include "xdemux_task.h"
 #include "xconvertor.h"
+#include "xcomposite_exporter.h"
+#include "xexport_model.h"
 #include "xtools.h"
 #include <QSplitter>
 #include <QVBoxLayout>
@@ -13,8 +15,16 @@
 #include <QMessageBox>
 #include <QFileInfo>
 #include <QTimerEvent>
+#include <QPainter>
+#include <QFont>
 #include <algorithm>
 #include <thread>
+
+extern "C" {
+#include <libavcodec/avcodec.h>
+#include <libavutil/frame.h>
+#include <libavutil/imgutils.h>
+}
 
 //毫秒 -> 时间字符串 (mm:ss / h:mm:ss)
 static QString msToText(long long ms)
@@ -139,31 +149,33 @@ bool XVideoEditorWindow::importFiles(const QStringList& files)
     return true;
 }
 
-long long XVideoEditorWindow::probeDurationMs(const QString& url)
-{
-    XDemuxTask t;
-    if (!t.Open(url.toStdString()))
-        return -1;
-    long long d = 0;
-    auto vp = t.CopyVideoPara();
-    if (vp)
-        d = std::max(d, vp->total_ms);
-    auto ap = t.CopyAudioPara();
-    if (ap)
-        d = std::max(d, ap->total_ms);
-    t.Stop();
-    return d;
-}
-
 void XVideoEditorWindow::addClip(const QString& url)
 {
-    long long dur = probeDurationMs(url);
+    //探针: 打开解封装判断流构成与总时长(音视频取较大者)
+    XDemuxTask probe;
+    if (!probe.Open(url.toStdString()))
+        return;
+    auto vp = probe.CopyVideoPara();
+    auto ap = probe.CopyAudioPara();
+    long long dur = 0;
+    if (vp)
+        dur = std::max(dur, vp->total_ms);
+    if (ap)
+        dur = std::max(dur, ap->total_ms);
+    probe.Stop();
     if (dur <= 0)
         return;
-    //每个导入文件独占一条新轨道(多轨叠加), 从时间轴0开始
+
+    //每个导入文件独占一条新轨道(多轨叠加), 从时间轴0开始;
+    //无视频流的文件(m4a等)按纯音频导入, 只混声音不占画面
     int track = model_.clipCount();
-    model_.addTrack(track, ClipType::VIDEO, QString("视频轨 %1").arg(track + 1));
-    model_.addClip(url, 0, dur, track);
+    if (vp) {
+        model_.addTrack(track, ClipType::VIDEO, QString("视频轨 %1").arg(track + 1));
+        model_.addClip(url, 0, dur, track);
+    } else {
+        model_.addTrack(track, ClipType::AUDIO, QString("音频轨 %1").arg(track + 1));
+        model_.addClip(url, 0, dur, track, ClipType::AUDIO);
+    }
     timeline_->refresh();
     timeline_->setPlayheadMs(player_.pos_ms());
     updateLabels();
@@ -172,8 +184,8 @@ void XVideoEditorWindow::addClip(const QString& url)
 void XVideoEditorWindow::onAddClicked()
 {
     QStringList files = QFileDialog::getOpenFileNames(
-        this, "选择视频文件", QString(),
-        "视频文件 (*.mp4 *.mov *.mkv *.avi *.ts);;所有文件 (*)");
+        this, "选择视频/音频文件", QString(),
+        "视频/音频文件 (*.mp4 *.mov *.mkv *.avi *.ts *.m4a);;所有文件 (*)");
     importFiles(files);
 }
 
@@ -207,47 +219,117 @@ void XVideoEditorWindow::exportWorker(const QString& out)
 {
     //拷贝一份模型, 避免与UI线程的编辑操作竞争
     const std::vector<Clip> model_snapshot(model_.clips().begin(), model_.clips().end());
+    if (model_snapshot.empty()) {
+        QMutexLocker locker(&export_mutex_);
+        export_ok_ = false;
+        export_msg_ = "时间轴为空";
+        export_done_ = true;
+        return;
+    }
 
-    std::vector<Clip> sorted = model_snapshot;
-    std::sort(sorted.begin(), sorted.end(),
-              [](const Clip& a, const Clip& b) { return a.pos_ms < b.pos_ms; });
-
-    std::vector<std::string> urls;
-    std::vector<std::pair<long long, long long>> seg_trims;
-    for (const Clip& c : sorted) {
-        urls.push_back(c.url.toStdString());
-        seg_trims.push_back({c.source_start_ms, c.source_end_ms});
+    //TimelineModel -> XExportModel: 保留轨道/位置/裁剪/矩形, 类型与贴纸/字幕一一对应
+    XExportModel xm;
+    long long total = 0;
+    for (const Clip& c : model_snapshot) {
+        XExportClip xc;
+        switch (c.type) {
+        case ClipType::AUDIO:   xc.type = XClipType::AUDIO;   break;
+        case ClipType::SUBTITLE:xc.type = XClipType::SUBTITLE;break;
+        case ClipType::STICKER: xc.type = XClipType::STICKER; break;
+        default:                xc.type = XClipType::VIDEO;   break;
+        }
+        xc.url = c.url.toStdString();
+        xc.source_start_ms = c.source_start_ms;
+        xc.source_end_ms = c.source_end_ms;
+        xc.pos_ms = c.pos_ms;
+        xc.track_index = c.trackIndex;
+        xc.rect = XClipRect{c.rect.x, c.rect.y, c.rect.w, c.rect.h};
+        xc.alpha = c.alpha;
+        xc.text = c.text.toStdString();
+        total = std::max(total, c.pos_ms + c.duration_ms());
+        xm.clips.push_back(xc);
     }
 
     bool ok = false;
     QString msg;
-    XConvertor cvt;
-    cvt.set_gpu_decode(false);
-    cvt.set_gpu_encode(false);
-    cvt.set_show_progress(false);
-    if (!cvt.Open(urls[0].c_str())) {
-        msg = "打开源文件失败";
+    XCompositeExporter ex;
+    ex.setModel(xm);
+
+    //视频输出参数: 以第一个视频片段的源分辨率/帧率为基准, 无视频则用默认值
+    XCompositeExporter::VideoOpts vo;
+    bool have_video = false;
+    for (const Clip& c : model_snapshot) {
+        if (c.type != ClipType::VIDEO)
+            continue;
+        XDemuxTask probe;
+        if (probe.Open(c.url.toStdString())) {
+            auto vp = probe.CopyVideoPara();
+            if (vp && vp->para && vp->para->width > 0 && vp->para->height > 0) {
+                vo.width = vp->para->width;
+                vo.height = vp->para->height;
+            }
+            probe.Stop();
+        }
+        have_video = true;
+        break;
+    }
+    ex.setVideoOpts(vo);
+
+    //贴纸/字幕: 逐帧回调提供RGBA画面(与时间轴预览的合成逻辑一致)
+    ex.setRgbaProvider([this, &model_snapshot](const XExportClip* xc, long long /*t*/) -> AVFrame* {
+        const Clip* src = nullptr;
+        for (const Clip& c : model_snapshot) {
+            if (c.url.toStdString() == xc->url && c.trackIndex == xc->track_index) {
+                src = &c;
+                break;
+            }
+        }
+        if (!src)
+            return nullptr;
+        QImage q;
+        if (src->type == ClipType::STICKER) {
+            q = QImage(src->url);
+        } else if (src->type == ClipType::SUBTITLE) {
+            q = QImage(640, 160, QImage::Format_RGBA8888);
+            q.fill(Qt::transparent);
+            QPainter p(&q);
+            p.setRenderHint(QPainter::TextAntialiasing, true);
+            p.setPen(Qt::white);
+            QFont f("Arial", 48, QFont::Bold);
+            p.setFont(f);
+            p.drawText(q.rect(), Qt::AlignCenter | Qt::TextWordWrap, src->text);
+            p.end();
+        }
+        if (q.isNull())
+            return nullptr;
+        QImage rgba = q.convertToFormat(QImage::Format_RGBA8888);
+        AVFrame* f = av_frame_alloc();
+        f->format = AV_PIX_FMT_RGBA;
+        f->width = rgba.width();
+        f->height = rgba.height();
+        if (av_frame_get_buffer(f, 32) < 0) {
+            av_frame_free(&f);
+            return nullptr;
+        }
+        for (int y = 0; y < rgba.height(); ++y)
+            memcpy(f->data[0] + (size_t)y * f->linesize[0],
+                   rgba.constScanLine(y), (size_t)rgba.width() * 4);
+        return f;
+    });
+
+    if (!ex.Start(out.toStdString())) {
+        msg = QString::fromStdString(ex.GetError());
+        if (msg.isEmpty())
+            msg = "启动合成导出失败";
     } else {
-        auto vp = cvt.GetVideoCodec();
-        auto ap = cvt.GetAudioCodec();
-        std::map<std::string, std::string> video_opts;
-        std::map<std::string, std::string> audio_opts;
-        if (vp) {
-            video_opts["crf"] = "18";
-            video_opts["preset"] = "medium";
-        }
-        cvt.StartConcat(urls, out.toStdString().c_str(),
-                        vp ? vp->para : nullptr, vp ? vp->time_base : nullptr,
-                        ap ? ap->para : nullptr, ap ? ap->time_base : nullptr,
-                        video_opts, audio_opts, seg_trims);
-        while (!cvt.IsFinished()) {
+        while (!ex.IsFinished())
             MSleep(50);
-        }
-        if (cvt.HasError())
-            msg = QString::fromStdString(cvt.GetError());
+        ex.Wait();
+        if (ex.HasError())
+            msg = QString::fromStdString(ex.GetError());
         else
             ok = true;
-        cvt.Stop();
+        ex.Stop();
     }
 
     QMutexLocker locker(&export_mutex_);

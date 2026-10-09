@@ -26,8 +26,12 @@ public:
     void ClearFinish();
 
     //后台预热: 解码出第一帧后自暂停, 供跨片段无缝切换
-    void set_preroll_one(bool v) { video_decode_.set_preroll_one(v); }
-    bool preroll_ready() const { return video_decode_.preroll_paused(); }
+    void set_preroll_one(bool v) { video_decode_.set_preroll_one(v); audio_decode_.set_preroll_one(v); }
+    //预热就绪: 视频源看视频帧缓冲, 纯音频源看音频帧缓冲
+    bool preroll_ready() const {
+        if (video_decode_.is_open()) return video_decode_.preroll_paused();
+        return audio_decode_.preroll_paused();
+    }
 
     //渲染视频 播放音频
     void Update();

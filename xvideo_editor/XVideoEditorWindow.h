@@ -25,7 +25,6 @@ protected:
 
 private:
     void onFrameTimer();
-    long long probeDurationMs(const QString& url);
     void addClip(const QString& url);
     void onAddClicked();
     void togglePlay();

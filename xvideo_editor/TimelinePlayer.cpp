@@ -198,19 +198,20 @@ int TimelinePlayer::nextBaseClip(int idx) const
     if (!model_)
         return -1;
     for (int i = idx > 0 ? idx : 0; i < model_->clipCount(); ++i)
-        if (model_->clip(i).type == ClipType::VIDEO)
+        if (model_->clip(i).type == ClipType::VIDEO ||
+            model_->clip(i).type == ClipType::AUDIO)
             return i;
     return -1;
 }
 
-//timeline_ms 处最低轨激活视频片段(基片): 按Z序最底层, 无则-1
-int TimelinePlayer::activeVideoClipIndex(long long ms) const
+//timeline_ms 处最低轨激活的"可作基片"片段(VIDEO或AUDIO): 按Z序最底层, 无则-1
+int TimelinePlayer::activeBaseClipIndex(long long ms) const
 {
     if (!model_)
         return -1;
     auto act = model_->getActiveClips(ms);
     for (const Clip* p : act) {
-        if (p->type != ClipType::VIDEO)
+        if (p->type != ClipType::VIDEO && p->type != ClipType::AUDIO)
             continue;
         for (int i = 0; i < model_->clipCount(); ++i)
             if (&model_->clip(i) == p)
@@ -411,11 +412,12 @@ bool TimelinePlayer::play()
     if (!model_ || model_->empty())
         return false;
     if (active_idx_ < 0) {
-        // 尚未打开基片: 从播放头处最低轨视频开始, 找不到则取第一个视频片段
-        int idx = activeVideoClipIndex(timeline_pos_ms_);
+        // 尚未打开基片: 从播放头处最低轨的视频/音频开始, 找不到则取第一个可作基片的片段
+        int idx = activeBaseClipIndex(timeline_pos_ms_);
         if (idx < 0) {
             for (int i = 0; i < model_->clipCount(); ++i)
-                if (model_->clip(i).type == ClipType::VIDEO) { idx = i; break; }
+                if (model_->clip(i).type == ClipType::VIDEO ||
+                    model_->clip(i).type == ClipType::AUDIO) { idx = i; break; }
         }
         if (idx < 0)
             idx = 0;
@@ -439,7 +441,7 @@ bool TimelinePlayer::seekTo(long long timeline_ms)
 {
     if (!model_ || model_->empty())
         return false;
-    int idx = activeVideoClipIndex(timeline_ms);
+    int idx = activeBaseClipIndex(timeline_ms);
     if (idx < 0)
         return false;
     timeline_pos_ms_ = timeline_ms;

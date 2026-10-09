@@ -126,6 +126,10 @@ bool XPlayer::Open(const char* url, void* winid)
         demux_.set_syn_type(XSYN_VIDEO);//根据视频同步
     }
 
+    //纯音频文件(无视频流)以音频总长作为时长, 便于进度与耗尽判断
+    if (!vp && ap)
+        this->total_ms_ = ap->total_ms;
+
     //解封装数据传到当前类
     demux_.set_next(this);
 
@@ -152,6 +156,9 @@ void XPlayer::Start()
 }
 
 bool XPlayer::IsFinish() {
+  //纯音频源无视频解码器, 以音频解码EOF判断; 否则以视频EOF判断
+  if (!video_decode_.is_open())
+    return audio_decode_.IsVideoFinish();
   return video_decode_.IsVideoFinish();
 }
 
@@ -223,7 +230,8 @@ void XPlayer::Main()
     auto au = XAudioPlay::Instance();
     auto ap = demux_.CopyAudioPara();
     auto vp = demux_.CopyVideoPara();
-    video_decode_.set_time_base(vp->time_base);
+    if (vp)
+        video_decode_.set_time_base(vp->time_base);
     while (!is_exit_)
     {
         if (is_pause())
@@ -231,8 +239,9 @@ void XPlayer::Main()
             MSleep(1);
             continue;
         }
-        this->pos_ms_ = video_decode_.cur_ms();
-        if (ap)
+        //纯音频源(无视频流)时以音频解码位置作为播放进度, 否则取视频位置
+        this->pos_ms_ = vp ? video_decode_.cur_ms() : audio_decode_.cur_ms();
+        if (ap && vp)
         {
             syn = XRescale(au->cur_pts(), ap->time_base, vp->time_base);
             audio_decode_.set_syn_pts(au->cur_pts() + 10000);

@@ -52,7 +52,7 @@ private:
     void joinPrefetch();              //回收并等待预热线程结束
     bool takePrefetched();            //把预热好的播放器换成当前主播放器
     int nextBaseClip(int idx) const;  //idx 之后(含)下一个视频片段索引, 无则-1
-    int activeVideoClipIndex(long long ms) const;  //ms处最低轨激活视频片段索引, 无则-1
+    int activeBaseClipIndex(long long ms) const;  //ms处最低轨激活的视频/音频片段索引, 无则-1
 
     //叠加层播放(轨>=1)
     struct XOverlayPlay {

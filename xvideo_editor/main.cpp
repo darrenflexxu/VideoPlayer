@@ -10,6 +10,7 @@ extern "C" {
 
 #include "xcomposite_exporter.h"
 #include "xexport_model.h"
+#include "xdemux_task.h"
 #include "xtools.h"
 
 //临时自测: 合成导出(两片段画中画 + 贴纸), 验证复合导出管线
@@ -111,6 +112,31 @@ static int runExportDemo(const QStringList& args)
     return 0;
 }
 
+//临时自测: 探测文件流构成(视频/音频)与时长, 验证m4a导入分类(同addClip的探针逻辑)
+static int runProbe(const QStringList& args)
+{
+    if (args.size() < 3) {
+        fprintf(stderr, "[probe] usage: --probe <file>\n");
+        return -1;
+    }
+    std::string url = args[2].toStdString();
+    XDemuxTask t;
+    if (!t.Open(url)) {
+        fprintf(stderr, "[probe] open failed: %s\n", url.c_str());
+        return -1;
+    }
+    auto vp = t.CopyVideoPara();
+    auto ap = t.CopyAudioPara();
+    long long dur = 0;
+    if (vp && vp->total_ms > dur) dur = vp->total_ms;
+    if (ap && ap->total_ms > dur) dur = ap->total_ms;
+    t.Stop();
+    fprintf(stderr, "[probe] url=%s video=%d audio=%d dur=%lldms type=%s\n",
+            url.c_str(), vp ? 1 : 0, ap ? 1 : 0, dur,
+            vp ? "VIDEO(视频轨)" : (ap ? "AUDIO(音频轨)" : "NONE"));
+    return 0;
+}
+
 int main(int argc, char* argv[])
 {
     //视频着色器使用 GLSL 330 core, 需请求 OpenGL 3.3+ 核心模式(macOS最高4.1)
@@ -126,6 +152,9 @@ int main(int argc, char* argv[])
     QStringList args = a.arguments();
     if (args.size() >= 3 && args[1] == "--demo" && args[2] == "export") {
         return runExportDemo(args);
+    }
+    if (args.size() >= 3 && args[1] == "--probe") {
+        return runProbe(args);
     }
 
     XVideoEditorWindow w;
