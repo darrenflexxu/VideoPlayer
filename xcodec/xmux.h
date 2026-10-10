@@ -31,6 +31,11 @@ public:
     // 不再以首包为0重定基, 否则首包非0(如第0段无音频时)会把后续时间轴整体平移
     void set_ms_mode(bool on) { ms_mode_ = on; }
 
+    //纯音频输出: 音频包走流0(无视频流时避免与video_index_冲突)
+    void set_audio_only(bool on) {
+        if (on) { audio_index_ = 0; video_index_ = -1; }
+    }
+
     ~XMux();
 private:
     AVRational* src_video_time_base_ = nullptr;

@@ -51,8 +51,8 @@ bool XCompositeExporter::Start(const std::string& out_url)
     progress_.store(0.0f);
     stop_requested_.store(false);
 
-    //初始化 FBO(离屏渲染目标)
-    if (!fbo_.Init(vopts_.width, vopts_.height)) {
+    //初始化 FBO(离屏渲染目标); 纯音频模式跳过
+    if (!audio_only_ && !fbo_.Init(vopts_.width, vopts_.height)) {
         error_ = "FBO init failed";
         return false;
     }
@@ -68,20 +68,24 @@ bool XCompositeExporter::Start(const std::string& out_url)
 
 bool XCompositeExporter::InitEncoders()
 {
-    //视频编码器参数
-    AVCodecParameters* vpara = avcodec_parameters_alloc();
-    const AVCodec* venc = avcodec_find_encoder_by_name(vopts_.codec.c_str());
-    if (!venc) {
-        error_ = "video encoder not found: " + vopts_.codec;
-        avcodec_parameters_free(&vpara);
-        return false;
+    AVCodecParameters* vpara = nullptr;
+    AVRational vtb = {1, vopts_.fps};
+    if (!audio_only_) {
+        //视频编码器参数
+        vpara = avcodec_parameters_alloc();
+        const AVCodec* venc = avcodec_find_encoder_by_name(vopts_.codec.c_str());
+        if (!venc) {
+            error_ = "video encoder not found: " + vopts_.codec;
+            avcodec_parameters_free(&vpara);
+            return false;
+        }
+        vpara->codec_type = AVMEDIA_TYPE_VIDEO;
+        vpara->codec_id = venc->id;
+        vpara->width = vopts_.width;
+        vpara->height = vopts_.height;
+        vpara->format = AV_PIX_FMT_YUV420P;
+        vpara->framerate = {vopts_.fps, 1};
     }
-    vpara->codec_type = AVMEDIA_TYPE_VIDEO;
-    vpara->codec_id = venc->id;
-    vpara->width = vopts_.width;
-    vpara->height = vopts_.height;
-    vpara->format = AV_PIX_FMT_YUV420P;
-    vpara->framerate = {vopts_.fps, 1};
 
     //音频编码器参数
     AVCodecParameters* apara = avcodec_parameters_alloc();
@@ -99,56 +103,69 @@ bool XCompositeExporter::InitEncoders()
     apara->format = AV_SAMPLE_FMT_FLTP;
     apara->bit_rate = aopts_.bitrate;
 
-    AVRational vtb = {1, vopts_.fps};
     AVRational atb = {1, aopts_.sample_rate};
 
-    video_enc_ = std::make_unique<XEncodeTask>();
-    video_enc_->set_gpu_encode(false);
-    video_enc_->set_time_base(&vtb);
-    if (!video_enc_->Open(vpara, vopts_.opts)) {
-        error_ = "video encoder open failed";
+    if (!audio_only_) {
+        video_enc_ = std::make_unique<XEncodeTask>();
+        video_enc_->set_gpu_encode(false);
+        video_enc_->set_time_base(&vtb);
+        if (!video_enc_->Open(vpara, vopts_.opts)) {
+            error_ = "video encoder open failed";
+            avcodec_parameters_free(&vpara);
+            avcodec_parameters_free(&apara);
+            return false;
+        }
         avcodec_parameters_free(&vpara);
-        avcodec_parameters_free(&apara);
-        return false;
+        vpara = nullptr;
     }
-    avcodec_parameters_free(&vpara);
 
     audio_enc_ = std::make_unique<XEncodeTask>();
     audio_enc_->set_gpu_encode(false);
     audio_enc_->set_time_base(&atb);
     if (!audio_enc_->Open(apara, aopts_.opts)) {
         error_ = "audio encoder open failed";
+        if (vpara) avcodec_parameters_free(&vpara);
         avcodec_parameters_free(&apara);
         return false;
     }
     avcodec_parameters_free(&apara);
 
-    //从编码器上下文复制编码器参数给复用器
-    AVCodecParameters* vout = avcodec_parameters_alloc();
-    avcodec_parameters_from_context(vout, video_enc_->GetCodecContext());
+    //从编码器上下文复制编码器参数给复用器; 纯音频模式无视频流
+    AVCodecParameters* vout = nullptr;
+    if (!audio_only_) {
+        vout = avcodec_parameters_alloc();
+        avcodec_parameters_from_context(vout, video_enc_->GetCodecContext());
+    }
     AVCodecParameters* aout = avcodec_parameters_alloc();
     avcodec_parameters_from_context(aout, audio_enc_->GetCodecContext());
 
-    //复用器
+    //复用器; 纯音频模式只建音频流(传nullptr视频参数)
     mux_ = std::make_unique<XMuxTask>();
-    if (!mux_->Open(out_url_.c_str(), vout, &vtb, aout, &atb)) {
+    if (!mux_->Open(out_url_.c_str(), vout, audio_only_ ? nullptr : &vtb, aout, &atb)) {
         error_ = "muxer open failed: " + mux_->error();
-        avcodec_parameters_free(&vout);
+        if (vout) avcodec_parameters_free(&vout);
         avcodec_parameters_free(&aout);
         return false;
     }
-    avcodec_parameters_free(&vout);
+    if (audio_only_)
+        mux_->set_audio_only(true);
+    if (vout) avcodec_parameters_free(&vout);
     avcodec_parameters_free(&aout);
 
-    //责任链: 编码器发包 -> 复用器
-    video_enc_->set_stream_index(0);
-    audio_enc_->set_stream_index(1);
-    video_enc_->set_next(mux_.get());
+    //责任链: 编码器发包 -> 复用器; 纯音频时音频独占流0
+    if (!audio_only_) {
+        video_enc_->set_stream_index(0);
+        audio_enc_->set_stream_index(1);
+        video_enc_->set_next(mux_.get());
+    } else {
+        audio_enc_->set_stream_index(0);
+    }
     audio_enc_->set_next(mux_.get());
     mux_->ignoreMaxPkts(true);
 
     mux_->Start();
-    video_enc_->Start();
+    if (!audio_only_)
+        video_enc_->Start();
     audio_enc_->Start();
     return true;
 }
@@ -184,8 +201,9 @@ XCompositeExporter::ClipDecoder* XCompositeExporter::GetDecoder(const XExportCli
     decoders_[idx] = std::move(nd);
     ClipDecoder* d = decoders_[idx].get();
     //预先打开音/视频解码器并挂到路由器, 再启动解封装。
-    //否则懒打开会丢弃路由器中途的音频包, 造成混音起始偏移
-    if (d->vp) OpenVideoDecoder(d);
+    //否则懒打开会丢弃路由器中途的音频包, 造成混音起始偏移;
+    //纯音频模式跳过视频解码器
+    if (!audio_only_ && d->vp) OpenVideoDecoder(d);
     if (d->ap) OpenAudioDecoder(d);
     if (!d->v_started && !d->a_started) {
         decoders_[idx].reset();
@@ -533,8 +551,9 @@ void XCompositeExporter::MixAndEncodeAudio(long long s0, long long s1)
     pend_l_.insert(pend_l_.end(), L.begin(), L.end());
     pend_r_.insert(pend_r_.end(), R.begin(), R.end());
 
-    //按 1024 样本(编码器帧大小)切块发送, 剩余留到下一轮或结尾补齐
-    static const long long kChunk = 1024;
+    //按编码器帧大小切块发送(PCM等为0时按1024), 剩余留到下一轮或结尾补齐
+    long long kChunk = audio_enc_ ? audio_enc_->audio_frame_size() : 0;
+    if (kChunk <= 0) kChunk = 1024;
     while ((long long)pend_l_.size() >= kChunk) {
         AVFrame* f = av_frame_alloc();
         if (!f) return;
@@ -556,10 +575,11 @@ void XCompositeExporter::MixAndEncodeAudio(long long s0, long long s1)
     }
 }
 
-//结尾不足一帧的部分补零到 1024 再发送, 保证编码器能出包
+//结尾不足一帧的部分补零到编码器帧大小再发送, 保证编码器能出包
 void XCompositeExporter::FlushPendingAudio(int sr)
 {
-    static const long long kChunk = 1024;
+    long long kChunk = audio_enc_ ? audio_enc_->audio_frame_size() : 0;
+    if (kChunk <= 0) kChunk = 1024;
     if (pend_l_.empty())
         return;
     while ((long long)pend_l_.size() < kChunk) {
@@ -611,7 +631,7 @@ void XCompositeExporter::ExportThread(const std::string& out_url)
     }
 
     const int sr = aopts_.sample_rate;
-    const long long fps = vopts_.fps;
+    const long long fps = vopts_.fps > 0 ? vopts_.fps : 25;
     const long long total_frames = (total_ms * fps + 999) / 1000;
 
     //混音目标参数(不 open, 只做重采样参考)
@@ -622,15 +642,29 @@ void XCompositeExporter::ExportThread(const std::string& out_url)
         av_channel_layout_default(&mix_ctx_->ch_layout, aopts_.channels);
     }
 
-    for (long long i = 0; i < total_frames && !stop_requested_.load(); ++i) {
-        progress_.store((float)i / (float)total_frames);
-        long long timeline_ms = i * 1000 / fps;
-        //视频合成编码
-        CompositeAndEncodeVideo((int)i, timeline_ms);
-        //音频混合编码(按帧推进采样区间)
-        long long s0 = av_rescale(i, sr, (int)fps);
-        long long s1 = av_rescale(i + 1, sr, (int)fps);
-        MixAndEncodeAudio(s0, s1);
+    if (audio_only_) {
+        //纯音频: 按时间步进混音, 不依赖视频帧计数(每步约一视频帧时长)
+        const long long total_samples = total_ms * sr / 1000;
+        const long long chunk = sr / fps > 0 ? sr / fps : 1024;
+        long long s = 0;
+        while (s < total_samples && !stop_requested_.load()) {
+            long long s1 = std::min(s + chunk, total_samples);
+            progress_.store(total_samples > 0 ? (float)s / (float)total_samples : 1.0f);
+            MixAndEncodeAudio(s, s1);
+            s = s1;
+        }
+        progress_.store(1.0f);
+    } else {
+        for (long long i = 0; i < total_frames && !stop_requested_.load(); ++i) {
+            progress_.store((float)i / (float)total_frames);
+            long long timeline_ms = i * 1000 / fps;
+            //视频合成编码
+            CompositeAndEncodeVideo((int)i, timeline_ms);
+            //音频混合编码(按帧推进采样区间)
+            long long s0 = av_rescale(i, sr, (int)fps);
+            long long s1 = av_rescale(i + 1, sr, (int)fps);
+            MixAndEncodeAudio(s0, s1);
+        }
     }
     //结尾不足一帧的音频补零发送
     FlushPendingAudio(sr);
@@ -639,10 +673,13 @@ void XCompositeExporter::ExportThread(const std::string& out_url)
     for (auto& d : decoders_)
         if (d) StopClipDecoder(d.get());
 
-    //结束编码线程(内部冲刷剩余帧与包), 再收尾封装
-    video_enc_->Exit();
+    //结束编码线程(内部冲刷剩余帧与包), 再收尾封装;
+    //纯音频模式视频编码器未初始化, 跳过
+    if (video_enc_) {
+        video_enc_->Exit();
+        video_enc_->Wait();
+    }
     audio_enc_->Exit();
-    video_enc_->Wait();
     audio_enc_->Wait();
     mux_->Exit();
     mux_->Wait();

@@ -57,6 +57,8 @@ class XCODEC_API XEncodeTask : public XThread {
 
   // 已经送入编码器的帧数量
   int frame_count() { return frame_count_; }
+  // 音频编码器要求的每帧采样数(<=0表示任意, 如PCM); 混音切块用
+  int audio_frame_size();
   // 实际使用的硬件加速编码状态(失败回退软件后为 false)
   bool gpu_used() { return gpu_used_; }
   // 编码器名称(如 libx264/h264_qsv), 未打开返回空

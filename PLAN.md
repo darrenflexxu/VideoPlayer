@@ -1,64 +1,77 @@
-# Implementation Plan: Multi-track Editing with m4a Support
+# Implementation Plan: Pure Audio Format Export
 
 ## Context
-The user wants to fully implement multi-track editing, specifically adding support for `.m4a` audio files and ensuring the "composite" nature of the project (overlapping layers) is preserved during both playback and export.
+Currently, the project's export pipeline in `XCompositeExporter` is tightly coupled to video rendering. It requires a video encoder and an OpenGL FBO to be initialized, and the export loop is driven by video frame counts. This makes it impossible to export a project as a pure audio file (e.g., `.mp3`, `.m4a`).
 
-While the `TimelineModel` and `TimelinePlayer` already support layering and Z-order, the current export process uses a linear concatenation tool (`XConvertor::StartConcat`), and the UI restricts imports to video files.
+The goal is to make the video path optional in the `XCompositeExporter`, allowing it to perform only audio mixing and encoding when a pure audio format is requested.
 
 ## Recommended Approach
 
-We will enable audio-only imports, refine the multi-track playback coordination, and migrate the export process to use the `XCompositeExporter` for true layered rendering.
+We will introduce an `audio_only` mode to the `XCompositeExporter` that bypasses all video-related initialization and processing while maintaining the audio mixing pipeline.
 
-### 1. Enable `.m4a` and Audio-Only Imports
-The project uses FFmpeg, which natively supports AAC/MPEG-4 (`.m4a`). We need to update the UI to allow these files and the model to categorize them correctly.
-- **UI Update**: Expand the `QFileDialog` filter in `XVideoEditorWindow::onAddClicked` to include `*.m4a`.
-- **Type Detection**: In `XVideoEditorWindow::addClip`, use `XDemuxTask` to check for the presence of a video stream.
-    - If video exists: `ClipType::VIDEO`, place on a "Video Track".
-    - If video is absent: `ClipType::AUDIO`, place on an "Audio Track".
+### 1. `XCompositeExporter` Modifications
+The exporter needs to be modified to make the video encoding path conditional.
 
-### 2. Refine Multi-track Playback
-The `TimelinePlayer` manages a "Base" player and "Overlay" players.
-- **Base Player Coordination**: Ensure the `TimelinePlayer` can handle timelines that may consist entirely of audio clips or start with an audio clip.
-- **Audio Mixing**: Leverage the existing `XAudioPlay` mixer (which uses `SDL_MixAudio`) to ensure that the base audio and all overlay audio (including `.m4a` clips) are summed correctly.
+- **Configuration**: Add a `bool audio_only_` flag and a corresponding `setAudioOnly(bool on)` method.
+- **Conditional Initialization**:
+    - **FBO**: In `Start()`, skip the initialization of the off-screen Framebuffer Object (FBO) if `audio_only_` is true.
+    - **Encoders**: In `InitEncoders()`, skip the initialization of the video encoder and its parameters if `audio_only_` is true.
+    - **Muxer**: Pass `nullptr` for video parameters (`vout`, `vtb`) to `mux_->Open()` when in audio-only mode.
+- **Loop Refactoring**:
+    - Refactor `ExportThread` to avoid relying on `total_frames` (which depends on FPS) for its loop termination.
+    - Change the loop to be driven by the total duration of the timeline in milliseconds.
+    - Inside the loop:
+        - Call `CompositeAndEncodeVideo()` only if `!audio_only_`.
+        - Always call `MixAndEncodeAudio()`.
+- **Cleanup**: Ensure `video_enc_->Exit()` and `video_enc_->Wait()` are only called if the video encoder was actually initialized.
 
-### 3. Transition to Composite Export
-The current `exportWorker` uses `XConvertor::StartConcat`, which is linear. We will migrate to `XCompositeExporter` to support multi-track composition.
-- **Model Mapping**: Convert the `TimelineModel` (with its tracks and offsets) into a list of `XExportClip` objects.
-- **Composite Rendering**: `XCompositeExporter` will render the layered video (using an FBO) and mix the audio streams before encoding the final file.
-- **Export Workflow**: Update `XVideoEditorWindow::exportWorker` to instantiate `XCompositeExporter`, configure the output settings, and poll for completion.
+### 2. UI Integration (`XVideoEditorWindow`)
+The UI must allow the user to choose an audio-only output format.
+
+- **File Dialog**: Update `QFileDialog::getSaveFileName` in `doExport()` to include audio extensions: `"MP4 文件 (*.mp4);;音频文件 (*.mp3 *.m4a *.wav)"`.
+- **Export Flag**: In `exportWorker()`, check the file extension of the output path. If it matches an audio format, call `exporter.setAudioOnly(true)`.
 
 ---
 
 ## Implementation Steps
 
-### Step 1: UI and Import Logic (`xvideo_editor/XVideoEditorWindow.cpp`)
-- **Action**: Update the file filter: `"视频/音频文件 (*.mp4 *.mov *.mkv *.avi *.ts *.m4a);;所有文件 (*)"`.
-- **Action**: Update `addClip()`:
-    - Use `XDemuxTask` to probe the file.
-    - If `CopyVideoPara()` returns `nullptr`, set the clip type to `ClipType::AUDIO` and create/use an "Audio Track".
-- **Verification**: Import an `.m4a` file; verify it appears on the timeline as an audio clip.
+### Step 1: Update `XCompositeExporter` Header
+- **Action**: Add `bool audio_only_ = false;` and `void setAudioOnly(bool on);` to `xcodec/xcomposite_exporter.h`.
+- **Verification**: Project compiles.
 
-### Step 2: Playback Synchronization (`xvideo_editor/TimelinePlayer.cpp`)
-- **Action**: Ensure `TimelinePlayer::play()` and `seekTo()` can operate correctly when the first active clip is audio-only.
-- **Action**: Verify that `buildOverlayPlayer` is triggered for all `ClipType::AUDIO` segments.
-- **Verification**: Play a sequence where an `.m4a` clip overlaps a video clip; verify both are heard.
+### Step 2: Modify `XCompositeExporter` Implementation
+- **Action**: Update `xcodec/xcomposite_exporter.cpp`:
+    - Wrap FBO initialization in `Start()` with `if (!audio_only_)`.
+    - Wrap video encoder setup in `InitEncoders()` with `if (!audio_only_)`.
+    - Update `mux_->Open()` call to pass `nullptr` for video parameters if `audio_only_` is true.
+    - Refactor the `ExportThread` loop to be time-driven (0 to `total_duration_ms`) rather than frame-driven.
+- **Verification**: Verify that `XCompositeExporter` can be initialized with `setAudioOnly(true)` without attempting to create a video encoder or FBO.
 
-### Step 3: Export Migration (`xvideo_editor/XVideoEditorWindow.cpp`)
-- **Action**: Rewrite `exportWorker()`:
-    1. Replace `XConvertor` with `XCompositeExporter`.
-    2. Map `TimelineModel` $\rightarrow$ `std::vector<XExportClip>`.
-    3. Call `exporter->Start(out_url)`.
-    4. Poll `exporter->finished()`.
-- **Verification**: Export a project with overlapping video and `.m4a` audio. Verify the output file contains the mixed audio and layered video.
+### Step 3: Update Export UI
+- **Action**: Modify `xvideo_editor/XVideoEditorWindow.cpp`:
+    - Update the save dialog filter to include `.mp3`, `.m4a`, and `.wav`.
+    - In `exportWorker`, detect the extension and set the `audio_only` flag on the exporter.
+- **Verification**: Launch the app, click "Export", and verify that `.m4a` or `.mp3` can be selected as the output extension.
 
 ---
 
 ## Verification Plan
 
-| Test Case | Action | Expected Result |
-| :--- | :--- | :--- |
-| **m4a Import** | Add an `.m4a` file to the timeline. | File is accepted and categorized as `ClipType::AUDIO`. |
-| **Audio Overlap** | Place an `.m4a` clip over a video clip. | Both audio sources are mixed and played simultaneously in the preview. |
-| **Multi-track Export** | Export a project with layered tracks. | The resulting file matches the visual and auditory layers of the timeline. |
-| **Format Compatibility** | Export a project containing only `.m4a` clips. | The output file (e.g., .mp4) contains the mixed audio. |
-| **Stability** | Export a complex multi-track timeline. | No crashes; the `XCompositeExporter` handles the layered rendering successfully. |
+### 1. Pure Audio Export Test
+- **Action**: Create a timeline with mixed audio/video clips and export as `.m4a`.
+- **Expected Result**: 
+    - The export completes successfully.
+    - The resulting `.m4a` file is playable and contains the correctly mixed audio from all tracks.
+    - Console logs confirm that no video encoder was initialized.
+
+### 2. Video Export Regression Test
+- **Action**: Export a timeline as `.mp4`.
+- **Expected Result**: 
+    - Video and audio are both present.
+    - Playback is synchronized and the quality is consistent with previous versions.
+
+### 3. Edge Case Testing
+- **Action**: Export a project containing only audio clips as an audio file.
+- **Expected Result**: Successful export with no "missing video" errors.
+- **Action**: Attempt to export a video-heavy project as a pure audio file.
+- **Expected Result**: The system ignores the video layers and exports only the mixed audio.

@@ -224,7 +224,8 @@ void XVideoEditorWindow::doExport()
     if (model_.empty() || exporting_)
         return;
     QString out = QFileDialog::getSaveFileName(
-        this, "导出视频", QStringLiteral("拼接_输出.mp4"), "MP4 文件 (*.mp4)");
+        this, "导出视频", QStringLiteral("拼接_输出.mp4"),
+        "MP4 文件 (*.mp4);;音频文件 (*.mp3 *.m4a *.wav)");
     if (out.isEmpty())
         return;
     exporting_ = true;
@@ -293,6 +294,21 @@ void XVideoEditorWindow::exportWorker(const QString& out)
         break;
     }
     ex.setVideoOpts(vo);
+
+    //纯音频导出: 按扩展名切换混音编码, 跳过视频路径
+    QString lower = out.toLower();
+    if (lower.endsWith(".mp3") || lower.endsWith(".m4a") ||
+        lower.endsWith(".aac") || lower.endsWith(".wav")) {
+        ex.setAudioOnly(true);
+        XCompositeExporter::AudioOpts ao;
+        if (lower.endsWith(".mp3"))
+            ao.codec = "libmp3lame";
+        else if (lower.endsWith(".wav"))
+            ao.codec = "pcm_s16le";
+        else
+            ao.codec = "aac";
+        ex.setAudioOpts(ao);
+    }
 
     //贴纸/字幕: 逐帧回调提供RGBA画面(与时间轴预览的合成逻辑一致)
     ex.setRgbaProvider([this, &model_snapshot](const XExportClip* xc, long long /*t*/) -> AVFrame* {
@@ -395,7 +411,7 @@ void XVideoEditorWindow::timerEvent(QTimerEvent* ev)
         export_done_ = false;
         locker.unlock();
         if (ok)
-            QMessageBox::information(this, "导出完成", "视频导出成功");
+            QMessageBox::information(this, "导出完成", "导出成功");
         else
             QMessageBox::warning(this, "导出失败", msg.isEmpty() ? "未知错误" : msg);
     }

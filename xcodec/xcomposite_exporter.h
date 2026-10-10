@@ -42,6 +42,9 @@ public:
     void setVideoOpts(const VideoOpts& v) { vopts_ = v; }
     void setAudioOpts(const AudioOpts& a) { aopts_ = a; }
     void setRgbaProvider(RgbaProvider cb) { rgba_provider_ = std::move(cb); }
+    //纯音频模式: 跳过FBO与视频编码器初始化, 只混音编码
+    void setAudioOnly(bool on) { audio_only_ = on; }
+    bool audioOnly() const { return audio_only_; }
 
     bool Start(const std::string& out_url);
     void Wait();
@@ -120,6 +123,7 @@ private:
     VideoOpts vopts_;
     AudioOpts aopts_;
     RgbaProvider rgba_provider_;
+    bool audio_only_ = false;   //纯音频导出: 跳过视频路径
 
     XFBO fbo_;
     std::unique_ptr<XEncodeTask> video_enc_;

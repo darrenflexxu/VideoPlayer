@@ -115,6 +115,12 @@ const char* XEncodeTask::encoder_name() {
   return (c && c->codec) ? c->codec->name : "";
 }
 
+int XEncodeTask::audio_frame_size() {
+  auto c = encode_.get_codec_context();
+  if (!c || c->codec_type != AVMEDIA_TYPE_AUDIO) return 0;
+  return c->frame_size;
+}
+
 bool XEncodeTask::EndEncode() {
   return end_encode_;
 }
