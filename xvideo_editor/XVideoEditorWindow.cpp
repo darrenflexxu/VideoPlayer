@@ -14,6 +14,7 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QProgressDialog>
+#include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QDialog>
@@ -209,9 +210,24 @@ void XVideoEditorWindow::addClip(const QString& url)
 
 void XVideoEditorWindow::onAddClicked()
 {
-    QStringList files = QFileDialog::getOpenFileNames(
-        this, "选择视频/音频文件", QString(),
-        "视频/音频文件 (*.mp4 *.mov *.mkv *.avi *.ts *.m4a);;所有文件 (*)");
+    //显式多选对话框(ExistingFiles), 避免静态函数在某些平台回退为单选
+    QFileDialog dlg(this, "选择视频/音频文件(可多选)",
+                    last_import_dir_.isEmpty() ? QDir::homePath() : last_import_dir_);
+    dlg.setFileMode(QFileDialog::ExistingFiles);
+    dlg.setNameFilters(QStringList()
+        << "视频/音频文件 (*.mp4 *.mov *.mkv *.avi *.ts *.m4a)"
+        << "所有文件 (*)");
+    if (dlg.exec() != QDialog::Accepted)
+        return;
+    QStringList files = dlg.selectedFiles();
+    if (files.isEmpty())
+        return;
+    //按文件名排序, 保证多选导入时时间轴顺序确定
+    std::sort(files.begin(), files.end(), [](const QString& a, const QString& b) {
+        return QFileInfo(a).fileName().compare(QFileInfo(b).fileName(),
+                                               Qt::CaseInsensitive) < 0;
+    });
+    last_import_dir_ = QFileInfo(files.front()).absolutePath();
     importFiles(files);
 }
 

@@ -64,4 +64,6 @@ private:
     int exp_channels_ = 2;
     int exp_bitrate_ = 128000;
     bool exp_denoise_ = true;
+    //导入文件对话框记住上次目录
+    QString last_import_dir_;
 };
