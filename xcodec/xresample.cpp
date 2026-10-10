@@ -76,6 +76,11 @@ bool XResample::Create(const AVFrame* src, const AVCodecContext* dst) {
   av_opt_set_chlayout(swr_, "out_chlayout", &dst_ch_, 0);
   av_opt_set_int(swr_, "out_sample_rate", dst_sample_rate_, 0);
   av_opt_set_sample_fmt(swr_, "out_sample_fmt", (AVSampleFormat)dst_fmt_, 0);
+  //单声道->立体声: 默认矩阵按0.707映射会引入-3dB衰减, 这里显式等电平复制
+  //(剪辑场景的双单声道行为; 其他声道变换不受影响)
+  double unity_stereo[2] = {1.0, 1.0};
+  if (src_ch_.nb_channels == 1 && dst_ch_.nb_channels == 2)
+      swr_set_matrix(swr_, unity_stereo, 1);
 
   if (swr_init(swr_) < 0) {
     swr_free(&swr_);

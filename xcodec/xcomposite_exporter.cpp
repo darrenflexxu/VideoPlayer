@@ -1,5 +1,6 @@
 #include "predefine_header.h"
 #include "xcomposite_exporter.h"
+#include "xdenoise.h"
 #include "xtools.h"
 #include <algorithm>
 #include <cstring>
@@ -381,11 +382,12 @@ bool XCompositeExporter::AppendAudioFrame(ClipDecoder* d)
         return true;
     }
 
-    //帧的源绝对采样位置(以目标采样率计)
+    //帧的源绝对采样位置(以目标采样率计);
+    //注意: 必须由pts一次性换算到采样, 不能经毫秒中转(毫秒取整每帧漂移数个采样,
+    //导致fab与实际缓冲错位, 触发补零/丢帧, 听感为周期性咔哒声)
     long long fab = d->abuf_abs + (long long)d->abuf_l.size();
     if (out->pts != AV_NOPTS_VALUE)
-        fab = av_rescale_q(out->pts, *d->ap->time_base, {1, 1000}) *
-              mix_ctx_->sample_rate / 1000;
+        fab = av_rescale_q(out->pts, *d->ap->time_base, {1, mix_ctx_->sample_rate});
 
     int n = out->nb_samples;
     int off = 0;
@@ -394,8 +396,10 @@ bool XCompositeExporter::AppendAudioFrame(ClipDecoder* d)
     } else {
         long long expected = d->abuf_abs + (long long)d->abuf_l.size();
         if (fab > expected) {
-            //空洞补零(理论上连续解码不会出现)
+            //空洞补零(正常连续解码不应出现; 出现则打日志便于排查咔哒声)
             long long gap = fab - expected;
+            fprintf(stderr, "[EXPORT] audio gap fill gap=%lld (clip=%s)\n",
+                    gap, d->clip ? d->clip->url.c_str() : "?");
             d->abuf_l.resize(d->abuf_l.size() + gap, 0.0f);
             d->abuf_r.resize(d->abuf_r.size() + gap, 0.0f);
         } else if (fab < expected) {
@@ -551,55 +555,133 @@ void XCompositeExporter::MixAndEncodeAudio(long long s0, long long s1)
     pend_l_.insert(pend_l_.end(), L.begin(), L.end());
     pend_r_.insert(pend_r_.end(), R.begin(), R.end());
 
-    //按编码器帧大小切块发送(PCM等为0时按1024), 剩余留到下一轮或结尾补齐
-    long long kChunk = audio_enc_ ? audio_enc_->audio_frame_size() : 0;
-    if (kChunk <= 0) kChunk = 1024;
+    //按编码器帧大小切块(经降噪重组), 剩余留到下一轮或结尾补齐
+    long long kChunk = audioChunkSize();
     while ((long long)pend_l_.size() >= kChunk) {
-        AVFrame* f = av_frame_alloc();
+        AVFrame* f = MakeAudioFrame(pend_l_.data(), pend_r_.data(),
+                                    (int)kChunk, pend_pts_);
         if (!f) return;
-        f->format = AV_SAMPLE_FMT_FLTP;
-        f->sample_rate = sr;
-        av_channel_layout_default(&f->ch_layout, aopts_.channels);
-        f->nb_samples = (int)kChunk;
-        if (av_frame_get_buffer(f, 0) < 0) {
-            av_frame_free(&f);
-            return;
-        }
-        memcpy(f->data[0], pend_l_.data(), (size_t)kChunk * sizeof(float));
-        memcpy(f->data[1], pend_r_.data(), (size_t)kChunk * sizeof(float));
-        f->pts = pend_pts_;   //样本域, 编码器时间基 {1, sr}
-        audio_enc_->Do(f);
+        SendAudioFrame(f);
         pend_l_.erase(pend_l_.begin(), pend_l_.begin() + kChunk);
         pend_r_.erase(pend_r_.begin(), pend_r_.begin() + kChunk);
         pend_pts_ += kChunk;
     }
 }
 
+long long XCompositeExporter::audioChunkSize() const
+{
+    long long k = audio_enc_ ? audio_enc_->audio_frame_size() : 0;
+    return k > 0 ? k : 1024;
+}
+
+AVFrame* XCompositeExporter::MakeAudioFrame(const float* l, const float* r,
+                                            int n, long long pts)
+{
+    const int sr = aopts_.sample_rate;
+    AVFrame* f = av_frame_alloc();
+    if (!f) return nullptr;
+    f->format = AV_SAMPLE_FMT_FLTP;
+    f->sample_rate = sr;
+    av_channel_layout_default(&f->ch_layout, aopts_.channels);
+    f->nb_samples = n;
+    if (av_frame_get_buffer(f, 0) < 0) {
+        av_frame_free(&f);
+        return nullptr;
+    }
+    memcpy(f->data[0], l, (size_t)n * sizeof(float));
+    memcpy(f->data[1], r, (size_t)n * sizeof(float));
+    f->pts = pts;   //样本域, 编码器时间基 {1, sr}
+    return f;
+}
+
+//从缓冲按编码帧大小切块送编码器
+void XCompositeExporter::EmitChunks(std::vector<float>& L,
+                                    std::vector<float>& R, long long& pts)
+{
+    long long kChunk = audioChunkSize();
+    while ((long long)L.size() >= kChunk) {
+        AVFrame* f = MakeAudioFrame(L.data(), R.data(), (int)kChunk, pts);
+        if (!f) return;
+        audio_enc_->Do(f);
+        L.erase(L.begin(), L.begin() + kChunk);
+        R.erase(R.begin(), R.begin() + kChunk);
+        pts += kChunk;
+    }
+}
+
+//混音切块送编码器: 开降噪时先过afftdn(输出重组为编码帧, 异常直通保连续)
+void XCompositeExporter::SendAudioFrame(AVFrame* f)
+{
+    if (!denoise_ || !denoise_->is_open()) {
+        audio_enc_->Do(f);
+        return;
+    }
+    auto outs = denoise_->Filter(f);
+    av_frame_free(&f);   //滤波器只引用输入, 原帧由这里释放; 样本已在滤波器内排队
+    for (AVFrame* o : outs) {
+        if (!o)
+            continue;
+        if (o->format != AV_SAMPLE_FMT_FLTP ||
+            o->ch_layout.nb_channels != aopts_.channels || o->nb_samples <= 0) {
+            fprintf(stderr, "[EXPORT] denoise bad frame, drop\n");
+            av_frame_free(&o);
+            continue;
+        }
+        const float* srcL = (const float*)o->data[0];
+        const float* srcR = (const float*)o->data[1];
+        dn_pend_l_.insert(dn_pend_l_.end(), srcL, srcL + o->nb_samples);
+        dn_pend_r_.insert(dn_pend_r_.end(), srcR, srcR + o->nb_samples);
+        av_frame_free(&o);
+    }
+    EmitChunks(dn_pend_l_, dn_pend_r_, dn_pend_pts_);
+}
+
+//冲刷降噪延迟帧并送编码器
+void XCompositeExporter::FlushDenoise()
+{
+    if (!denoise_ || !denoise_->is_open())
+        return;
+    auto outs = denoise_->Flush();
+    for (AVFrame* o : outs) {
+        if (!o)
+            continue;
+        if (o->format != AV_SAMPLE_FMT_FLTP ||
+            o->ch_layout.nb_channels != aopts_.channels || o->nb_samples <= 0) {
+            av_frame_free(&o);
+            continue;
+        }
+        const float* srcL = (const float*)o->data[0];
+        const float* srcR = (const float*)o->data[1];
+        dn_pend_l_.insert(dn_pend_l_.end(), srcL, srcL + o->nb_samples);
+        dn_pend_r_.insert(dn_pend_r_.end(), srcR, srcR + o->nb_samples);
+        av_frame_free(&o);
+    }
+    //尾部不足一帧补零, 与FlushPendingAudio一致
+    long long kChunk = audioChunkSize();
+    if (!dn_pend_l_.empty()) {
+        while ((long long)dn_pend_l_.size() < kChunk) {
+            dn_pend_l_.push_back(0.0f);
+            dn_pend_r_.push_back(0.0f);
+        }
+    }
+    EmitChunks(dn_pend_l_, dn_pend_r_, dn_pend_pts_);
+}
+
 //结尾不足一帧的部分补零到编码器帧大小再发送, 保证编码器能出包
 void XCompositeExporter::FlushPendingAudio(int sr)
 {
-    long long kChunk = audio_enc_ ? audio_enc_->audio_frame_size() : 0;
-    if (kChunk <= 0) kChunk = 1024;
+    (void)sr;
+    long long kChunk = audioChunkSize();
     if (pend_l_.empty())
         return;
     while ((long long)pend_l_.size() < kChunk) {
         pend_l_.push_back(0.0f);
         pend_r_.push_back(0.0f);
     }
-    AVFrame* f = av_frame_alloc();
+    AVFrame* f = MakeAudioFrame(pend_l_.data(), pend_r_.data(),
+                                (int)kChunk, pend_pts_);
     if (!f) return;
-    f->format = AV_SAMPLE_FMT_FLTP;
-    f->sample_rate = sr;
-    av_channel_layout_default(&f->ch_layout, aopts_.channels);
-    f->nb_samples = (int)kChunk;
-    if (av_frame_get_buffer(f, 0) < 0) {
-        av_frame_free(&f);
-        return;
-    }
-    memcpy(f->data[0], pend_l_.data(), (size_t)kChunk * sizeof(float));
-    memcpy(f->data[1], pend_r_.data(), (size_t)kChunk * sizeof(float));
-    f->pts = pend_pts_;
-    audio_enc_->Do(f);
+    SendAudioFrame(f);
 }
 
 void XCompositeExporter::StopClipDecoder(ClipDecoder* d)
@@ -642,6 +724,15 @@ void XCompositeExporter::ExportThread(const std::string& out_url)
         av_channel_layout_default(&mix_ctx_->ch_layout, aopts_.channels);
     }
 
+    //导出降噪: 打开失败则回退直通, 不影响导出
+    if (aopts_.denoise) {
+        denoise_ = std::make_unique<XAudioDenoise>();
+        if (!denoise_->Open(sr, aopts_.channels, aopts_.denoise_nr)) {
+            fprintf(stderr, "[EXPORT] denoise open failed, bypass\n");
+            denoise_.reset();
+        }
+    }
+
     if (audio_only_) {
         //纯音频: 按时间步进混音, 不依赖视频帧计数(每步约一视频帧时长)
         const long long total_samples = total_ms * sr / 1000;
@@ -668,6 +759,9 @@ void XCompositeExporter::ExportThread(const std::string& out_url)
     }
     //结尾不足一帧的音频补零发送
     FlushPendingAudio(sr);
+    //冲刷降噪延迟帧(在编码器退出前送完, 保证尾部不丢)
+    FlushDenoise();
+    denoise_.reset();
 
     //停掉片段解码器
     for (auto& d : decoders_)

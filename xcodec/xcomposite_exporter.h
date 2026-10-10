@@ -15,6 +15,8 @@
 #include <map>
 #include <functional>
 
+class XAudioDenoise;   //导出混音降噪(实现见xdenoise.*)
+
 class XCODEC_API XCompositeExporter {
 public:
     struct VideoOpts {
@@ -30,6 +32,8 @@ public:
         std::string codec = "aac";
         int bitrate = 128000;
         std::map<std::string, std::string> opts;
+        bool denoise = true;       //导出混音降噪(afftdn谱减)
+        float denoise_nr = 12.0f;  //降噪强度dB
     };
 
     //回调: 应用层为贴纸/字幕提供 RGBA 帧(每帧调用, 返回 nullptr 表示无)
@@ -115,6 +119,16 @@ private:
 
     void CompositeAndEncodeVideo(int frame_idx, long long timeline_ms);
     void MixAndEncodeAudio(long long s0, long long s1);
+    //混音切块送编码器: 开降噪时先过afftdn再送
+    void SendAudioFrame(AVFrame* f);
+    //冲刷降噪延迟帧并送编码器
+    void FlushDenoise();
+    //编码器音频帧大小(<=0按1024)
+    long long audioChunkSize() const;
+    //拼一个FLTP立体声编码帧(调用者释放失败返回nullptr)
+    AVFrame* MakeAudioFrame(const float* l, const float* r, int n, long long pts);
+    //从缓冲按编码帧大小切块送编码器
+    void EmitChunks(std::vector<float>& L, std::vector<float>& R, long long& pts);
     //结尾不足一帧的音频补零编码
     void FlushPendingAudio(int sr);
     void StopClipDecoder(ClipDecoder* d);
@@ -124,6 +138,7 @@ private:
     AudioOpts aopts_;
     RgbaProvider rgba_provider_;
     bool audio_only_ = false;   //纯音频导出: 跳过视频路径
+    std::unique_ptr<XAudioDenoise> denoise_;   //导出混音降噪器
 
     XFBO fbo_;
     std::unique_ptr<XEncodeTask> video_enc_;
@@ -137,6 +152,9 @@ private:
     //音频待发缓冲: 混音按视频帧步进(~1765样本), 编码器要求固定1024, 这里拼切
     std::vector<float> pend_l_, pend_r_;
     long long pend_pts_ = 0;   //待发缓冲首样本的输出时间轴采样位置
+    //降噪输出重组缓冲(afftdn输出帧大小与输入不同, 这里按编码帧重切)
+    std::vector<float> dn_pend_l_, dn_pend_r_;
+    long long dn_pend_pts_ = 0;
 
     std::thread export_th_;
     std::atomic<bool> running_{false};
