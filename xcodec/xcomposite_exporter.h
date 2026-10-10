@@ -125,8 +125,10 @@ private:
     void FlushDenoise();
     //编码器音频帧大小(<=0按1024)
     long long audioChunkSize() const;
-    //拼一个FLTP立体声编码帧(调用者释放失败返回nullptr)
-    AVFrame* MakeAudioFrame(const float* l, const float* r, int n, long long pts);
+    //拼一个FLTP编码帧; out_ch=1时混音取均值折叠单声道, 否则立体声直拷
+    //(调用者释放, 失败返回nullptr)
+    AVFrame* MakeAudioFrame(const float* l, const float* r, int n,
+                            long long pts, int out_ch);
     //从缓冲按编码帧大小切块送编码器
     void EmitChunks(std::vector<float>& L, std::vector<float>& R, long long& pts);
     //结尾不足一帧的音频补零编码

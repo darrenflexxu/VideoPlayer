@@ -16,6 +16,11 @@
 #include <QProgressDialog>
 #include <QFile>
 #include <QFileInfo>
+#include <QDialog>
+#include <QFormLayout>
+#include <QComboBox>
+#include <QCheckBox>
+#include <QDialogButtonBox>
 #include <QTimerEvent>
 #include <QPainter>
 #include <QFont>
@@ -230,13 +235,58 @@ void XVideoEditorWindow::doExport()
         "MP4 文件 (*.mp4);;音频文件 (*.mp3 *.m4a *.wav)");
     if (out.isEmpty())
         return;
+    //导出音频设置: 采样率/声道/码率/降噪(记住上次选择)
+    XCompositeExporter::AudioOpts ao;
+    {
+        QDialog dlg(this);
+        dlg.setWindowTitle("导出音频设置");
+        auto* form = new QFormLayout(&dlg);
+        auto* srBox = new QComboBox(&dlg);
+        srBox->addItem("44100 Hz", 44100);
+        srBox->addItem("48000 Hz", 48000);
+        srBox->setCurrentIndex(exp_sample_rate_ == 48000 ? 1 : 0);
+        auto* chBox = new QComboBox(&dlg);
+        chBox->addItem("立体声", 2);
+        chBox->addItem("单声道", 1);
+        chBox->setCurrentIndex(exp_channels_ == 1 ? 1 : 0);
+        auto* brBox = new QComboBox(&dlg);
+        brBox->addItem("64 kbps", 64000);
+        brBox->addItem("96 kbps", 96000);
+        brBox->addItem("128 kbps", 128000);
+        brBox->addItem("192 kbps", 192000);
+        brBox->addItem("256 kbps", 256000);
+        brBox->addItem("320 kbps", 320000);
+        int bri = brBox->findData(exp_bitrate_);
+        brBox->setCurrentIndex(bri >= 0 ? bri : 2);
+        auto* dnBox = new QCheckBox("降噪", &dlg);
+        dnBox->setChecked(exp_denoise_);
+        form->addRow("采样率", srBox);
+        form->addRow("声道", chBox);
+        form->addRow("码率", brBox);
+        form->addRow("", dnBox);
+        auto* btns = new QDialogButtonBox(
+            QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
+        form->addRow(btns);
+        connect(btns, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+        connect(btns, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+        if (dlg.exec() != QDialog::Accepted)
+            return;
+        exp_sample_rate_ = srBox->currentData().toInt();
+        exp_channels_ = chBox->currentData().toInt();
+        exp_bitrate_ = brBox->currentData().toInt();
+        exp_denoise_ = dnBox->isChecked();
+    }
+    ao.sample_rate = exp_sample_rate_;
+    ao.channels = exp_channels_;
+    ao.bitrate = exp_bitrate_;
+    ao.denoise = exp_denoise_;
     exporting_ = true;
     export_done_ = false;
     export_cancel_ = false;
     export_progress_ = 0.0f;
     if (status_)
         status_->setText("导出中...");
-    std::thread([this, out]() { exportWorker(out); }).detach();
+    std::thread([this, out, ao]() { exportWorker(out, ao); }).detach();
     //模态进度对话框: UI线程显示/取消, 工作线程只读写atomic标志
     if (!export_dialog_) {
         export_dialog_ = new QProgressDialog("正在导出...", "取消", 0, 100, this);
@@ -259,7 +309,8 @@ void XVideoEditorWindow::onExportCanceled()
         status_->setText("正在取消导出...");
 }
 
-void XVideoEditorWindow::exportWorker(const QString& out)
+void XVideoEditorWindow::exportWorker(const QString& out,
+                                     XCompositeExporter::AudioOpts ao)
 {
     //拷贝一份模型, 避免与UI线程的编辑操作竞争
     const std::vector<Clip> model_snapshot(model_.clips().begin(), model_.clips().end());
@@ -319,18 +370,21 @@ void XVideoEditorWindow::exportWorker(const QString& out)
     }
     ex.setVideoOpts(vo);
 
-    //纯音频导出: 按扩展名切换混音编码, 跳过视频路径
+    //纯音频导出: 按扩展名切换混音编码, 跳过视频路径;
+    //采样率/声道/码率/降噪来自导出设置对话框
     QString lower = out.toLower();
     if (lower.endsWith(".mp3") || lower.endsWith(".m4a") ||
         lower.endsWith(".aac") || lower.endsWith(".wav")) {
         ex.setAudioOnly(true);
-        XCompositeExporter::AudioOpts ao;
         if (lower.endsWith(".mp3"))
             ao.codec = "libmp3lame";
         else if (lower.endsWith(".wav"))
             ao.codec = "pcm_s16le";
         else
             ao.codec = "aac";
+        ex.setAudioOpts(ao);
+    } else {
+        //视频导出: 音频参数同样按设置走(声道/采样率/码率/降噪)
         ex.setAudioOpts(ao);
     }
 

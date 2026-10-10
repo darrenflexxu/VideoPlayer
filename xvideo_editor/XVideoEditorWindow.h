@@ -5,6 +5,7 @@
 #include "TimelineModel.h"
 #include "TimelineWidget.h"
 #include "TimelinePlayer.h"
+#include "xcomposite_exporter.h"
 
 class QPushButton;
 class QLabel;
@@ -30,7 +31,7 @@ private:
     void onAddClicked();
     void togglePlay();
     void doExport();
-    void exportWorker(const QString& out);
+    void exportWorker(const QString& out, XCompositeExporter::AudioOpts ao);
     void onExportCanceled();
     void updateLabels();
 
@@ -58,4 +59,9 @@ private:
     QProgressDialog* export_dialog_ = nullptr;
     std::atomic<bool> export_cancel_{false};
     std::atomic<float> export_progress_{0.0f};
+    //导出音频设置(对话框记住上次选择)
+    int exp_sample_rate_ = 44100;
+    int exp_channels_ = 2;
+    int exp_bitrate_ = 128000;
+    bool exp_denoise_ = true;
 };

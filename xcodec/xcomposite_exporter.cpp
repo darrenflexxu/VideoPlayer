@@ -555,11 +555,11 @@ void XCompositeExporter::MixAndEncodeAudio(long long s0, long long s1)
     pend_l_.insert(pend_l_.end(), L.begin(), L.end());
     pend_r_.insert(pend_r_.end(), R.begin(), R.end());
 
-    //按编码器帧大小切块(经降噪重组), 剩余留到下一轮或结尾补齐
+    //按编码器帧大小切块(混音域立体声, 降噪/折叠在下游), 剩余留到下一轮或结尾补齐
     long long kChunk = audioChunkSize();
     while ((long long)pend_l_.size() >= kChunk) {
         AVFrame* f = MakeAudioFrame(pend_l_.data(), pend_r_.data(),
-                                    (int)kChunk, pend_pts_);
+                                    (int)kChunk, pend_pts_, 2);
         if (!f) return;
         SendAudioFrame(f);
         pend_l_.erase(pend_l_.begin(), pend_l_.begin() + kChunk);
@@ -575,32 +575,41 @@ long long XCompositeExporter::audioChunkSize() const
 }
 
 AVFrame* XCompositeExporter::MakeAudioFrame(const float* l, const float* r,
-                                            int n, long long pts)
+                                            int n, long long pts, int out_ch)
 {
     const int sr = aopts_.sample_rate;
+    const int ch = out_ch == 1 ? 1 : 2;   //只支持单/立体声
     AVFrame* f = av_frame_alloc();
     if (!f) return nullptr;
     f->format = AV_SAMPLE_FMT_FLTP;
     f->sample_rate = sr;
-    av_channel_layout_default(&f->ch_layout, aopts_.channels);
+    av_channel_layout_default(&f->ch_layout, ch);
     f->nb_samples = n;
     if (av_frame_get_buffer(f, 0) < 0) {
         av_frame_free(&f);
         return nullptr;
     }
-    memcpy(f->data[0], l, (size_t)n * sizeof(float));
-    memcpy(f->data[1], r, (size_t)n * sizeof(float));
+    if (ch == 1) {
+        //单声道输出: 混音(L/R)取均值折叠; 双单声道内容电平完全不变
+        float* dst = (float*)f->data[0];
+        for (int i = 0; i < n; ++i)
+            dst[i] = (l[i] + r[i]) * 0.5f;
+    } else {
+        memcpy(f->data[0], l, (size_t)n * sizeof(float));
+        memcpy(f->data[1], r, (size_t)n * sizeof(float));
+    }
     f->pts = pts;   //样本域, 编码器时间基 {1, sr}
     return f;
 }
 
-//从缓冲按编码帧大小切块送编码器
+//从缓冲按编码帧大小切块送编码器; out_ch决定输出声道(混音域恒为立体声)
 void XCompositeExporter::EmitChunks(std::vector<float>& L,
                                     std::vector<float>& R, long long& pts)
 {
     long long kChunk = audioChunkSize();
+    int out_ch = aopts_.channels == 1 ? 1 : 2;
     while ((long long)L.size() >= kChunk) {
-        AVFrame* f = MakeAudioFrame(L.data(), R.data(), (int)kChunk, pts);
+        AVFrame* f = MakeAudioFrame(L.data(), R.data(), (int)kChunk, pts, out_ch);
         if (!f) return;
         audio_enc_->Do(f);
         L.erase(L.begin(), L.begin() + kChunk);
@@ -622,7 +631,7 @@ void XCompositeExporter::SendAudioFrame(AVFrame* f)
         if (!o)
             continue;
         if (o->format != AV_SAMPLE_FMT_FLTP ||
-            o->ch_layout.nb_channels != aopts_.channels || o->nb_samples <= 0) {
+            o->ch_layout.nb_channels != 2 || o->nb_samples <= 0) {
             fprintf(stderr, "[EXPORT] denoise bad frame, drop\n");
             av_frame_free(&o);
             continue;
@@ -646,7 +655,7 @@ void XCompositeExporter::FlushDenoise()
         if (!o)
             continue;
         if (o->format != AV_SAMPLE_FMT_FLTP ||
-            o->ch_layout.nb_channels != aopts_.channels || o->nb_samples <= 0) {
+            o->ch_layout.nb_channels != 2 || o->nb_samples <= 0) {
             av_frame_free(&o);
             continue;
         }
@@ -679,7 +688,7 @@ void XCompositeExporter::FlushPendingAudio(int sr)
         pend_r_.push_back(0.0f);
     }
     AVFrame* f = MakeAudioFrame(pend_l_.data(), pend_r_.data(),
-                                (int)kChunk, pend_pts_);
+                                (int)kChunk, pend_pts_, 2);
     if (!f) return;
     SendAudioFrame(f);
 }
@@ -716,18 +725,21 @@ void XCompositeExporter::ExportThread(const std::string& out_url)
     const long long fps = vopts_.fps > 0 ? vopts_.fps : 25;
     const long long total_frames = (total_ms * fps + 999) / 1000;
 
+    //混音域固定立体声(与输出声道无关): 降噪/混音缓冲都按立体声,
+    //单声道输出在拼编码帧时折叠, 编码器按用户声道输出
+    static const int kMixChannels = 2;
     //混音目标参数(不 open, 只做重采样参考)
     mix_ctx_ = avcodec_alloc_context3(nullptr);
     if (mix_ctx_) {
         mix_ctx_->sample_fmt = AV_SAMPLE_FMT_FLTP;
         mix_ctx_->sample_rate = sr;
-        av_channel_layout_default(&mix_ctx_->ch_layout, aopts_.channels);
+        av_channel_layout_default(&mix_ctx_->ch_layout, kMixChannels);
     }
 
     //导出降噪: 打开失败则回退直通, 不影响导出
     if (aopts_.denoise) {
         denoise_ = std::make_unique<XAudioDenoise>();
-        if (!denoise_->Open(sr, aopts_.channels, aopts_.denoise_nr)) {
+        if (!denoise_->Open(sr, kMixChannels, aopts_.denoise_nr)) {
             fprintf(stderr, "[EXPORT] denoise open failed, bypass\n");
             denoise_.reset();
         }
