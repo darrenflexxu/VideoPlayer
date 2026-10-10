@@ -13,6 +13,8 @@
 #include <QSlider>
 #include <QFileDialog>
 #include <QMessageBox>
+#include <QProgressDialog>
+#include <QFile>
 #include <QFileInfo>
 #include <QTimerEvent>
 #include <QPainter>
@@ -230,9 +232,31 @@ void XVideoEditorWindow::doExport()
         return;
     exporting_ = true;
     export_done_ = false;
+    export_cancel_ = false;
+    export_progress_ = 0.0f;
     if (status_)
         status_->setText("导出中...");
     std::thread([this, out]() { exportWorker(out); }).detach();
+    //模态进度对话框: UI线程显示/取消, 工作线程只读写atomic标志
+    if (!export_dialog_) {
+        export_dialog_ = new QProgressDialog("正在导出...", "取消", 0, 100, this);
+        export_dialog_->setWindowTitle("导出");
+        export_dialog_->setWindowModality(Qt::WindowModal);
+        export_dialog_->setMinimumDuration(0);
+        export_dialog_->setAutoClose(false);
+        export_dialog_->setAutoReset(false);
+        connect(export_dialog_, &QProgressDialog::canceled,
+                this, &XVideoEditorWindow::onExportCanceled);
+    }
+    export_dialog_->setValue(0);
+    export_dialog_->show();
+}
+
+void XVideoEditorWindow::onExportCanceled()
+{
+    export_cancel_ = true;
+    if (status_)
+        status_->setText("正在取消导出...");
 }
 
 void XVideoEditorWindow::exportWorker(const QString& out)
@@ -357,13 +381,25 @@ void XVideoEditorWindow::exportWorker(const QString& out)
         if (msg.isEmpty())
             msg = "启动合成导出失败";
     } else {
-        while (!ex.IsFinished())
+        while (!ex.IsFinished()) {
+            export_progress_.store(ex.GetProgress());
+            if (export_cancel_.load()) {
+                ex.Stop();   //通知导出线程停下, 下面Wait收尾
+                break;
+            }
             MSleep(50);
+        }
+        export_progress_.store(ex.GetProgress());
         ex.Wait();
-        if (ex.HasError())
+        if (export_cancel_.load()) {
+            ok = false;
+            msg = "已取消导出";
+            QFile::remove(out);   //删掉未完成的半截文件
+        } else if (ex.HasError()) {
             msg = QString::fromStdString(ex.GetError());
-        else
+        } else {
             ok = true;
+        }
         ex.Stop();
     }
 
@@ -410,9 +446,25 @@ void XVideoEditorWindow::timerEvent(QTimerEvent* ev)
         QString msg = export_msg_;
         export_done_ = false;
         locker.unlock();
+        //收起进度对话框
+        if (export_dialog_) {
+            export_dialog_->hide();
+            export_dialog_->deleteLater();
+            export_dialog_ = nullptr;
+        }
+        export_cancel_ = false;
+        export_progress_ = 0.0f;
         if (ok)
             QMessageBox::information(this, "导出完成", "导出成功");
+        else if (msg == "已取消导出")
+            QMessageBox::information(this, "导出", "已取消导出");
         else
             QMessageBox::warning(this, "导出失败", msg.isEmpty() ? "未知错误" : msg);
+    } else if (exporting_ && export_dialog_) {
+        //导出中: 刷新进度条(UI线程, 工作线程只写atomic)
+        int v = (int)(export_progress_.load() * 100.0f);
+        if (v < 0) v = 0;
+        if (v > 100) v = 100;
+        export_dialog_->setValue(v);
     }
 }

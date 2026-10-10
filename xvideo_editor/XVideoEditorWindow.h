@@ -9,6 +9,7 @@
 class QPushButton;
 class QLabel;
 class QSlider;
+class QProgressDialog;
 class XQtOpenGLWidget;
 
 //视频编辑器主窗口: 预览 + 时间轴 + 播放控制 + 导出
@@ -30,6 +31,7 @@ private:
     void togglePlay();
     void doExport();
     void exportWorker(const QString& out);
+    void onExportCanceled();
     void updateLabels();
 
     TimelineModel model_;
@@ -52,4 +54,8 @@ private:
     bool export_ok_ = false;
     QString export_msg_;
     QMutex export_mutex_;
+    //导出进度对话框(UI线程)与工作线程之间的状态
+    QProgressDialog* export_dialog_ = nullptr;
+    std::atomic<bool> export_cancel_{false};
+    std::atomic<float> export_progress_{0.0f};
 };
