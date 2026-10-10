@@ -68,6 +68,9 @@ struct XAudioSource
     int volume = 128; //0~128
     std::list<XData> datas;
     long long mixed_bytes = 0; //累计已混音字节数(调试/进度用, 持锁统计)
+    long long cur_pts = 0;     //该源当前的播放位置(pts)
+    long long last_mix_ms = 0; //该源上次被混音的系统时间毫秒(时钟外推用)
+    double time_base = 0;      //该源时间基(pts->秒)
 };
 
 /// <summary>
@@ -122,6 +125,14 @@ public:
     void setSourceVolume(int id, int v);
     //清空所有源缓冲(seek/切换时调用), 不重开SDL设备
     void ClearBuffers();
+    //只清空指定源的缓冲并重置其时钟(切段/seek用, 不影响其他源)
+    void clearSource(int id);
+    //设置指定源的时间基(pts->秒换算用)
+    void set_source_time_base(int id, double b);
+    //重置指定源的播放时钟(新片段从0开始)
+    void reset_source_clock(int id);
+    //指定源的当前播放位置(pts单位)
+    long long cur_pts_for(int id);
     //某源累计已混音字节数(调试/导出比对用)
     long long mixedBytes(int id);
 

@@ -7,7 +7,9 @@ void XPlayer::Pause(bool is_pause)
     demux_.Pause(is_pause);
     audio_decode_.Pause(is_pause);
     video_decode_.Pause(is_pause);
-    XAudioPlay::Instance()->Pause(is_pause);
+    //SDL设备全局共享: 仅主播放器操作暂停, 叠加层/后台预热只停自身线程
+    if (own_audio_)
+        XAudioPlay::Instance()->Pause(is_pause);
 }
 
 XPlayer::~XPlayer()
@@ -24,7 +26,8 @@ bool XPlayer::Seek(long long ms)
     //先清空解码缓存
     audio_decode_.Clear();
     video_decode_.Clear();
-    XAudioPlay::Instance()->Clear();
+    //只清本源缓冲(旧实现 Clear() 会清空所有源, 导致其他轨静音)
+    XAudioPlay::Instance()->clearSource(audio_source_);
     //再设置seek目标: 关键帧与目标之间的帧由解码侧丢弃, 保证从目标位置开始播放
     //同时把当前进度置为目标值, 避免UI进度条先跳回旧位置
     video_decode_.set_seek_target_ms(ms);
@@ -51,10 +54,9 @@ void XPlayer::Stop()
         view_ = nullptr;
         own_view_ = false;
     }
-    //多播放器混音: 移除本源的缓冲; 只有拥有设备的播放器才关闭SDL音频
+    //多播放器混音: 移除本源的缓冲; SDL音频设备由时间轴共享常驻,
+    //切段时不再关闭设备, 否则后一段因设备被关闭而无声
     XAudioPlay::Instance()->removeSource(audio_source_);
-    if (own_audio_)
-        XAudioPlay::Instance()->Close();
 }
 bool XPlayer::Open(const char* url, void* winid)
 {
@@ -113,13 +115,13 @@ bool XPlayer::Open(const char* url, void* winid)
         //时间基数(用于seek后丢弃目标前的帧)
         audio_decode_.set_time_base(ap->time_base);
 
-        //初始化音频播放: 仅拥有设备的播放器(主轨)打开SDL, 并联注册混音源
+        //初始化音频播放: 仅拥有设备的播放器(主轨)打开SDL(同规格复用, 不重开),
+        //混音源独立注册; 各源时钟独立, 切段互不干扰
         if (own_audio_)
             XAudioPlay::Instance()->Open(*ap);
-        XAudioPlay::Instance()->addSource(audio_source_);
-
-        //设置时间基数
-        double time_base = 0;
+        if (ap->time_base && ap->time_base->num > 0)
+            audio_tb_ = (double)ap->time_base->den / (double)ap->time_base->num;
+        bindAudioSource(audio_source_);
     }
     else
     {
@@ -218,13 +220,23 @@ bool XPlayer::GetVideoFrameCopy(AVFrame** out)
     *out = copy;
     return true;
 }
-//设置音量 0.0~1.0, 内部换算为SDL的0~128
+//切换混音源绑定(基片换装用): 绑定源id并重置其独立时钟
+void XPlayer::bindAudioSource(int id)
+{
+    audio_source_ = id;
+    auto au = XAudioPlay::Instance();
+    au->addSource(id);
+    if (audio_tb_ > 0)
+        au->set_source_time_base(id, audio_tb_);
+    au->reset_source_clock(id);
+}
+//设置音量 0.0~1.0, 内部换算为SDL的0~128; 只作用于本播放器混音源
 void XPlayer::SetVolume(float volume)
 {
     if (volume < 0.0f) volume = 0.0f;
     if (volume > 1.0f) volume = 1.0f;
     int sdl_vol = (int)(volume * 128.0f);
-    XAudioPlay::Instance()->set_volume(sdl_vol);
+    XAudioPlay::Instance()->setSourceVolume(audio_source_, sdl_vol);
 }
 void XPlayer::Main()
 {

@@ -3,11 +3,11 @@
 using namespace std;
 
 //从单个源消费最多 len 字节到 out, 返回实际混入的字节数(持锁时调用)
-static int ConsumeSource(XAudioSource& s, unsigned char* out, int len, long long& cur_pts)
+static int ConsumeSource(XAudioSource& s, unsigned char* out, int len)
 {
     if (s.datas.empty())
         return 0;
-    cur_pts = s.datas.front().pts;
+    s.cur_pts = s.datas.front().pts;
     int mixed = 0;
     while (mixed < len && !s.datas.empty())
     {
@@ -71,6 +71,53 @@ void XAudioPlay::ClearBuffers()
         s.datas.clear();
 }
 
+void XAudioPlay::clearSource(int id)
+{
+    std::lock_guard<std::mutex> lock(mux_);
+    for (auto& s : sources_)
+        if (s.id == id) {
+            s.datas.clear();
+            s.cur_pts = 0;
+            s.last_mix_ms = 0;
+            return;
+        }
+}
+
+void XAudioPlay::set_source_time_base(int id, double b)
+{
+    std::lock_guard<std::mutex> lock(mux_);
+    source(id).time_base = b;
+}
+
+void XAudioPlay::reset_source_clock(int id)
+{
+    std::lock_guard<std::mutex> lock(mux_);
+    source(id).cur_pts = 0;
+    source(id).last_mix_ms = 0;
+}
+
+long long XAudioPlay::cur_pts_for(int id)
+{
+    std::lock_guard<std::mutex> lock(mux_);
+    long long base_pts = 0;
+    long long last_mix = 0;
+    double tb = time_base_;
+    for (auto& s : sources_)
+        if (s.id == id) {
+            base_pts = s.cur_pts;
+            last_mix = s.last_mix_ms;
+            if (s.time_base > 0)
+                tb = s.time_base;
+            break;
+        }
+    double ms = 0;
+    if (last_mix > 0)
+        ms = NowMs() - last_mix;   //距离该源上次被混音的时间毫秒
+    if (tb > 0)
+        ms = ms / (double)1000 / tb;
+    return base_pts + (long long)(speed_ * ms);
+}
+
 long long XAudioPlay::mixedBytes(int id)
 {
     std::lock_guard<std::mutex> lock(mux_);
@@ -94,15 +141,28 @@ public:
         }
         else
         {
-            //去掉暂停的事件
-            if(pause_begin>0)
-                last_ms_ += (NowMs() - pause_begin);
+            //去掉暂停的时间: 各源上次混音时刻整体后移, 恢复后时钟不跳变
+            if(pause_begin>0) {
+                long long paused = NowMs() - pause_begin;
+                unique_lock<mutex> lock(mux_);
+                for (auto& s : sources_)
+                    if (s.last_mix_ms > 0)
+                        s.last_mix_ms += paused;
+                pause_begin = 0;
+            }
             SDL_PauseAudio(0);
         }
-            
+
     }
     bool Open(XAudioSpec& spec)
     {
+        //同规格重复打开直接复用设备: 切段/预热时不再 quit+reopen, 避免断音
+        if (device_open_ &&
+            spec.freq == spec_.freq &&
+            spec.format == spec_.format &&
+            spec.channels == spec_.channels &&
+            spec.samples == spec_.samples)
+            return true;
         this->spec_ = spec;
         //退出上一次音频
         SDL_QuitSubSystem(SDL_INIT_AUDIO);
@@ -118,20 +178,24 @@ public:
         if (SDL_OpenAudio(&sdl_spec, nullptr) < 0)
         {
             cerr << SDL_GetError() << endl;
+            device_open_ = false;
             return false;
         }
         //开始播放
         SDL_PauseAudio(0);
+        device_open_ = true;
         return true;
     }
     void Close()
     {
-        SDL_QuitSubSystem(SDL_INIT_AUDIO);
+        //设备由时间轴共享: 切段/Stop 时只清缓冲不清设备, 保证后一段不断流;
+        //SDL设备常驻进程, 退出时由系统回收
         unique_lock<mutex> lock(mux_);
-        for (auto& s : sources_)
+        for (auto& s : sources_) {
             s.datas.clear();
-        cur_pts_ = 0; //当前播放位置
-        last_ms_ = 0;  //上次的时间戳
+            s.cur_pts = 0;
+            s.last_mix_ms = 0;
+        }
         pause_begin = 0;//暂停开始时间戳
     }
     void Callback(unsigned char* stream, int len)
@@ -140,37 +204,26 @@ public:
         unique_lock<mutex> lock(mux_);
         // 多源混音: 每个活跃源各取 len 字节, 用 SDL_MixAudio 累加进同一输出缓冲
         vector<unsigned char> tmp((size_t)len > 0 ? len : 1);
-        bool any = false;
         for (auto& s : sources_)
         {
             if (s.datas.empty())
                 continue;
             memset(tmp.data(), 0, len);
-            if (ConsumeSource(s, tmp.data(), len, cur_pts_) > 0)
+            if (ConsumeSource(s, tmp.data(), len) > 0)
             {
                 SDL_MixAudio(stream, tmp.data(), len, (Uint8)s.volume);
                 s.mixed_bytes += len;   //累计混音字节数(调试/导出比对用)
-                any = true;
+                s.last_mix_ms = NowMs();
             }
-            if (!any)
-                continue;
-            last_ms_ = NowMs();
         }
-        (void)any;
     }
     long long cur_pts() override
     {
-        double ms = 0;
-        if (last_ms_ > 0)
-            ms = NowMs() - last_ms_;//距离上次写入缓冲的播放时间毫秒
-        //pts 毫秒换算pts的时间基数
-        if(time_base_ > 0)
-            ms = ms / (double)1000 / (double)time_base_;
-        return cur_pts_ + speed_*ms;
+        //主轨固定用混音源0; 各叠加层用独立源, 互不干扰
+        return cur_pts_for(0);
     }
 private:
-    long long cur_pts_ = 0; //当前播放位置
-    long long last_ms_ = 0;  //上次的时间戳
+    bool device_open_ = false; //SDL音频设备是否已打开
     long long pause_begin = 0;//暂停开始时间戳
 };
 

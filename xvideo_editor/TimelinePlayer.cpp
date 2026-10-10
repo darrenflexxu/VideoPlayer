@@ -39,14 +39,14 @@ void TimelinePlayer::releaseBase()
     player_ = nullptr;
 }
 
-XPlayer* TimelinePlayer::buildBasePlayer(const Clip& c)
+XPlayer* TimelinePlayer::buildBasePlayer(const Clip& c, int audio_source, bool owns_audio)
 {
     auto* p = new XPlayer();
     p->set_view(view_);
     p->set_gpu_decode(false);
     p->set_gpu_direct_render_(false);
-    p->set_owns_audio(true);   //主轨负责SDL音频设备
-    p->set_audio_source(0);    //混音源0
+    p->set_owns_audio(owns_audio);   //预热/临时实例不碰SDL设备暂停
+    p->set_audio_source(audio_source);
 
     if (!p->Open(c.url.toLocal8Bit().constData(), nullptr)) {
         delete p;
@@ -61,7 +61,9 @@ bool TimelinePlayer::switchToBase(int idx)
         return false;
     const Clip& c = model_->clip(idx);
 
-    XPlayer* p = buildBasePlayer(c);
+    //用临时混音源打开新片段, 避免提前重置正在播放的旧源时钟;
+    //换装成功后再绑定到源0
+    XPlayer* p = buildBasePlayer(c, -2, true);
     if (!p) {
         paused_ = true;
         timeline_pos_ms_ = c.pos_ms;
@@ -71,6 +73,7 @@ bool TimelinePlayer::switchToBase(int idx)
     releaseBase();
     player_ = p;
     active_idx_ = idx;
+    player_->bindAudioSource(0);   //主轨固定用混音源0, 时钟从0开始
     if (c.source_start_ms > 0)
         player_->Seek(c.source_start_ms);
     player_->Start();
@@ -101,7 +104,7 @@ XPlayer* TimelinePlayer::buildOverlayPlayer(const Clip& c)
     p->set_no_view(true);
     p->set_gpu_decode(false);
     p->set_owns_audio(false);       //SDL设备由主轨打开, 此处仅注入混音源
-    p->set_audio_source(c.trackIndex);
+    p->set_audio_source(1000 + c.trackIndex);   //叠加层独立源, 避开主轨源0
     p->set_gpu_direct_render_(false);
 
     if (!p->Open(c.url.toLocal8Bit().constData(), nullptr)) {
@@ -140,7 +143,8 @@ void TimelinePlayer::startPrefetch(int idx)
     const Clip c = model_->clip(idx);
     int gen = ++prefetch_gen_;
     prefetch_th_ = std::thread([this, c, gen]() {
-        XPlayer* p = buildBasePlayer(c);
+        //预热实例用临时源且不碰SDL设备, 换装时再绑定到源0
+        XPlayer* p = buildBasePlayer(c, -1, false);
         if (!p)
             return;
         p->set_preroll_one(true);
@@ -189,6 +193,8 @@ bool TimelinePlayer::takePrefetched()
     releaseBase();
     player_ = next_player_;
     next_player_ = nullptr;
+    player_->bindAudioSource(0);     //换装到主轨源0, 时钟从0开始
+    player_->set_owns_audio(true);   //成为主播放器后负责SDL暂停
     player_->set_preroll_one(false);   // 预热完成, 解除"出帧即停"
     return true;
 }
@@ -574,7 +580,8 @@ void TimelinePlayer::Update()
     bool exhausted = local >= c.source_end_ms - 60 || player_->IsFinish();
     if (!exhausted)
         return;
-    int nx = nextBaseClip(active_idx_);
+    //严格取"下一段"(不含当前), 顺序时间轴上衔接才准
+    int nx = nextBaseClip(active_idx_ + 1);
     if (nx >= 0) {
         if (takePrefetched()) {
             // 后台已预热好下一段: 直接换装, 边界几乎无卡顿

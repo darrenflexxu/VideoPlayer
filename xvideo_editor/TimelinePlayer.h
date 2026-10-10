@@ -47,7 +47,7 @@ private:
     //主轨底层播放(轨0): 保留原有预热换装机制
     bool switchToBase(int idx);   //打开并开始第idx段(基片, 任意轨道最低层视频)
     void releaseBase();           //停掉并释放当前主播放器
-    XPlayer* buildBasePlayer(const Clip& c);  //新建并打开主播放器(未启动线程)
+    XPlayer* buildBasePlayer(const Clip& c, int audio_source = 0, bool owns_audio = true);
     void startPrefetch(int idx);      //后台预热下一段主播放器
     void joinPrefetch();              //回收并等待预热线程结束
     bool takePrefetched();            //把预热好的播放器换成当前主播放器
