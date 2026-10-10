@@ -8,10 +8,16 @@ XDemuxTask::~XDemuxTask()
 
 bool XDemuxTask::Seek(long long ms)
 {
+    //优先用视频流定位; 纯音频回退到音频流
     auto vp = demux_.CopyVideoPara();
-    if (!vp)return false;
-    auto pts = av_rescale_q(ms, { 1,1000 }, *vp->time_base);
-    return demux_.Seek(pts, video_index());
+    if (vp) {
+        auto pts = av_rescale_q(ms, { 1,1000 }, *vp->time_base);
+        return demux_.Seek(pts, video_index());
+    }
+    auto ap = demux_.CopyAudioPara();
+    if (!ap)return false;
+    auto pts = av_rescale_q(ms, { 1,1000 }, *ap->time_base);
+    return demux_.Seek(pts, audio_index());
 }
 void XDemuxTask::Stop()
 {
