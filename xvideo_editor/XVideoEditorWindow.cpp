@@ -166,15 +166,34 @@ void XVideoEditorWindow::addClip(const QString& url)
     if (dur <= 0)
         return;
 
-    //每个导入文件独占一条新轨道(多轨叠加), 从时间轴0开始;
-    //无视频流的文件(m4a等)按纯音频导入, 只混声音不占画面
+    //新片段: 每个文件独占一条轨道, 但时间上紧贴上一个片段末尾
+    //即: track = clipCount(), pos = 当前时间轴总时长(所有轨道最后片段的终点)
     int track = model_.clipCount();
+    long long pos = model_.total_ms();  //上一片段结束位置
     if (vp) {
         model_.addTrack(track, ClipType::VIDEO, QString("视频轨 %1").arg(track + 1));
-        model_.addClip(url, 0, dur, track);
+        // 兼容旧接口: addClip(url, src_start, src_end, trackIndex) 会自动计算 pos_ms,
+        // 这里需要手动指定位置, 用 addClip(const Clip&)
+        Clip c;
+        c.type = ClipType::VIDEO;
+        c.url = url;
+        c.source_start_ms = 0;
+        c.source_end_ms = dur;
+        c.source_total_ms = dur;
+        c.pos_ms = pos;
+        c.trackIndex = track;
+        model_.addClip(c);
     } else {
         model_.addTrack(track, ClipType::AUDIO, QString("音频轨 %1").arg(track + 1));
-        model_.addClip(url, 0, dur, track, ClipType::AUDIO);
+        Clip c;
+        c.type = ClipType::AUDIO;
+        c.url = url;
+        c.source_start_ms = 0;
+        c.source_end_ms = dur;
+        c.source_total_ms = dur;
+        c.pos_ms = pos;
+        c.trackIndex = track;
+        model_.addClip(c);
     }
     timeline_->refresh();
     timeline_->setPlayheadMs(player_.pos_ms());
