@@ -25,6 +25,7 @@
 #include <QTimerEvent>
 #include <QPainter>
 #include <QFont>
+#include <QFileInfo>
 #include <algorithm>
 #include <thread>
 
@@ -33,6 +34,40 @@ extern "C" {
 #include <libavutil/frame.h>
 #include <libavutil/imgutils.h>
 }
+namespace {
+
+//自然序比较: 把字符串按数字/非数字分段, 数字段按数值比较, 非数字段按字典序比较
+bool naturalLess(const QString& a, const QString& b)
+{
+    int i = 0, j = 0;
+    const int na = a.size(), nb = b.size();
+    while (i < na && j < nb) {
+        QChar ca = a[i], cb = b[j];
+        bool da = ca.isDigit(), db = cb.isDigit();
+        if (da && db) {
+            //都是数字: 读完整数再比较数值
+            long long na_val = 0, nb_val = 0;
+            while (i < na && a[i].isDigit())
+                na_val = na_val * 10 + (a[i++].digitValue());
+            while (j < nb && b[j].isDigit())
+                nb_val = nb_val * 10 + (b[j++].digitValue());
+            if (na_val != nb_val)
+                return na_val < nb_val;
+        } else if (!da && !db) {
+            //都是非数字: 逐字符忽略大小写比较
+            QChar la = a[i].toLower(), lb = b[j].toLower();
+            if (la != lb)
+                return la < lb;
+            ++i; ++j;
+        } else {
+            //一数一非: 非数字视为更小
+            return !da;
+        }
+    }
+    return na < nb; //前缀相同, 短的在前
+}
+
+} // namespace
 
 //毫秒 -> 时间字符串 (mm:ss / h:mm:ss)
 static QString msToText(long long ms)
@@ -222,11 +257,12 @@ void XVideoEditorWindow::onAddClicked()
     QStringList files = dlg.selectedFiles();
     if (files.isEmpty())
         return;
-    //按文件名排序, 保证多选导入时时间轴顺序确定
-    std::sort(files.begin(), files.end(), [](const QString& a, const QString& b) {
-        return QFileInfo(a).fileName().compare(QFileInfo(b).fileName(),
-                                               Qt::CaseInsensitive) < 0;
-    });
+    //自然序排序(1,2,...9,10,11...19,20,21...), 保证多选导入时时间轴顺序符合人类直觉
+    std::sort(files.begin(), files.end(),
+              [](const QString& a, const QString& b) {
+                  return naturalLess(QFileInfo(a).fileName(),
+                                     QFileInfo(b).fileName());
+              });
     last_import_dir_ = QFileInfo(files.front()).absolutePath();
     importFiles(files);
 }
