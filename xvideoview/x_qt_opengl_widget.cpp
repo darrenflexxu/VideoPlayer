@@ -1,6 +1,8 @@
 #include "x_qt_opengl_widget.h"
+#include "xgldebug.h"
 
 #include <cstdio>
+#include <string>
 #include <GL/glew.h>
 
 extern "C" {
@@ -220,6 +222,9 @@ void XQtOpenGLWidget::initializeGL() {
     const char* ver = reinterpret_cast<const char*>(glGetString(GL_VERSION));
     fprintf(stderr, "XQtOpenGLWidget: initializeGL OpenGL=%s\n",
             ver ? ver : "unknown");
+    fprintf(stderr, "XQtOpenGLWidget: RenderDoc debug markers=%s (KHR_debug=%d, EXT_debug_marker=%d)\n",
+            xgl::DebugMarkerAvailable() ? "on" : "off",
+            GLEW_KHR_debug ? 1 : 0, GLEW_EXT_debug_marker ? 1 : 0);
 }
 
 void XQtOpenGLWidget::resizeGL(int w, int h) {
@@ -286,7 +291,10 @@ void XQtOpenGLWidget::paintGL() {
         if (rect_h < 1) rect_h = 1;
     }
     glViewport(rect_x, rect_y, rect_w, rect_h);
+    //RenderDoc: 基础视频层单独成组
+    xgl::PushMarker("基础视频层");
     drawVideoFrame(cur, yv12_, nv12_, rgba_base_, pix_w_, pix_h_, 1.0f);
+    xgl::PopMarker();
 
     //合成叠加层(画中画等): 依次按归一化矩形定位绘制
     int ov_n = (int)ov.size();
@@ -301,6 +309,9 @@ void XQtOpenGLWidget::paintGL() {
         int oh = (int)(ov[i].rect.h * fh);
         if (ow < 1) ow = 1;
         if (oh < 1) oh = 1;
+        //RenderDoc: 每个叠加层单独成组, 便于区分画中画/贴纸
+        std::string ov_name = "叠加层 " + std::to_string(i);
+        xgl::PushMarker(ov_name.c_str());
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         //GL 视口左下角为原点, 归一化 y 是左上原点, 需要翻转
@@ -313,6 +324,7 @@ void XQtOpenGLWidget::paintGL() {
                 glDisable(GL_BLEND);
         }
         glDisable(GL_BLEND);
+        xgl::PopMarker();
     }
 
     av_frame_free(&cur);

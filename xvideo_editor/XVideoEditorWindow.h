@@ -33,6 +33,8 @@ private:
     void doExport();
     void exportWorker(const QString& out, XCompositeExporter::AudioOpts ao);
     void onExportCanceled();
+    //RenderDoc: 请求捕获下一帧(GPU 渲染调试)
+    void onRenderDocCapture();
     void updateLabels();
 
     TimelineModel model_;
@@ -46,6 +48,7 @@ private:
     QPushButton* zoom_in_btn_ = nullptr;
     QPushButton* zoom_out_btn_ = nullptr;
     QPushButton* export_btn_ = nullptr;
+    QPushButton* renderdoc_btn_ = nullptr;   //GPU 捕获(RenderDoc)
     QLabel* status_ = nullptr;
     QLabel* time_overlay_ = nullptr;   //预览画面上的时间水印
     QSlider* volume_slider_ = nullptr;
@@ -66,4 +69,6 @@ private:
     bool exp_denoise_ = true;
     //导入文件对话框记住上次目录
     QString last_import_dir_;
+    //RenderDoc 已捕获数量(轮询到变化后提示文件路径)
+    unsigned int rd_capture_count_ = 0;
 };

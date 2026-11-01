@@ -1,4 +1,5 @@
 ﻿#include "predefine_header.h"
+#include "xgldebug.h"
 
 #if TEXTURE_ROTATE  
 static const GLfloat vertexVertices[] = {
@@ -65,6 +66,9 @@ bool XShaderYV12::Draw(
   );
   glEnableVertexAttribArray(1);
 
+  //RenderDoc: 把三张平面纹理上传归为一组
+  xgl::PushMarker("YUV420P 纹理上传");
+
   //Y  
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, id_y);
@@ -92,8 +96,12 @@ bool XShaderYV12::Draw(
                GL_UNSIGNED_BYTE, v);
   glUniform1i(textureUniformV, 2);
 
-  // Draw  
+  xgl::PopMarker();   //纹理上传结束
+
+  //RenderDoc: 把实际绘制单独分组, 便于看 draw call 耗时
+  xgl::PushMarker("YUV420P 绘制");
   glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+  xgl::PopMarker();
   // Show 
   return true;
 }

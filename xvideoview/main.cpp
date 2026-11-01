@@ -4,8 +4,12 @@
 #include <QSurfaceFormat>
 #include "xplayer.h"
 #include "xplayvideo.h"
+#include "xrenderdoc.h"
 
 int main(int argc, char* argv[]) {
+  // 尽早加载 RenderDoc(由 RenderDoc 启动时可直接取到 in-app API; 未安装则降级)
+  XRenderDoc::Instance().Init();
+
   // 视频着色器使用 GLSL 330 core，需请求 OpenGL 3.3+ 核心模式( macOS 最高 4.1 )
   QSurfaceFormat format;
   format.setRenderableType(QSurfaceFormat::OpenGL);

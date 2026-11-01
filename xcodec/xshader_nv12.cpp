@@ -1,4 +1,5 @@
 ﻿#include "predefine_header.h"
+#include "xgldebug.h"
 
 #if TEXTURE_ROTATE  
 static const GLfloat vertexVertices[] = {
@@ -64,6 +65,8 @@ bool XShaderNV12::Draw(
   );
   glEnableVertexAttribArray(1);
 
+  xgl::PushMarker("NV12 纹理上传");
+
   //Y  
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, id_y);
@@ -84,8 +87,11 @@ bool XShaderNV12::Draw(
                GL_UNSIGNED_BYTE, uv);
   glUniform1i(textureUniformUV, 1);
 
-  // Draw  
+  xgl::PopMarker();   //纹理上传结束
+
+  xgl::PushMarker("NV12 绘制");
   glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+  xgl::PopMarker();
   // Show 
   return true;
 }

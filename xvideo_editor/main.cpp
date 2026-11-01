@@ -2,6 +2,7 @@
 #include <QSurfaceFormat>
 #include <QStringList>
 #include "XVideoEditorWindow.h"
+#include "xrenderdoc.h"
 
 extern "C" {
 #include <libavutil/frame.h>
@@ -139,6 +140,10 @@ static int runProbe(const QStringList& args)
 
 int main(int argc, char* argv[])
 {
+    //尽早加载 RenderDoc(若由 RenderDoc 启动, 这里直接取到 in-app API;
+    //未安装时安全降级, 不影响正常播放)
+    XRenderDoc::Instance().Init();
+
     //视频着色器使用 GLSL 330 core, 需请求 OpenGL 3.3+ 核心模式(macOS最高4.1)
     QSurfaceFormat format;
     format.setRenderableType(QSurfaceFormat::OpenGL);

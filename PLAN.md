@@ -1,77 +1,50 @@
-# Implementation Plan: Pure Audio Format Export
+# RenderDoc Integration Plan for Video Frame Rate Debugging and Optimization
 
-## Context
-Currently, the project's export pipeline in `XCompositeExporter` is tightly coupled to video rendering. It requires a video encoder and an OpenGL FBO to be initialized, and the export loop is driven by video frame counts. This makes it impossible to export a project as a pure audio file (e.g., `.mp3`, `.m4a`).
+## Goal
+Integrate RenderDoc into the VideoPlayer project to analyze OpenGL rendering pipelines, identify bottlenecks in frame processing, and optimize the video frame rate.
 
-The goal is to make the video path optional in the `XCompositeExporter`, allowing it to perform only audio mixing and encoding when a pure audio format is requested.
+## Analysis
+The project uses `QOpenGLWidget` in `ShowVideoWidget.cpp` for video rendering. It implements a YUV to RGB conversion using custom GLSL shaders. To debug this with RenderDoc, we need to ensure the application can be launched and captured by the tool, and potentially add markers to the rendering loop to identify specific frames or draw calls.
 
-## Recommended Approach
+## Implementation Plan
 
-We will introduce an `audio_only` mode to the `XCompositeExporter` that bypasses all video-related initialization and processing while maintaining the audio mixing pipeline.
+### 1. Involved Files
+- No source code files require immediate modification for basic RenderDoc integration (RenderDoc is primarily an external instrumentation tool).
+- However, for advanced debugging, the following file may be modified to add debug markers:
+    - `Form/Widget/ShowVideoWidget.cpp`
 
-### 1. `XCompositeExporter` Modifications
-The exporter needs to be modified to make the video encoding path conditional.
+### 2. Execution Steps
 
-- **Configuration**: Add a `bool audio_only_` flag and a corresponding `setAudioOnly(bool on)` method.
-- **Conditional Initialization**:
-    - **FBO**: In `Start()`, skip the initialization of the off-screen Framebuffer Object (FBO) if `audio_only_` is true.
-    - **Encoders**: In `InitEncoders()`, skip the initialization of the video encoder and its parameters if `audio_only_` is true.
-    - **Muxer**: Pass `nullptr` for video parameters (`vout`, `vtb`) to `mux_->Open()` when in audio-only mode.
-- **Loop Refactoring**:
-    - Refactor `ExportThread` to avoid relying on `total_frames` (which depends on FPS) for its loop termination.
-    - Change the loop to be driven by the total duration of the timeline in milliseconds.
-    - Inside the loop:
-        - Call `CompositeAndEncodeVideo()` only if `!audio_only_`.
-        - Always call `MixAndEncodeAudio()`.
-- **Cleanup**: Ensure `video_enc_->Exit()` and `video_enc_->Wait()` are only called if the video encoder was actually initialized.
+#### Step 1: Environment Setup
+- Install RenderDoc on the development machine.
+- Verify that the build is configured as `Debug` or `RelWithDebInfo` to ensure symbols are available for better analysis.
 
-### 2. UI Integration (`XVideoEditorWindow`)
-The UI must allow the user to choose an audio-only output format.
+#### Step 2: Application Launch via RenderDoc
+- Open RenderDoc.
+- Use the "Launch Application" tab:
+    - **Executable Path**: Path to `Bin/Debug/XVideoView` (or the relevant target binary).
+    - **Working Directory**: The project root or `Bin/Debug`.
+- Launch the application.
 
-- **File Dialog**: Update `QFileDialog::getSaveFileName` in `doExport()` to include audio extensions: `"MP4 文件 (*.mp4);;音频文件 (*.mp3 *.m4a *.wav)"`.
-- **Export Flag**: In `exportWorker()`, check the file extension of the output path. If it matches an audio format, call `exporter.setAudioOnly(true)`.
+#### Step 3: Capture Frame Data
+- Once the video playback starts in `XVideoView`, use the RenderDoc overlay (default `F12` or `PrintScreen`) or the "Capture Frame" button in the UI to trigger a capture.
+- Specifically capture frames during high-load scenarios to analyze frame rate drops.
 
----
+#### Step 4: (Optional) Adding OpenGL Debug Markers
+- If the rendering pipeline becomes complex, modify `Form/Widget/ShowVideoWidget.cpp` to include `glPushDebugGroup` and `glPopDebugGroup` (or the RenderDoc specific API) around the YUV texture upload and `glDrawArrays` calls.
+- This will group related calls in the RenderDoc event browser.
 
-## Implementation Steps
+#### Step 5: Performance Analysis
+- Use the **Event Browser** to check for redundant state changes.
+- Use the **Texture Viewer** to verify that Y, U, and V textures are being uploaded correctly and not causing excessive bandwidth usage.
+- Analyze the **Pipeline State** to ensure no unnecessary blending or depth tests are enabled during video rendering.
 
-### Step 1: Update `XCompositeExporter` Header
-- **Action**: Add `bool audio_only_ = false;` and `void setAudioOnly(bool on);` to `xcodec/xcomposite_exporter.h`.
-- **Verification**: Project compiles.
+### 3. Verification Methods
 
-### Step 2: Modify `XCompositeExporter` Implementation
-- **Action**: Update `xcodec/xcomposite_exporter.cpp`:
-    - Wrap FBO initialization in `Start()` with `if (!audio_only_)`.
-    - Wrap video encoder setup in `InitEncoders()` with `if (!audio_only_)`.
-    - Update `mux_->Open()` call to pass `nullptr` for video parameters if `audio_only_` is true.
-    - Refactor the `ExportThread` loop to be time-driven (0 to `total_duration_ms`) rather than frame-driven.
-- **Verification**: Verify that `XCompositeExporter` can be initialized with `setAudioOnly(true)` without attempting to create a video encoder or FBO.
-
-### Step 3: Update Export UI
-- **Action**: Modify `xvideo_editor/XVideoEditorWindow.cpp`:
-    - Update the save dialog filter to include `.mp3`, `.m4a`, and `.wav`.
-    - In `exportWorker`, detect the extension and set the `audio_only` flag on the exporter.
-- **Verification**: Launch the app, click "Export", and verify that `.m4a` or `.mp3` can be selected as the output extension.
-
----
-
-## Verification Plan
-
-### 1. Pure Audio Export Test
-- **Action**: Create a timeline with mixed audio/video clips and export as `.m4a`.
-- **Expected Result**: 
-    - The export completes successfully.
-    - The resulting `.m4a` file is playable and contains the correctly mixed audio from all tracks.
-    - Console logs confirm that no video encoder was initialized.
-
-### 2. Video Export Regression Test
-- **Action**: Export a timeline as `.mp4`.
-- **Expected Result**: 
-    - Video and audio are both present.
-    - Playback is synchronized and the quality is consistent with previous versions.
-
-### 3. Edge Case Testing
-- **Action**: Export a project containing only audio clips as an audio file.
-- **Expected Result**: Successful export with no "missing video" errors.
-- **Action**: Attempt to export a video-heavy project as a pure audio file.
-- **Expected Result**: The system ignores the video layers and exports only the mixed audio.
+| Step | Verification Method | Expected Result |
+| :--- | :--- | :--- |
+| Launch | RenderDoc "Launch Application" | Application starts normally and is listed as "captured" in RenderDoc. |
+| Capture | Trigger capture during playback | A `.rdc` capture file is generated containing the OpenGL command stream. |
+| Analysis | Inspect Event Browser | All `glTexImage2D` and `glDrawArrays` calls are visible and correctly sequenced. |
+| Markers | Check Event Browser groups | Rendered blocks are logically grouped by the markers added in Step 4. |
+| Optimization | Compare frame times | After applying optimizations based on RenderDoc findings, the GPU time per frame should decrease. |

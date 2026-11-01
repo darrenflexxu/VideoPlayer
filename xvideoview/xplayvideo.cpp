@@ -1,10 +1,16 @@
 #include "xplayvideo.h"
 #include "x_qt_opengl_widget.h"
+#include "xrenderdoc.h"
 #include <QCheckBox>
 #include <QDebug>
 #include <QKeyEvent>
 #include <QLayout>
 #include <QSplitter>
+#include <QShortcut>
+#include <QKeySequence>
+#include <QCoreApplication>
+#include <QToolTip>
+#include <QCursor>
 
 #ifndef WIN32
 #include <SDL.h>
@@ -221,6 +227,24 @@ XPlayVideo::XPlayVideo(QWidget* parent) : QWidget(parent) {
   hide_timer_->setSingleShot(true);
   hide_timer_->setInterval(3000);
   connect(hide_timer_, &QTimer::timeout, this, &XPlayVideo::HideControls);
+
+  //RenderDoc: Ctrl+F12 请求捕获下一帧(避开 RenderDoc 自带的 F12 全局热键)
+  auto* rd_shortcut = new QShortcut(QKeySequence("Ctrl+F12"), this);
+  connect(rd_shortcut, &QShortcut::activated, this, [this]() {
+    XRenderDoc& rd = XRenderDoc::Instance();
+    if (!rd.Available() && !rd.Init()) {
+      QToolTip::showText(QCursor::pos(),
+                         "未检测到 RenderDoc: 用 RenderDoc 启动本程序, "
+                         "或设置环境变量 RENDERDOC_LIB", this);
+      return;
+    }
+    const QString dir =
+        QCoreApplication::applicationDirPath() + "/rdoc_captures";
+    rd.SetCaptureDir(dir.toStdString(), "viewer");
+    rd.TriggerCapture();
+    QToolTip::showText(QCursor::pos(),
+                       QString("已请求捕获下一帧:\n%1").arg(dir), this);
+  });
 }
 
 XPlayVideo::~XPlayVideo() {

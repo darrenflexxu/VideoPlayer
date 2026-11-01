@@ -1,5 +1,6 @@
 #include "predefine_header.h"
 #include "xshader_rgba.h"
+#include "xgldebug.h"
 
 #include <vector>
 
@@ -70,6 +71,7 @@ bool XShaderRGBA::Draw(const unsigned char* rgba, int pitch, int w, int h, float
 
   // 上传 RGBA 纹理(行宽按 pitch, 兼容带对齐填充)
   // 注意: GL_UNPACK_ROW_LENGTH 以"像素"为单位(RGBA=4字节/像素), 这里换算字节行距
+  xgl::PushMarker("RGBA 纹理上传");
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, textureRGBA);
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
@@ -78,9 +80,12 @@ bool XShaderRGBA::Draw(const unsigned char* rgba, int pitch, int w, int h, float
                GL_UNSIGNED_BYTE, rgba);
   glUniform1i(textureUniform, 0);
   glUniform1f(alphaUniform, alpha > 1.0f ? 1.0f : alpha);
+  xgl::PopMarker();   //纹理上传结束
 
   // alpha 混合在 EnableBlend 中由合成器统一控制, 此处只画
+  xgl::PushMarker("RGBA 绘制");
   glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+  xgl::PopMarker();
   return true;
 }
 

@@ -3,6 +3,7 @@
 #include "xdemux_task.h"
 #include "xconvertor.h"
 #include "xcomposite_exporter.h"
+#include "xrenderdoc.h"
 #include "xexport_model.h"
 #include "xtools.h"
 #include <QSplitter>
@@ -22,10 +23,13 @@
 #include <QComboBox>
 #include <QCheckBox>
 #include <QDialogButtonBox>
+#include <QShortcut>
+#include <QKeySequence>
+#include <QToolTip>
+#include <QCoreApplication>
 #include <QTimerEvent>
 #include <QPainter>
 #include <QFont>
-#include <QFileInfo>
 #include <algorithm>
 #include <thread>
 
@@ -126,6 +130,7 @@ XVideoEditorWindow::XVideoEditorWindow(QWidget* parent)
     zoom_in_btn_ = new QPushButton("放大", this);
     zoom_out_btn_ = new QPushButton("缩小", this);
     export_btn_ = new QPushButton("导出", this);
+    renderdoc_btn_ = new QPushButton("GPU 捕获", this);
     status_ = new QLabel("00:00 / 00:00", this);
     status_->setMinimumWidth(180);
     bar->addWidget(play_btn_);
@@ -133,6 +138,7 @@ XVideoEditorWindow::XVideoEditorWindow(QWidget* parent)
     bar->addWidget(zoom_in_btn_);
     bar->addWidget(zoom_out_btn_);
     bar->addWidget(export_btn_);
+    bar->addWidget(renderdoc_btn_);
     bar->addSpacing(16);
     bar->addWidget(new QLabel("音量", this));
     volume_slider_ = new QSlider(Qt::Horizontal, this);
@@ -174,11 +180,28 @@ XVideoEditorWindow::XVideoEditorWindow(QWidget* parent)
             });
     connect(export_btn_, &QPushButton::clicked, this,
             &XVideoEditorWindow::doExport);
+    connect(renderdoc_btn_, &QPushButton::clicked, this,
+            &XVideoEditorWindow::onRenderDocCapture);
+    //Ctrl+F12 与应用内按钮等价; 避开 RenderDoc 自带的 F12 全局热键
+    auto* rd_shortcut = new QShortcut(QKeySequence("Ctrl+F12"), this);
+    connect(rd_shortcut, &QShortcut::activated, this,
+            &XVideoEditorWindow::onRenderDocCapture);
     //音量: 0~100 -> 0.0~1.0, 作用于基片与所有叠加层
     connect(volume_slider_, &QSlider::valueChanged, this,
             [this](int v) { player_.set_volume(v / 100.0f); });
 
     resize(960, 640);
+    //RenderDoc 可用性提示(由 main 提前 Init)
+    {
+        XRenderDoc& rd = XRenderDoc::Instance();
+        renderdoc_btn_->setToolTip(
+            rd.Available()
+                ? QString("RenderDoc %1: 捕获下一帧(Ctrl+F12)")
+                      .arg(QString::fromStdString(rd.Version()))
+                : QString("未检测到 RenderDoc。用 RenderDoc 启动本程序, "
+                          "或设置环境变量 RENDERDOC_LIB(Ctrl+F12)"));
+        rd_capture_count_ = rd.Available() ? rd.CaptureCount() : 0;
+    }
     startTimer(33);            //UI 刷新: 播放头/状态/导出
     frame_timer_ = startTimer(8);  //高频拉帧: 平滑节拍(空闲时开销极小)
 }
@@ -265,6 +288,33 @@ void XVideoEditorWindow::onAddClicked()
               });
     last_import_dir_ = QFileInfo(files.front()).absolutePath();
     importFiles(files);
+}
+
+void XVideoEditorWindow::onRenderDocCapture()
+{
+    XRenderDoc& rd = XRenderDoc::Instance();
+    if (!rd.Available() && !rd.Init()) {
+        QMessageBox::information(this, "RenderDoc",
+            "未检测到 RenderDoc 运行库。\n\n"
+            "推荐: 用 RenderDoc 的 Launch Application 启动本程序"
+            "(可执行文件 Bin/XVideoEditor, Windows 为 Bin\\XVideoEditor.exe)。\n\n"
+            "也可设置环境变量 RENDERDOC_LIB 指向 renderdoc.dll / librenderdoc.dylib。\n\n"
+            + QString::fromStdString(rd.LastError()));
+        return;
+    }
+
+    //捕获文件统一放到可执行文件旁的 rdoc_captures/
+    const QString dir = QCoreApplication::applicationDirPath() + "/rdoc_captures";
+    QDir().mkpath(dir);
+    rd.SetCaptureDir(dir.toStdString(), "editor");
+    rd_capture_count_ = rd.CaptureCount();
+    if (!rd.TriggerCapture()) {
+        QMessageBox::warning(this, "RenderDoc", "捕获请求失败。");
+        return;
+    }
+    QToolTip::showText(
+        renderdoc_btn_->mapToGlobal(QPoint(0, renderdoc_btn_->height())),
+        QString("已请求捕获下一帧, 输出目录:\n%1").arg(dir), renderdoc_btn_);
 }
 
 void XVideoEditorWindow::togglePlay()
@@ -535,6 +585,23 @@ void XVideoEditorWindow::timerEvent(QTimerEvent* ev)
     }
     timeline_->setPlayheadMs(player_.pos_ms());
     updateLabels();
+    //RenderDoc: 捕获落盘后(数量变化)用气泡提示实际文件路径
+    {
+        XRenderDoc& rd = XRenderDoc::Instance();
+        if (rd.Available()) {
+            const unsigned int n = rd.CaptureCount();
+            if (n != rd_capture_count_) {
+                rd_capture_count_ = n;
+                const std::string path = rd.LastCapturePath();
+                QToolTip::showText(
+                    renderdoc_btn_->mapToGlobal(QPoint(0, renderdoc_btn_->height())),
+                    path.empty()
+                        ? QString("GPU 捕获完成")
+                        : QString("GPU 捕获完成:\n%1").arg(QString::fromStdString(path)),
+                    renderdoc_btn_);
+            }
+        }
+    }
     //预览画面叠加播放时间水印(播放/拖动时实时更新)
     if (time_overlay_) {
         QString t = msToText(player_.pos_ms()) + " / " + msToText(player_.total_ms());
